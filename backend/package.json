@@ -1,0 +1,23 @@
+{
+	"name": "personal-assistant-backend",
+	"version": "1.0.0",
+	"description": "Backend engine for Personal Assistant",
+	"main": "src/server.js",
+	"type": "module",
+	"scripts": {
+		"start": "node src/server.js",
+		"dev": "node --watch src/server.js",
+		"build": "node esbuild.config.js"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.29.0",
+		"axios": "^1.18.1",
+		"dotenv": "^16.4.5",
+		"express": "^4.19.2",
+		"winston": "^3.13.0",
+		"ws": "^8.17.0"
+	},
+	"devDependencies": {
+		"esbuild": "^0.28.1"
+	}
+}
