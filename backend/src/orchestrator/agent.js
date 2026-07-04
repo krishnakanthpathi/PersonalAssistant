@@ -1,19 +1,22 @@
 import axios from 'axios';
-
 import { registry } from './registry.js';
 import { env } from '../config/env.js';
 import { catchErrors } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
 export class Agent {
 	run = catchErrors(async (prompt) => {
 		// 1. Prepare message history
 		const messages = [
+			{
+				role: 'system',
+				content: 'You are a local computer personal assistant. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.'
+			},
 			{ role: 'user', content: prompt }
 		];
 
 		// 2. Fetch tool definitions
 		const tools = await registry.getOllamaTools();
-
 
 		// 3. First call to Ollama including the tools list
 		const response = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
@@ -25,8 +28,33 @@ export class Agent {
 
 		let message = response.data.message;
 
-		// 4. Check if Ollama requested any tool execution
-		if (message.tool_calls && message.tool_calls.length > 0) {
+		// Helper to extract XML tool calls if native tool_calls is empty
+		const parseXmlToolCalls = (msg) => {
+			if ((!msg.tool_calls || msg.tool_calls.length === 0) && msg.content && msg.content.includes('<tool_call>')) {
+				msg.tool_calls = [];
+				const regex = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+				let match;
+				while ((match = regex.exec(msg.content)) !== null) {
+					try {
+						const toolJson = JSON.parse(match[1].trim());
+						msg.tool_calls.push({
+							function: {
+								name: toolJson.name,
+								arguments: toolJson.arguments
+							}
+						});
+					} catch (e) {
+						logger.error(`Failed to parse XML tool call: ${match[1]}`, e);
+					}
+				}
+			}
+		};
+
+		// Parse XML tool calls in the initial response
+		parseXmlToolCalls(message);
+
+		// Keep executing tool calls as long as the model requests them (Reasoning Loop)
+		while (message.tool_calls && message.tool_calls.length > 0) {
 			// Add assistant message containing the tool calls to history
 			messages.push(message);
 
@@ -35,7 +63,7 @@ export class Agent {
 				const toolArgs = call.function.arguments;
 
 				try {
-					// Execute the tool (e.g. volume_set)
+					// Execute the tool (local or MCP)
 					const toolResult = await registry.callTool(toolName, toolArgs);
 
 					// Append tool execution response to message history
@@ -53,13 +81,16 @@ export class Agent {
 				}
 			}
 
-			// 5. Call Ollama one more time with the tool results so it can output the final answer
-			const secondResponse = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
+			// Call Ollama again with the tool results to get the next step
+			const nextResponse = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
 				model: env.OLLAMA_MODEL,
 				messages: messages,
 				stream: false
 			});
-			message = secondResponse.data.message;
+			message = nextResponse.data.message;
+
+			// Parse XML tool calls in the subsequent response
+			parseXmlToolCalls(message);
 		}
 
 		return message.content;

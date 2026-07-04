@@ -9,9 +9,16 @@ export function catchErrors(fn, errorPrefix = '') {
 		try {
 			const result = await fn(...args);
 			// Log success message (use the return value if it is a string, otherwise fallback to a generic message)
-			const successMessage = typeof result === 'string' 
-				? result 
-				: (errorPrefix ? `${errorPrefix} succeeded` : 'Operation succeeded');
+			let successMessage = 'Operation succeeded';
+			if (typeof result === 'string') {
+				successMessage = result;
+			} else if (errorPrefix) {
+				// Strip off "Failed to" or "failed" prefixes to construct a clean success message
+				const cleanAction = errorPrefix
+					.replace(/^Failed to\s+/i, '')
+					.replace(/\s+failed$/i, '');
+				successMessage = `${cleanAction.charAt(0).toUpperCase() + cleanAction.slice(1)} succeeded`;
+			}
 			logger.info(successMessage);
 			return result;
 		} catch (error) {
