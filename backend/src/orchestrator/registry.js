@@ -4,6 +4,7 @@
 
 import { volumeSetTool } from '../tools/mac/volumeSet.js';
 import { mcpManager } from '../mcp/mcpManager.js';
+import { env } from '../config/env.js';
 
 class ToolRegistry {
 	constructor() {
@@ -52,6 +53,7 @@ class ToolRegistry {
 		const mcpTools = await mcpManager.getTools();
 		const mcpTool = mcpTools.find(t => t.name === name);
 		if (mcpTool) {
+
 			const result = await mcpManager.callTool(mcpTool.serverName, name, args);
 			// Extract and return text content from standard MCP payload format
 			if (result && result.content && result.content.length > 0) {

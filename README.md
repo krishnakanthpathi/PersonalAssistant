@@ -20,7 +20,6 @@ An agentic, multi-turn personal assistant backend built with Node.js, Express, O
 * [ ] **SQLite MCP** — Query and store structured personal data in a local SQLite file.
 * [ ] **Google Workspace MCP** — Integrate Google Calendar and Gmail to manage schedules and draft emails.
 * [ ] **Todoist MCP** — Create, list, and organize tasks and inbox items.
-* [ ] **Notion MCP** — Connect to database tables for notes and tracking.
 * [ ] **Spotify MCP** — Search and control playbacks of music.
 * [ ] **Home Assistant MCP** — Toggle smart lights and check local home sensor metrics.
 

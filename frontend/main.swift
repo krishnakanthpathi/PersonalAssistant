@@ -1,6 +1,6 @@
 import SwiftUI
 import AppKit
-import AVFoundation
+@preconcurrency import AVFoundation
 import Combine
 
 // MARK: - Models & Enums
@@ -147,55 +147,117 @@ struct VisualEffectView: NSViewRepresentable {
 // MARK: - Speech Manager (TTS)
 
 @MainActor
-class SpeechManager: NSObject, AVSpeechSynthesizerDelegate, ObservableObject {
-    let synthesizer = AVSpeechSynthesizer()
+class SpeechManager: NSObject, AVAudioPlayerDelegate, ObservableObject {
     @Published var isSpeaking = false
+    @Published var audioLevel: CGFloat = 0.0
     var onSpeakingStateChanged: ((Bool) -> Void)?
     
-    override init() {
-        super.init()
-        synthesizer.delegate = self
-    }
+    private var audioPlayer: AVAudioPlayer?
+    private var downloadTask: Task<Void, Never>?
+    private var levelTimer: Timer?
     
     func speak(_ text: String) {
-        // Stop any current speech
         stop()
         
-        let utterance = AVSpeechUtterance(string: text)
-        // Try to find a high-quality Siri voice, otherwise fallback to default
-        if let siriVoice = AVSpeechSynthesisVoice(language: "en-US") {
-            utterance.voice = siriVoice
+        // Fetch audio asynchronously from the Kokoro TTS service
+        downloadTask = Task {
+            var urlComponents = URLComponents(string: "http://100.105.203.102:8998/tts")!
+            urlComponents.queryItems = [
+                URLQueryItem(name: "api_key", value: "kokoro_sk_efb4338eb47b6d5b3d3886d1dbab4aa7"),
+                URLQueryItem(name: "text", value: text)
+            ]
+            
+            guard let url = urlComponents.url else { return }
+            
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                
+                if !Task.isCancelled {
+                    self.playAudio(data: data)
+                }
+            } catch {
+                print("Error fetching Kokoro TTS: \(error.localizedDescription)")
+            }
         }
-        utterance.rate = 0.52 // Balanced reading speed
-        utterance.pitchMultiplier = 1.0
-        utterance.volume = 1.0
-        
-        synthesizer.speak(utterance)
+    }
+    
+    private func playAudio(data: Data) {
+        do {
+            audioPlayer = try AVAudioPlayer(data: data)
+            audioPlayer?.delegate = self
+            audioPlayer?.isMeteringEnabled = true
+            audioPlayer?.prepareToPlay()
+            if audioPlayer?.play() == true {
+                self.isSpeaking = true
+                self.onSpeakingStateChanged?(true)
+                
+                // Monitor audio levels at 30 FPS
+                levelTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
+                    guard let self = self else { return }
+                    Task { @MainActor in
+                        guard let player = self.audioPlayer, player.isPlaying else { return }
+                        player.updateMeters()
+                        let power = player.averagePower(forChannel: 0)
+                        
+                        // Map power from -60..0 dB to 0.0..1.0 range
+                        let level: CGFloat
+                        if power < -60 {
+                            level = 0.0
+                        } else if power >= 0 {
+                            level = 1.0
+                        } else {
+                            level = CGFloat((power + 60) / 60)
+                        }
+                        
+                        withAnimation(.linear(duration: 0.03)) {
+                            self.audioLevel = level
+                        }
+                    }
+                }
+            }
+        } catch {
+            print("Error playing audio: \(error.localizedDescription)")
+        }
     }
     
     func stop() {
-        synthesizer.stopSpeaking(at: .immediate)
-    }
-    
-    // Delegate methods
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
-        DispatchQueue.main.async {
-            self.isSpeaking = true
-            self.onSpeakingStateChanged?(true)
+        downloadTask?.cancel()
+        downloadTask = nil
+        
+        levelTimer?.invalidate()
+        levelTimer = nil
+        audioLevel = 0.0
+        
+        audioPlayer?.stop()
+        audioPlayer = nil
+        
+        if isSpeaking {
+            isSpeaking = false
+            onSpeakingStateChanged?(false)
         }
     }
     
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    // MARK: - AVAudioPlayerDelegate
+    
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         DispatchQueue.main.async {
             self.isSpeaking = false
             self.onSpeakingStateChanged?(false)
+            self.audioPlayer = nil
+            self.levelTimer?.invalidate()
+            self.levelTimer = nil
+            self.audioLevel = 0.0
         }
     }
     
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         DispatchQueue.main.async {
             self.isSpeaking = false
             self.onSpeakingStateChanged?(false)
+            self.audioPlayer = nil
+            self.levelTimer?.invalidate()
+            self.levelTimer = nil
+            self.audioLevel = 0.0
         }
     }
 }
@@ -212,6 +274,9 @@ struct MainView: View {
     ]
     @State private var isSpeechEnabled = true
     @StateObject private var speechManager = SpeechManager()
+    
+    @State private var dragStartMouseLocation: NSPoint = .zero
+    @State private var dragStartWindowOrigin: NSPoint = .zero
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -256,9 +321,33 @@ struct MainView: View {
                         }
                     }
                 }) {
-                    SiriOrbView(state: currentState)
+                    SiriOrbView(state: currentState, audioLevel: speechManager.audioLevel)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .gesture(
+                    DragGesture(minimumDistance: 5)
+                        .onChanged { value in
+                            if let window = AppDelegate.shared.window {
+                                let currentMouse = NSEvent.mouseLocation
+                                if dragStartMouseLocation == .zero {
+                                    dragStartMouseLocation = currentMouse
+                                    dragStartWindowOrigin = window.frame.origin
+                                } else {
+                                    let dx = currentMouse.x - dragStartMouseLocation.x
+                                    let dy = currentMouse.y - dragStartMouseLocation.y
+                                    let newOrigin = NSPoint(
+                                        x: dragStartWindowOrigin.x + dx,
+                                        y: dragStartWindowOrigin.y + dy
+                                    )
+                                    window.setFrameOrigin(newOrigin)
+                                }
+                            }
+                        }
+                        .onEnded { _ in
+                            dragStartMouseLocation = .zero
+                            dragStartWindowOrigin = .zero
+                        }
+                )
                 
                 if appState.isChatOpen {
                     // Current Status indicator text next to the orb
@@ -378,6 +467,7 @@ struct MainView: View {
 
 struct SiriOrbView: View {
     let state: AssistantState
+    let audioLevel: CGFloat
     
     @State private var rotateAngle: Double = 0
     @State private var offset1 = CGSize.zero
@@ -385,71 +475,166 @@ struct SiriOrbView: View {
     @State private var offset3 = CGSize.zero
     @State private var offset4 = CGSize.zero
     
+    private func dynamicOffset(_ baseOffset: CGSize, index: Int) -> CGSize {
+        if state == .speaking {
+            let multiplier = 1.0 + audioLevel * 1.6
+            let angle = Double(index) * Double.pi / 2.0
+            let dx = cos(angle) * Double(audioLevel) * 16.0
+            let dy = sin(angle) * Double(audioLevel) * 16.0
+            return CGSize(width: baseOffset.width * multiplier + dx, height: baseOffset.height * multiplier + dy)
+        }
+        return baseOffset
+    }
+    
     var body: some View {
         ZStack {
-            // Ripple Background effects for listening/speaking states
+            // Dynamic, thin, sharp neon rings extending outside the orb
             if state == .listening || state == .speaking {
+                // Ring 1 (Thin, sharp, neon cyan)
                 Circle()
-                    .stroke(LinearGradient(colors: [Color.pink.opacity(0.3), Color.blue.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2)
-                    .scaleEffect(state == .listening ? 1.5 : 1.3)
-                    .opacity(0.0)
-                    .animateRipple(duration: state == .listening ? 1.2 : 1.8)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.cyan.opacity(0.6), Color.blue.opacity(0.1), Color.purple.opacity(0.4)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.0
+                    )
+                    .scaleEffect(1.0 + (state == .listening ? 0.4 : audioLevel * 0.7))
+                    .opacity(state == .listening ? 0.35 : Double(0.2 + audioLevel * 0.6))
+                    .rotationEffect(.degrees(-rotateAngle * 1.5))
                 
+                // Ring 2 (Thin, sharp, neon pink)
                 Circle()
-                    .stroke(LinearGradient(colors: [Color.purple.opacity(0.2), Color.cyan.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)
-                    .scaleEffect(state == .listening ? 1.8 : 1.5)
-                    .opacity(0.0)
-                    .animateRipple(duration: state == .listening ? 1.5 : 2.2, delay: 0.4)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.pink.opacity(0.55), Color.clear, Color.cyan.opacity(0.35)],
+                            startPoint: .bottomLeading,
+                            endPoint: .topTrailing
+                        ),
+                        lineWidth: 0.8
+                    )
+                    .scaleEffect(1.0 + (state == .listening ? 0.75 : audioLevel * 1.1))
+                    .opacity(state == .listening ? 0.25 : Double(0.15 + audioLevel * 0.5))
+                    .rotationEffect(.degrees(rotateAngle * 2.0))
+
+                // Ring 3 (Outer fading orbit)
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.35), Color.pink.opacity(0.15)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 0.5
+                    )
+                    .scaleEffect(1.0 + (state == .listening ? 1.1 : audioLevel * 1.5))
+                    .opacity(state == .listening ? 0.2 : Double(0.08 + audioLevel * 0.4))
+                    .rotationEffect(.degrees(-rotateAngle * 0.8))
             }
             
-            // Primary Glowing Orb Blur
+            // 3D Glass Sphere Container
             ZStack {
-                // Blob 1: Pink/Magenta
+                // 1. Solid dark background for volume
                 Circle()
-                    .fill(Color(red: 1.0, green: 0.1, blue: 0.6))
-                    .frame(width: 42, height: 42)
-                    .offset(offset1)
-                    
-                // Blob 2: Cyan/Blue
+                    .fill(Color.black.opacity(0.85))
+                
+                // 2. Base Radial 3D Sphere Shading
                 Circle()
-                    .fill(Color(red: 0.0, green: 0.8, blue: 1.0))
-                    .frame(width: 44, height: 44)
-                    .offset(offset2)
-                    
-                // Blob 3: Royal Blue
+                    .fill(RadialGradient(
+                        gradient: Gradient(colors: [Color.white.opacity(0.15), Color.black.opacity(0.95)]),
+                        center: .init(x: 0.35, y: 0.35),
+                        startRadius: 0,
+                        endRadius: 40
+                    ))
+                    .blendMode(.multiply)
+                
+                // 3. Colorful Glowing Blurred Blobs
+                ZStack {
+                    // Blob 1: Pink/Magenta
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.1, blue: 0.6))
+                        .frame(width: 46 + audioLevel * 14, height: 46 + audioLevel * 14)
+                        .offset(dynamicOffset(offset1, index: 1))
+                        
+                    // Blob 2: Cyan/Blue
+                    Circle()
+                        .fill(Color(red: 0.0, green: 0.8, blue: 1.0))
+                        .frame(width: 48 + audioLevel * 12, height: 48 + audioLevel * 12)
+                        .offset(dynamicOffset(offset2, index: 2))
+                        
+                    // Blob 3: Royal Blue
+                    Circle()
+                        .fill(Color(red: 0.1, green: 0.3, blue: 1.0))
+                        .frame(width: 44 + audioLevel * 16, height: 44 + audioLevel * 16)
+                        .offset(dynamicOffset(offset3, index: 3))
+                        
+                    // Blob 4: Bright Purple
+                    Circle()
+                        .fill(Color(red: 0.6, green: 0.1, blue: 1.0))
+                        .frame(width: 42 + audioLevel * 14, height: 42 + audioLevel * 14)
+                        .offset(dynamicOffset(offset4, index: 4))
+                }
+                .blendMode(.screen)
+                .filterBlur(radius: 20)
+                .rotationEffect(.degrees(rotateAngle))
+                
+                // 4. Concentric optical diffraction rings (internal texture)
                 Circle()
-                    .fill(Color(red: 0.1, green: 0.3, blue: 1.0))
-                    .frame(width: 40, height: 40)
-                    .offset(offset3)
-                    
-                // Blob 4: Bright Purple
+                    .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    .padding(4)
                 Circle()
-                    .fill(Color(red: 0.6, green: 0.1, blue: 1.0))
-                    .frame(width: 38, height: 38)
-                    .offset(offset4)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                    .padding(10)
+                Circle()
+                    .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
+                    .padding(18)
+                
+                // 5. Glossy Highlight Overlay to simulate 3D light reflection
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [.white.opacity(0.38 + Double(audioLevel) * 0.15), .clear]),
+                            center: .init(x: 0.3, y: 0.3), // Top-left light source
+                            startRadius: 0,
+                            endRadius: 28 + audioLevel * 10
+                        )
+                    )
+                    .blendMode(.plusLighter)
+                
+                // 6. Secondary bottom reflection for glass thickness look (bounce light)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [Color.cyan.opacity(0.25 + Double(audioLevel) * 0.2), .clear]),
+                            center: .init(x: 0.7, y: 0.7), // Bottom-right bounce light
+                            startRadius: 0,
+                            endRadius: 25
+                        )
+                    )
+                    .blendMode(.plusLighter)
+                
+                // 7. Translucent Glass Outer Rim Border
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white.opacity(0.6), .clear, .white.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.2
+                    )
+                    .blendMode(.overlay)
             }
-            .blendMode(.screen)
-            .filterBlur(radius: 12)
-            .rotationEffect(.degrees(rotateAngle))
+            .clipShape(Circle()) // Clip content to clean circular boundary
             .scaleEffect(scaleFactor)
             .animation(.spring(response: 0.5, dampingFraction: 0.6), value: state)
-            
-            // Core Highlight (a bright central sphere to add depth)
-            Circle()
-                .fill(RadialGradient(
-                    gradient: Gradient(colors: [.white.opacity(0.8), .clear]),
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: 20
-                ))
-                .frame(width: 45, height: 45)
-                .blendMode(.plusLighter)
         }
         .frame(width: 70, height: 70)
         .background(
             Circle()
-                .fill(Color.black.opacity(0.45))
-                .shadow(color: shadowColor.opacity(0.4), radius: 8, x: 0, y: 4)
+                .fill(Color.black.opacity(0.1))
+                .shadow(color: shadowColor.opacity(0.5 + Double(audioLevel) * 0.3), radius: 12 + audioLevel * 12, x: 0, y: 6)
         )
         .onAppear {
             startLoopingAnimations()
@@ -458,16 +643,17 @@ struct SiriOrbView: View {
     
     // Scale factor depending on Assistant State
     private var scaleFactor: CGFloat {
+        let base: CGFloat
         switch state {
-        case .idle:
-            return 1.0
-        case .listening:
-            return 1.25
-        case .thinking:
-            return 1.12
-        case .speaking:
-            return 1.18
+        case .idle: base = 1.0
+        case .listening: base = 1.25
+        case .thinking: base = 1.12
+        case .speaking: base = 1.18
         }
+        if state == .speaking {
+            return base + audioLevel * 0.35
+        }
+        return base
     }
     
     // Color of the shadow based on current state

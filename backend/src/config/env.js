@@ -10,5 +10,7 @@ export const env = {
 	LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 	OLLAMA_URL: process.env.OLLAMA_URL || 'http://localhost:11434',
 	OLLAMA_MODEL: process.env.OLLAMA_MODEL || 'llama3.1',
+	NOTION_TOKEN: process.env.NOTION_TOKEN,
+	NOTION_PARENT_PAGE_ID: process.env.NOTION_PARENT_PAGE_ID,
 };
 

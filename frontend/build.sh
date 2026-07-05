@@ -42,6 +42,11 @@ cat <<EOF > "${CONTENTS_DIR}/Info.plist"
     <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
 </dict>
 </plist>
 EOF

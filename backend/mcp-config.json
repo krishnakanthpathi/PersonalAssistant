@@ -7,6 +7,13 @@
 				"@modelcontextprotocol/server-filesystem",
 				"/Users/krishnakanth/Projects/PersonalAssisstent"
 			]
+		},
+		"notion": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@notionhq/notion-mcp-server"
+			]
 		}
 	}
 }

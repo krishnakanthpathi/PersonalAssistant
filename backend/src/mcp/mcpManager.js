@@ -31,7 +31,13 @@ export class MCPManager {
 			this.servers.set('filesystem', fsClient);
 		}
 
-		// (Future clients like Brave Search or GitHub can be loaded here)
+		// 2. Initialize Notion Client if configured
+		if (config.mcpServers.notion) {
+			const { NotionClient } = await import('./clients/notion.js');
+			const notionClient = new NotionClient(config.mcpServers.notion);
+			await notionClient.connect();
+			this.servers.set('notion', notionClient);
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**

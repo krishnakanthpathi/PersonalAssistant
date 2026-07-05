@@ -10,7 +10,8 @@ export class Agent {
 		const messages = [
 			{
 				role: 'system',
-				content: 'You are a local computer personal assistant. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.'
+				content: `You are a local computer personal assistant. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
+For Notion operations: the default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID when creating new pages or retrieving notes unless specified otherwise.`
 			},
 			{ role: 'user', content: prompt }
 		];
@@ -23,7 +24,10 @@ export class Agent {
 			model: env.OLLAMA_MODEL,
 			messages: messages,
 			tools: tools,
-			stream: false
+			stream: false,
+			options: {
+				num_ctx: 16384
+			}
 		});
 
 		let message = response.data.message;
@@ -62,7 +66,7 @@ export class Agent {
 			for (const call of message.tool_calls) {
 				const toolName = call.function.name;
 				const toolArgs = call.function.arguments;
-				
+
 				logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
 
 				try {
@@ -113,7 +117,10 @@ export class Agent {
 			const nextResponse = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
 				model: env.OLLAMA_MODEL,
 				messages: messages,
-				stream: false
+				stream: false,
+				options: {
+					num_ctx: 16384
+				}
 			});
 			message = nextResponse.data.message;
 
