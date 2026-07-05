@@ -413,24 +413,35 @@ struct MainView: View {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: payload)
             
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                 throw NSError(domain: "Server Error", code: 500, userInfo: nil)
             }
             
             var reply = ""
-            if let decoded = try? JSONDecoder().decode(String.self, from: data) {
-                reply = decoded
-            } else if let raw = String(data: data, encoding: .utf8) {
-                // Sometimes backend might send un-escaped JSON string, fallback to reading raw UTF8
-                reply = raw
-                // Strip leading/trailing quotes if it's a simple JSON string response
-                if reply.hasPrefix("\"") && reply.hasSuffix("\"") && reply.count >= 2 {
-                    reply = String(reply.dropFirst().dropLast())
+            
+            struct SSEMessage: Codable {
+                let type: String
+                let content: String
+            }
+            
+            for try await line in bytes.lines {
+                guard line.hasPrefix("data: ") else { continue }
+                let rawJson = String(line.dropFirst(6)) // strip "data: "
+                
+                if let data = rawJson.data(using: .utf8),
+                   let sseMsg = try? JSONDecoder().decode(SSEMessage.self, from: data) {
+                    await MainActor.run {
+                        if sseMsg.type == "status" {
+                            self.statusMessage = sseMsg.content
+                        } else if sseMsg.type == "result" {
+                            reply = sseMsg.content
+                        } else if sseMsg.type == "error" {
+                            reply = "Error: \(sseMsg.content)"
+                        }
+                    }
                 }
-            } else {
-                reply = "Error parsing response data."
             }
             
             // Clean up backslash escapes from JSON serialization if they slipped through
@@ -438,13 +449,14 @@ struct MainView: View {
                 .replacingOccurrences(of: "\\n", with: "\n")
                 .replacingOccurrences(of: "\\\"", with: "\"")
             
+            let finalReply = reply
             await MainActor.run {
-                self.chatHistory.append(ChatMessage(sender: .assistant, text: reply))
+                self.chatHistory.append(ChatMessage(sender: .assistant, text: finalReply))
                 self.currentState = .speaking
                 self.statusMessage = "Speaking..."
                 
                 if isSpeechEnabled {
-                    speechManager.speak(reply)
+                    speechManager.speak(finalReply)
                 } else {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                         if self.currentState == .speaking {

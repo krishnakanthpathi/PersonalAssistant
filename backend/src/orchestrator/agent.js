@@ -5,7 +5,7 @@ import { catchErrors } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
 export class Agent {
-	run = catchErrors(async (prompt) => {
+	run = catchErrors(async (prompt, onStatusUpdate) => {
 		// 1. Prepare message history
 		const messages = [
 			{
@@ -31,6 +31,9 @@ Browser/Puppeteer Tool Usage Guidelines:
 		const tools = await registry.getOllamaTools();
 
 		// 3. First call to Ollama including the tools list
+		if (onStatusUpdate) {
+			onStatusUpdate('Thinking...');
+		}
 		const response = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
 			model: env.OLLAMA_MODEL,
 			messages: messages,
@@ -79,6 +82,9 @@ Browser/Puppeteer Tool Usage Guidelines:
 				const toolArgs = call.function.arguments;
 
 				logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
+				if (onStatusUpdate) {
+					onStatusUpdate(`Running: ${toolName}`);
+				}
 
 				try {
 					// Execute the tool (local or MCP)
@@ -125,6 +131,9 @@ Browser/Puppeteer Tool Usage Guidelines:
 			}
 
 			// Call Ollama again with the tool results to get the next step
+			if (onStatusUpdate) {
+				onStatusUpdate('Thinking...');
+			}
 			const nextResponse = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
 				model: env.OLLAMA_MODEL,
 				messages: messages,
