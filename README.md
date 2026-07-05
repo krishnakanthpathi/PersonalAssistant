@@ -8,13 +8,16 @@ An agentic, multi-turn personal assistant backend built with Node.js, Express, O
 * **Modular MCP Switchboard**: Automatically loads local/external tools and connects to MCP servers over standard input/output streams (`stdio`).
 * **Winston Logging**: High-performance color-coded terminal log formatting and persistent JSON files.
 * **Filesystem MCP**: Integrates local workspace read, write, search, and directory navigation tools.
+* **Notion MCP**: Read, write, search, and update page elements in your Notion workspace.
+* **Puppeteer MCP**: Local browser automation to search, screenshot, click, and auto-fill web forms.
 
 ---
 
 ## MCP Integration Roadmap (To-Do List)
 
 * [x] **Filesystem MCP** (Integrated) — Read, write, list, and search files inside the workspace.
-* [ ] **Fetch MCP** — Fetch remote web pages and convert them to clean Markdown.
+* [x] **Notion MCP** (Integrated) — Connect to your Notion workspace to manage structured notes and documents.
+* [x] **Puppeteer MCP** (Integrated) — Browse, scrape, and auto-fill web forms.
 * [ ] **Brave Search MCP** — Retrieve real-time search engine results from the web.
 * [ ] **Memory MCP** — Enable graph-based long-term memory to record personal preferences and facts.
 * [ ] **SQLite MCP** — Query and store structured personal data in a local SQLite file.
@@ -38,7 +41,7 @@ OLLAMA_MODEL=qwen2.5:7b
 ```
 
 ### 2. Configure MCP Servers
-Expose allowed paths in `backend/mcp-config.json`:
+Expose allowed paths and servers in `backend/mcp-config.json`:
 ```json
 {
 	"mcpServers": {
@@ -49,6 +52,20 @@ Expose allowed paths in `backend/mcp-config.json`:
 				"@modelcontextprotocol/server-filesystem",
 				"/Users/krishnakanth/Projects/PersonalAssisstent"
 			]
+		},
+		"notion": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@notionhq/notion-mcp-server"
+			]
+		},
+		"puppeteer": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-puppeteer"
+			]
 		}
 	}
 }
@@ -58,4 +75,11 @@ Expose allowed paths in `backend/mcp-config.json`:
 ```bash
 cd backend
 npm run dev
+```
+
+### 4. Puppeteer Setup (Browser Autofill & Search)
+The Puppeteer MCP server requires a specific version of Chrome. If you receive a "Could not find Chrome" error, install the required version by running:
+```bash
+cd backend
+npx puppeteer browsers install chrome@131.0.6778.204
 ```

@@ -38,6 +38,14 @@ export class MCPManager {
 			await notionClient.connect();
 			this.servers.set('notion', notionClient);
 		}
+
+		// 3. Initialize Puppeteer Client if configured
+		if (config.mcpServers.puppeteer) {
+			const { PuppeteerClient } = await import('./clients/puppeteer.js');
+			const puppeteerClient = new PuppeteerClient(config.mcpServers.puppeteer);
+			await puppeteerClient.connect();
+			this.servers.set('puppeteer', puppeteerClient);
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**

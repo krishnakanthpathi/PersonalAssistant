@@ -406,6 +406,7 @@ struct MainView: View {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300.0 // 5 minutes timeout for agentic loops
         
         let payload = ["prompt": message]
         
