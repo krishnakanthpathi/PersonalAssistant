@@ -38,6 +38,7 @@ export class Agent {
 					try {
 						const toolJson = JSON.parse(match[1].trim());
 						msg.tool_calls.push({
+							isXml: true,
 							function: {
 								name: toolJson.name,
 								arguments: toolJson.arguments
@@ -61,23 +62,50 @@ export class Agent {
 			for (const call of message.tool_calls) {
 				const toolName = call.function.name;
 				const toolArgs = call.function.arguments;
+				
+				logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
 
 				try {
 					// Execute the tool (local or MCP)
 					const toolResult = await registry.callTool(toolName, toolArgs);
+					logger.info(`Tool "${toolName}" executed successfully. Result length: ${String(toolResult).length} characters.`);
 
-					// Append tool execution response to message history
-					messages.push({
-						role: 'tool',
-						content: String(toolResult),
-						name: toolName
-					});
+					if (call.isXml) {
+						// For XML-based tool calls, append as a user message with tool_response tags
+						messages.push({
+							role: 'user',
+							content: `<tool_response>\n${String(toolResult)}\n</tool_response>`
+						});
+					} else {
+						// For native tool calls, append as a tool message with tool_call_id
+						const toolMessage = {
+							role: 'tool',
+							content: String(toolResult),
+							name: toolName
+						};
+						if (call.id) {
+							toolMessage.tool_call_id = call.id;
+						}
+						messages.push(toolMessage);
+					}
 				} catch (error) {
-					messages.push({
-						role: 'tool',
-						content: `Error: ${error.message}`,
-						name: toolName
-					});
+					logger.error(`Tool "${toolName}" failed to execute: ${error.message}`);
+					if (call.isXml) {
+						messages.push({
+							role: 'user',
+							content: `<tool_response>\nError: ${error.message}\n</tool_response>`
+						});
+					} else {
+						const toolMessage = {
+							role: 'tool',
+							content: `Error: ${error.message}`,
+							name: toolName
+						};
+						if (call.id) {
+							toolMessage.tool_call_id = call.id;
+						}
+						messages.push(toolMessage);
+					}
 				}
 			}
 
