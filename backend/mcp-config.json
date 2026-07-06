@@ -15,12 +15,15 @@
 				"@notionhq/notion-mcp-server"
 			]
 		},
-		"puppeteer": {
+		"google-calendar": {
 			"command": "npx",
 			"args": [
 				"-y",
-				"@modelcontextprotocol/server-puppeteer"
-			]
+				"@cocal/google-calendar-mcp"
+			],
+			"env": {
+				"GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json"
+			}
 		}
 	}
 }

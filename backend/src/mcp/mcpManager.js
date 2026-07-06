@@ -46,6 +46,14 @@ export class MCPManager {
 			await puppeteerClient.connect();
 			this.servers.set('puppeteer', puppeteerClient);
 		}
+
+		// 4. Initialize Google Calendar Client if configured
+		if (config.mcpServers['google-calendar']) {
+			const { GoogleCalendarClient } = await import('./clients/google-calendar.js');
+			const calendarClient = new GoogleCalendarClient(config.mcpServers['google-calendar']);
+			await calendarClient.connect();
+			this.servers.set('google-calendar', calendarClient);
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**

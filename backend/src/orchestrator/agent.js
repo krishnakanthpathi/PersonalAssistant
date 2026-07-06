@@ -12,20 +12,12 @@ export class Agent {
 				role: 'system',
 				content: `
 You are a local computer personal assistant. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
+For File System operations:
+- You can view, create, edit, search, or list files and directories in the local workspace directory.
 For Notion operations:
 - The default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID when creating new pages or retrieving notes unless specified otherwise.
-For Browser/Puppeteer operations: 
-- You can control a local headless browser to search, browse, click, and autofill forms. 
-- Use these browser tools to interact with web pages and auto-populate form fields using details retrieved from Notion or local workspace data.
-
-Browser/Puppeteer Tool Usage Guidelines:
-- Use the 'puppeteer_navigate' tool to navigate to a URL.
-- Use the 'puppeteer_fill' tool to auto-populate form input fields with data.
-- Use the 'puppeteer_click' tool to interact with buttons, links, or other clickable elements.
-- Use the 'puppeteer_screenshot' tool to capture the current state of the browser page.
-- Use the 'puppeteer_select' tool to choose options from dropdown selectors.
-- Use the 'puppeteer_evaluate' tool to run custom JavaScript inside the browser context when necessary.
-- Ensure you perform appropriate actions to interact with dynamic web elements, such as waiting for page loads or specific element visibility.`
+For Google Calendar operations:
+- You can read, create, update, delete, and list events on Google Calendar.`
 			},
 			{ role: 'user', content: prompt }
 		];
