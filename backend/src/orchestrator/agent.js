@@ -12,8 +12,11 @@ export class Agent {
 				role: 'system',
 				content: `
 You are a local computer personal assistant. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
-For Notion operations: the default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID when creating new pages or retrieving notes unless specified otherwise.
-For Browser/Puppeteer operations: you can control a local headless browser to search, browse, click, and autofill forms. Use these browser tools to interact with web pages and auto-populate form fields using details retrieved from Notion or local workspace data.
+For Notion operations:
+- The default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID when creating new pages or retrieving notes unless specified otherwise.
+For Browser/Puppeteer operations: 
+- You can control a local headless browser to search, browse, click, and autofill forms. 
+- Use these browser tools to interact with web pages and auto-populate form fields using details retrieved from Notion or local workspace data.
 
 Browser/Puppeteer Tool Usage Guidelines:
 - Use the 'puppeteer_navigate' tool to navigate to a URL.
@@ -29,22 +32,57 @@ Browser/Puppeteer Tool Usage Guidelines:
 
 		// 2. Fetch tool definitions
 		const tools = await registry.getOllamaTools();
+		logger.info(`Loaded ${tools.length} tools for agent`);
+
+		const MAX_ITERATIONS = 15;
+		let iteration = 0;
+
+		// Helper to call Ollama with detailed logging
+		const callOllama = async (msgs, includeTools = false) => {
+			const payload = {
+				model: env.OLLAMA_MODEL,
+				messages: msgs,
+				stream: false,
+				options: {
+					num_ctx: 16384
+				}
+			};
+			if (includeTools) {
+				payload.tools = tools;
+			}
+
+			const payloadSize = JSON.stringify(payload).length;
+			logger.info(`Ollama request: model=${env.OLLAMA_MODEL}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
+			logger.debug(`Ollama message roles: [${msgs.map(m => m.role).join(', ')}]`);
+
+			try {
+				const res = await axios.post(`${env.OLLAMA_URL}/api/chat`, payload);
+				const data = res.data;
+				logger.info(`Ollama response: status=${res.status}, done=${data.done}, done_reason=${data.done_reason || 'N/A'}, eval_count=${data.eval_count || 'N/A'}, tool_calls=${data.message?.tool_calls?.length || 0}`);
+				logger.debug(`Ollama response content (first 500 chars): ${(data.message?.content || '').substring(0, 500)}`);
+				return data;
+			} catch (error) {
+				// Log detailed axios error info
+				if (error.response) {
+					logger.error(`Ollama HTTP error: status=${error.response.status}, statusText=${error.response.statusText}`);
+					logger.error(`Ollama error response body: ${JSON.stringify(error.response.data).substring(0, 1000)}`);
+					logger.error(`Ollama request payload size was ${payloadSize} chars with ${msgs.length} messages`);
+				} else if (error.request) {
+					logger.error(`Ollama request failed (no response): ${error.message}`);
+				} else {
+					logger.error(`Ollama request setup error: ${error.message}`);
+				}
+				throw error;
+			}
+		};
 
 		// 3. First call to Ollama including the tools list
 		if (onStatusUpdate) {
 			onStatusUpdate('Thinking...');
 		}
-		const response = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
-			model: env.OLLAMA_MODEL,
-			messages: messages,
-			tools: tools,
-			stream: false,
-			options: {
-				num_ctx: 16384
-			}
-		});
+		const response = await callOllama(messages, true);
 
-		let message = response.data.message;
+		let message = response.message;
 
 		// Helper to extract XML tool calls if native tool_calls is empty
 		const parseXmlToolCalls = (msg) => {
@@ -74,6 +112,15 @@ Browser/Puppeteer Tool Usage Guidelines:
 
 		// Keep executing tool calls as long as the model requests them (Reasoning Loop)
 		while (message.tool_calls && message.tool_calls.length > 0) {
+			iteration++;
+			logger.info(`--- Reasoning loop iteration ${iteration} (${message.tool_calls.length} tool call(s)) ---`);
+
+			if (iteration > MAX_ITERATIONS) {
+				logger.warn(`Reasoning loop exceeded max iterations (${MAX_ITERATIONS}). Breaking out.`);
+				message.content = message.content || `I completed ${iteration - 1} steps but stopped to avoid an infinite loop. Here's what I accomplished so far.`;
+				break;
+			}
+
 			// Add assistant message containing the tool calls to history
 			messages.push(message);
 
@@ -132,22 +179,16 @@ Browser/Puppeteer Tool Usage Guidelines:
 
 			// Call Ollama again with the tool results to get the next step
 			if (onStatusUpdate) {
-				onStatusUpdate('Thinking...');
+				onStatusUpdate(`Thinking... (step ${iteration})`);
 			}
-			const nextResponse = await axios.post(`${env.OLLAMA_URL}/api/chat`, {
-				model: env.OLLAMA_MODEL,
-				messages: messages,
-				stream: false,
-				options: {
-					num_ctx: 16384
-				}
-			});
-			message = nextResponse.data.message;
+			const nextResponse = await callOllama(messages, false);
+			message = nextResponse.message;
 
 			// Parse XML tool calls in the subsequent response
 			parseXmlToolCalls(message);
 		}
 
+		logger.info(`Agent finished after ${iteration} tool-calling iteration(s).`);
 		return message.content;
 	}, 'Agent reasoning loop failed');
 }

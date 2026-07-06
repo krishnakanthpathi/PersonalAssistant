@@ -47,9 +47,30 @@ cat <<EOF > "${CONTENTS_DIR}/Info.plist"
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>SiriAssistant needs microphone access for voice commands and the Friday wake word.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>SiriAssistant uses speech recognition for voice input and wake word detection.</string>
 </dict>
 </plist>
 EOF
 
+echo "📝 Generating entitlements..."
+ENTITLEMENTS_FILE="${FRONTEND_DIR}/SiriAssistant.entitlements"
+cat <<EOF > "$ENTITLEMENTS_FILE"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+echo "🔏 Signing app bundle..."
+codesign --force --sign - --entitlements "$ENTITLEMENTS_FILE" "${APP_BUNDLE}"
+
 echo "🚀 Build completed successfully! App bundle generated at: ${FRONTEND_DIR}/${APP_BUNDLE}"
 echo "Run it with: open ${APP_BUNDLE}"
+

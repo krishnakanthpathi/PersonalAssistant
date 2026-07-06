@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 @preconcurrency import AVFoundation
 import Combine
+import Speech
 
 // MARK: - Models & Enums
 
@@ -262,6 +263,268 @@ class SpeechManager: NSObject, AVAudioPlayerDelegate, ObservableObject {
     }
 }
 
+// MARK: - Speech Recognition Manager (STT with Auto-Send)
+
+@MainActor
+class SpeechRecognitionManager: ObservableObject {
+    @Published var transcript: String = ""
+    @Published var isRecording: Bool = false
+    @Published var isAvailable: Bool = false
+    
+    var onAutoSend: ((String) -> Void)?
+    
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    private let audioEngine = AVAudioEngine()
+    
+    private var silenceTimer: Timer?
+    private let silenceTimeout: TimeInterval = 1.5
+    private var lastTranscriptUpdate: Date = Date()
+    
+    init() {
+        requestAuthorization()
+    }
+    
+    private func requestAuthorization() {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized:
+                    self?.isAvailable = true
+                case .denied, .restricted, .notDetermined:
+                    self?.isAvailable = false
+                @unknown default:
+                    self?.isAvailable = false
+                }
+            }
+        }
+    }
+    
+    func startRecording() {
+        // Cancel any existing task
+        stopRecording(sendMessage: false)
+        
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            print("Speech recognizer not available")
+            return
+        }
+        
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else { return }
+        
+        recognitionRequest.shouldReportPartialResults = true
+        
+        // Use on-device recognition if available
+        if speechRecognizer.supportsOnDeviceRecognition {
+            recognitionRequest.requiresOnDeviceRecognition = true
+        }
+        
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
+        }
+        
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            Task { @MainActor in
+                if let result = result {
+                    self.transcript = result.bestTranscription.formattedString
+                    self.lastTranscriptUpdate = Date()
+                    self.resetSilenceTimer()
+                }
+                
+                if error != nil || (result?.isFinal ?? false) {
+                    if result?.isFinal == true && !self.transcript.isEmpty {
+                        self.stopRecording(sendMessage: true)
+                    } else if error != nil {
+                        self.stopRecording(sendMessage: false)
+                    }
+                }
+            }
+        }
+        
+        audioEngine.prepare()
+        do {
+            try audioEngine.start()
+            isRecording = true
+            transcript = ""
+            startSilenceTimer()
+        } catch {
+            print("Audio engine failed to start: \(error.localizedDescription)")
+            stopRecording(sendMessage: false)
+        }
+    }
+    
+    func stopRecording(sendMessage: Bool) {
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+        
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+        
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        
+        let finalText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        isRecording = false
+        
+        if sendMessage && !finalText.isEmpty {
+            onAutoSend?(finalText)
+            transcript = ""
+        }
+    }
+    
+    private func startSilenceTimer() {
+        silenceTimer?.invalidate()
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                guard self.isRecording else {
+                    self.silenceTimer?.invalidate()
+                    return
+                }
+                
+                let elapsed = Date().timeIntervalSince(self.lastTranscriptUpdate)
+                if elapsed >= self.silenceTimeout && !self.transcript.isEmpty {
+                    self.stopRecording(sendMessage: true)
+                }
+            }
+        }
+    }
+    
+    private func resetSilenceTimer() {
+        lastTranscriptUpdate = Date()
+    }
+}
+
+// MARK: - Wake Word Listener ("Friday")
+
+@MainActor
+class WakeWordListener: ObservableObject {
+    @Published var isListening: Bool = false
+    
+    var onWakeWordDetected: (() -> Void)?
+    
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    private let audioEngine = AVAudioEngine()
+    
+    private var restartTimer: Timer?
+    private var isPaused: Bool = false
+    
+    func startListening() {
+        guard !isPaused else { return }
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            // Retry after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+                self?.startListening()
+            }
+            return
+        }
+        
+        stopListening()
+        
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else { return }
+        
+        recognitionRequest.shouldReportPartialResults = true
+        if speechRecognizer.supportsOnDeviceRecognition {
+            recognitionRequest.requiresOnDeviceRecognition = true
+        }
+        
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
+        }
+        
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            Task { @MainActor in
+                if let result = result {
+                    let spokenText = result.bestTranscription.formattedString.lowercased()
+                    if spokenText.contains("friday") {
+                        self.stopListening()
+                        self.onWakeWordDetected?()
+                        return
+                    }
+                }
+                
+                if error != nil {
+                    // Recognition session ended, restart after a short delay
+                    self.stopListening()
+                    if !self.isPaused {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                            self?.startListening()
+                        }
+                    }
+                }
+            }
+        }
+        
+        audioEngine.prepare()
+        do {
+            try audioEngine.start()
+            isListening = true
+        } catch {
+            print("Wake word audio engine failed: \(error.localizedDescription)")
+            // Retry
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.startListening()
+            }
+        }
+        
+        // Restart recognition every 15 seconds to keep it fresh
+        // (Apple's recognizer can time out on long sessions)
+        restartTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                if !self.isPaused {
+                    self.stopListening()
+                    self.startListening()
+                }
+            }
+        }
+    }
+    
+    func stopListening() {
+        restartTimer?.invalidate()
+        restartTimer = nil
+        
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+        
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        
+        isListening = false
+    }
+    
+    func pause() {
+        isPaused = true
+        stopListening()
+    }
+    
+    func resume() {
+        isPaused = false
+        startListening()
+    }
+}
+
 // MARK: - Main Application View
 
 struct MainView: View {
@@ -274,6 +537,8 @@ struct MainView: View {
     ]
     @State private var isSpeechEnabled = true
     @StateObject private var speechManager = SpeechManager()
+    @StateObject private var speechRecognizer = SpeechRecognitionManager()
+    @StateObject private var wakeWordListener = WakeWordListener()
     
     @State private var dragStartMouseLocation: NSPoint = .zero
     @State private var dragStartWindowOrigin: NSPoint = .zero
@@ -288,6 +553,7 @@ struct MainView: View {
                     statusMessage: $statusMessage,
                     isSpeechEnabled: $isSpeechEnabled,
                     currentState: $currentState,
+                    speechRecognizer: speechRecognizer,
                     onSendMessage: { message in
                         Task {
                             await sendMessageToBackend(message)
@@ -376,9 +642,48 @@ struct MainView: View {
                     if self.currentState == .speaking {
                         self.currentState = .idle
                         self.statusMessage = "Ready"
+                        // Resume wake word listening when idle
+                        wakeWordListener.resume()
                     }
                 }
             }
+            
+            // Wire up speech recognition auto-send
+            speechRecognizer.onAutoSend = { text in
+                Task {
+                    await sendMessageToBackend(text)
+                }
+            }
+            
+            // Wire up wake word detection
+            wakeWordListener.onWakeWordDetected = {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    appState.isChatOpen = true
+                }
+                // Start listening for the user's command
+                wakeWordListener.pause()
+                speechRecognizer.startRecording()
+                currentState = .listening
+                statusMessage = "Listening..."
+            }
+            
+            // Start wake word listener
+            wakeWordListener.startListening()
+        }
+        .onChange(of: speechRecognizer.isRecording) {
+            if speechRecognizer.isRecording {
+                currentState = .listening
+                statusMessage = "Listening..."
+                wakeWordListener.pause()
+            } else {
+                if currentState == .listening {
+                    currentState = .idle
+                    statusMessage = "Ready"
+                }
+            }
+        }
+        .onChange(of: speechRecognizer.transcript) {
+            promptText = speechRecognizer.transcript
         }
     }
     
@@ -476,244 +781,29 @@ struct MainView: View {
     }
 }
 
-// MARK: - Siri-like Pulsing Orb View
+// MARK: - Simple Orb Button (Placeholder for 3D Model)
 
 struct SiriOrbView: View {
     let state: AssistantState
     let audioLevel: CGFloat
     
-    @State private var rotateAngle: Double = 0
-    @State private var offset1 = CGSize.zero
-    @State private var offset2 = CGSize.zero
-    @State private var offset3 = CGSize.zero
-    @State private var offset4 = CGSize.zero
-    
-    private func dynamicOffset(_ baseOffset: CGSize, index: Int) -> CGSize {
-        if state == .speaking {
-            let multiplier = 1.0 + audioLevel * 1.6
-            let angle = Double(index) * Double.pi / 2.0
-            let dx = cos(angle) * Double(audioLevel) * 16.0
-            let dy = sin(angle) * Double(audioLevel) * 16.0
-            return CGSize(width: baseOffset.width * multiplier + dx, height: baseOffset.height * multiplier + dy)
+    // Button color based on state
+    private var buttonColor: Color {
+        switch state {
+        case .idle: return Color(red: 0.35, green: 0.4, blue: 0.95)     // calm blue-purple
+        case .listening: return Color(red: 0.2, green: 0.85, blue: 0.7) // teal/green
+        case .thinking: return Color(red: 0.9, green: 0.6, blue: 0.2)   // warm amber
+        case .speaking: return Color(red: 0.5, green: 0.3, blue: 0.95)  // vibrant purple
         }
-        return baseOffset
     }
     
     var body: some View {
-        ZStack {
-            // Dynamic, thin, sharp neon rings extending outside the orb
-            if state == .listening || state == .speaking {
-                // Ring 1 (Thin, sharp, neon cyan)
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.cyan.opacity(0.6), Color.blue.opacity(0.1), Color.purple.opacity(0.4)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.0
-                    )
-                    .scaleEffect(1.0 + (state == .listening ? 0.4 : audioLevel * 0.7))
-                    .opacity(state == .listening ? 0.35 : Double(0.2 + audioLevel * 0.6))
-                    .rotationEffect(.degrees(-rotateAngle * 1.5))
-                
-                // Ring 2 (Thin, sharp, neon pink)
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.pink.opacity(0.55), Color.clear, Color.cyan.opacity(0.35)],
-                            startPoint: .bottomLeading,
-                            endPoint: .topTrailing
-                        ),
-                        lineWidth: 0.8
-                    )
-                    .scaleEffect(1.0 + (state == .listening ? 0.75 : audioLevel * 1.1))
-                    .opacity(state == .listening ? 0.25 : Double(0.15 + audioLevel * 0.5))
-                    .rotationEffect(.degrees(rotateAngle * 2.0))
-
-                // Ring 3 (Outer fading orbit)
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.35), Color.pink.opacity(0.15)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 0.5
-                    )
-                    .scaleEffect(1.0 + (state == .listening ? 1.1 : audioLevel * 1.5))
-                    .opacity(state == .listening ? 0.2 : Double(0.08 + audioLevel * 0.4))
-                    .rotationEffect(.degrees(-rotateAngle * 0.8))
-            }
-            
-            // 3D Glass Sphere Container
-            ZStack {
-                // 1. Solid dark background for volume
-                Circle()
-                    .fill(Color.black.opacity(0.85))
-                
-                // 2. Base Radial 3D Sphere Shading
-                Circle()
-                    .fill(RadialGradient(
-                        gradient: Gradient(colors: [Color.white.opacity(0.15), Color.black.opacity(0.95)]),
-                        center: .init(x: 0.35, y: 0.35),
-                        startRadius: 0,
-                        endRadius: 40
-                    ))
-                    .blendMode(.multiply)
-                
-                // 3. Colorful Glowing Blurred Blobs
-                ZStack {
-                    // Blob 1: Pink/Magenta
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.1, blue: 0.6))
-                        .frame(width: 46 + audioLevel * 14, height: 46 + audioLevel * 14)
-                        .offset(dynamicOffset(offset1, index: 1))
-                        
-                    // Blob 2: Cyan/Blue
-                    Circle()
-                        .fill(Color(red: 0.0, green: 0.8, blue: 1.0))
-                        .frame(width: 48 + audioLevel * 12, height: 48 + audioLevel * 12)
-                        .offset(dynamicOffset(offset2, index: 2))
-                        
-                    // Blob 3: Royal Blue
-                    Circle()
-                        .fill(Color(red: 0.1, green: 0.3, blue: 1.0))
-                        .frame(width: 44 + audioLevel * 16, height: 44 + audioLevel * 16)
-                        .offset(dynamicOffset(offset3, index: 3))
-                        
-                    // Blob 4: Bright Purple
-                    Circle()
-                        .fill(Color(red: 0.6, green: 0.1, blue: 1.0))
-                        .frame(width: 42 + audioLevel * 14, height: 42 + audioLevel * 14)
-                        .offset(dynamicOffset(offset4, index: 4))
-                }
-                .blendMode(.screen)
-                .filterBlur(radius: 20)
-                .rotationEffect(.degrees(rotateAngle))
-                
-                // 4. Concentric optical diffraction rings (internal texture)
-                Circle()
-                    .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                    .padding(4)
-                Circle()
-                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
-                    .padding(10)
-                Circle()
-                    .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
-                    .padding(18)
-                
-                // 5. Glossy Highlight Overlay to simulate 3D light reflection
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            gradient: Gradient(colors: [.white.opacity(0.38 + Double(audioLevel) * 0.15), .clear]),
-                            center: .init(x: 0.3, y: 0.3), // Top-left light source
-                            startRadius: 0,
-                            endRadius: 28 + audioLevel * 10
-                        )
-                    )
-                    .blendMode(.plusLighter)
-                
-                // 6. Secondary bottom reflection for glass thickness look (bounce light)
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            gradient: Gradient(colors: [Color.cyan.opacity(0.25 + Double(audioLevel) * 0.2), .clear]),
-                            center: .init(x: 0.7, y: 0.7), // Bottom-right bounce light
-                            startRadius: 0,
-                            endRadius: 25
-                        )
-                    )
-                    .blendMode(.plusLighter)
-                
-                // 7. Translucent Glass Outer Rim Border
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white.opacity(0.6), .clear, .white.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.2
-                    )
-                    .blendMode(.overlay)
-            }
-            .clipShape(Circle()) // Clip content to clean circular boundary
-            .scaleEffect(scaleFactor)
-            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: state)
-        }
-        .frame(width: 70, height: 70)
-        .background(
-            Circle()
-                .fill(Color.black.opacity(0.1))
-                .shadow(color: shadowColor.opacity(0.5 + Double(audioLevel) * 0.3), radius: 12 + audioLevel * 12, x: 0, y: 6)
-        )
-        .onAppear {
-            startLoopingAnimations()
-        }
-    }
-    
-    // Scale factor depending on Assistant State
-    private var scaleFactor: CGFloat {
-        let base: CGFloat
-        switch state {
-        case .idle: base = 1.0
-        case .listening: base = 1.25
-        case .thinking: base = 1.12
-        case .speaking: base = 1.18
-        }
-        if state == .speaking {
-            return base + audioLevel * 0.35
-        }
-        return base
-    }
-    
-    // Color of the shadow based on current state
-    private var shadowColor: Color {
-        switch state {
-        case .idle: return .purple
-        case .listening: return .red
-        case .thinking: return .cyan
-        case .speaking: return .blue
-        }
-    }
-    
-    private func startLoopingAnimations() {
-        // Blob 1 Animation
-        withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true)) {
-            offset1 = CGSize(width: -12, height: 8)
-        }
-        // Blob 2 Animation
-        withAnimation(.easeInOut(duration: 3.8).repeatForever(autoreverses: true)) {
-            offset2 = CGSize(width: 12, height: -10)
-        }
-        // Blob 3 Animation
-        withAnimation(.easeInOut(duration: 5.2).repeatForever(autoreverses: true)) {
-            offset3 = CGSize(width: -8, height: -12)
-        }
-        // Blob 4 Animation
-        withAnimation(.easeInOut(duration: 4.2).repeatForever(autoreverses: true)) {
-            offset4 = CGSize(width: 10, height: 12)
-        }
-        
-        // Continuous Rotation
-        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { _ in
-            let increment: Double
-            switch state {
-            case .idle: increment = 0.4
-            case .listening: increment = 1.2
-            case .thinking: increment = 3.5  // Spins quickly when thinking
-            case .speaking: increment = 0.8
-            }
-            rotateAngle += increment
-            if rotateAngle >= 360 {
-                rotateAngle -= 360
-            }
-        }
+        Circle()
+            .fill(buttonColor)
+            .frame(width: 60, height: 60)
+            .shadow(color: buttonColor.opacity(0.5), radius: 8, x: 0, y: 4)
     }
 }
-
 // Custom View Modifier for standard Ripple effect
 struct RippleModifier: ViewModifier {
     let duration: Double
@@ -753,7 +843,10 @@ struct ChatPanelView: View {
     @Binding var statusMessage: String
     @Binding var isSpeechEnabled: Bool
     @Binding var currentState: AssistantState
+    @ObservedObject var speechRecognizer: SpeechRecognitionManager
     var onSendMessage: (String) -> Void
+    
+    @State private var micPulse: Bool = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -888,14 +981,48 @@ struct ChatPanelView: View {
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
                 .onReceive(Just(promptText)) { _ in
-                    // Adjust assistant state back and forth based on focus/typing if needed
-                    if currentState == .idle && !promptText.isEmpty {
-                        currentState = .listening
-                        statusMessage = "Typing..."
-                    } else if currentState == .listening && promptText.isEmpty {
-                        currentState = .idle
-                        statusMessage = "Ready"
+                    // Adjust assistant state based on typing (only when not voice recording)
+                    if !speechRecognizer.isRecording {
+                        if currentState == .idle && !promptText.isEmpty {
+                            currentState = .listening
+                            statusMessage = "Typing..."
+                        } else if currentState == .listening && promptText.isEmpty {
+                            currentState = .idle
+                            statusMessage = "Ready"
+                        }
                     }
+                }
+                
+                // Microphone Button
+                Button(action: {
+                    if speechRecognizer.isRecording {
+                        speechRecognizer.stopRecording(sendMessage: false)
+                    } else {
+                        speechRecognizer.startRecording()
+                    }
+                }) {
+                    ZStack {
+                        if speechRecognizer.isRecording {
+                            // Pulsing red background
+                            Circle()
+                                .fill(Color.red.opacity(0.3))
+                                .frame(width: 32, height: 32)
+                                .scaleEffect(micPulse ? 1.3 : 1.0)
+                                .opacity(micPulse ? 0.0 : 0.6)
+                                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: false), value: micPulse)
+                        }
+                        
+                        Image(systemName: speechRecognizer.isRecording ? "mic.fill" : "mic")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(speechRecognizer.isRecording ? .red : (speechRecognizer.isAvailable ? .white.opacity(0.6) : .white.opacity(0.2)))
+                            .frame(width: 32, height: 32)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(!speechRecognizer.isAvailable || currentState == .thinking || currentState == .speaking)
+                .help(speechRecognizer.isRecording ? "Stop Recording" : (speechRecognizer.isAvailable ? "Voice Input" : "Speech Recognition Unavailable"))
+                .onChange(of: speechRecognizer.isRecording) {
+                    micPulse = speechRecognizer.isRecording
                 }
                 
                 // Submit Button

@@ -23,7 +23,16 @@ export function catchErrors(fn, errorPrefix = '') {
 			return result;
 		} catch (error) {
 			const errorMessage = errorPrefix ? `${errorPrefix}: ${error.message}` : error.message;
-			logger.error(errorMessage, { error });
+			logger.error(errorMessage);
+			// Log the full stack trace for debugging
+			if (error.stack) {
+				logger.error(`Stack trace: ${error.stack}`);
+			}
+			// Log axios-specific details if available
+			if (error.response) {
+				logger.error(`HTTP response status: ${error.response.status} ${error.response.statusText}`);
+				logger.error(`HTTP response body: ${JSON.stringify(error.response.data).substring(0, 2000)}`);
+			}
 			throw new Error(errorMessage);
 		}
 	};

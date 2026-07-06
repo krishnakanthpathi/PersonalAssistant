@@ -2,6 +2,7 @@
  * Express application & HTTP/WS bootstrapper
  */
 import express from 'express';
+import cors from 'cors';
 
 import { mcpManager } from './mcp/mcpManager.js';
 import { Agent } from "./orchestrator/agent.js";
@@ -13,6 +14,8 @@ import { env } from './config/env.js';
 
 const app = express();
 const agent = new Agent();
+
+app.use(cors())
 
 app.use(express.json());
 
