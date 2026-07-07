@@ -5,6 +5,7 @@
 import { volumeSetTool } from '../tools/mac/volumeSet.js';
 import { listApplicationsTool } from '../tools/mac/listApplications.js';
 import { openApplicationTool } from '../tools/mac/openApplication.js';
+import { screenshotTool } from '../tools/mac/screenshot.js';
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { Embedder } from '../rag/embedder.js';
@@ -25,6 +26,7 @@ class ToolRegistry {
 		this.tools.set(volumeSetTool.definition.name, volumeSetTool);
 		this.tools.set(listApplicationsTool.definition.name, listApplicationsTool);
 		this.tools.set(openApplicationTool.definition.name, openApplicationTool);
+		this.tools.set(screenshotTool.definition.name, screenshotTool);
 	}
 
 	// Ensure database connection is loaded

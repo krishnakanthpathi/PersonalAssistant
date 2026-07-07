@@ -7,6 +7,8 @@ export * from './volumeSet.js';
 export * from './listApplications.js';
 export * from './agentDesktop.js';
 export * from './openApplication.js';
+export * from './screenshot.js';
+
 
 
 

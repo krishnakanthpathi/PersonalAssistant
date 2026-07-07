@@ -32,6 +32,10 @@ async function testRAGSelection() {
 		{
 			query: 'Open Safari application',
 			expectedKeywords: ['open_application']
+		},
+		{
+			query: 'Take a screenshot of my screen',
+			expectedKeywords: ['screenshot']
 		}
 	];
 
@@ -77,6 +81,18 @@ async function testRAGSelection() {
 	console.log('==================================================');
 	try {
 		const result = await registry.callTool('open_application', { app: 'Safari' });
+		console.log('Result:', result);
+		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
+	} catch (error) {
+		console.log('❌ EXECUTION FAILED:', error.message);
+	}
+
+	// 4. Direct execution test of take_screenshot
+	console.log('\n==================================================');
+	console.log('EXECUTING: take_screenshot');
+	console.log('==================================================');
+	try {
+		const result = await registry.callTool('take_screenshot', {});
 		console.log('Result:', result);
 		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
 	} catch (error) {
