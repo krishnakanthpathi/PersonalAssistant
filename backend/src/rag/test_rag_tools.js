@@ -27,7 +27,11 @@ async function testRAGSelection() {
 		},
 		{
 			query: 'Show me what applications are installed on this computer',
-			expectedKeywords: ['application']
+			expectedKeywords: ['desktop']
+		},
+		{
+			query: 'Click on the element @e12 in Google Chrome',
+			expectedKeywords: ['desktop']
 		}
 	];
 
@@ -54,12 +58,12 @@ async function testRAGSelection() {
 		}
 	}
 
-	// 2. Direct execution test of list_applications
+	// 2. Direct execution test of agent_desktop_action (apps)
 	console.log('\n==================================================');
-	console.log('EXECUTING: list_applications');
+	console.log('EXECUTING: agent_desktop_action (apps)');
 	console.log('==================================================');
 	try {
-		const result = await registry.callTool('list_applications', {});
+		const result = await registry.callTool('agent_desktop_action', { action: 'apps' });
 		console.log('Result (first 500 chars):');
 		console.log(result.substring(0, 500) + '...');
 		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
