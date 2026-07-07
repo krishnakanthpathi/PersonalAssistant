@@ -48,6 +48,34 @@ async function testRAGSelection() {
 		{
 			query: 'Check my battery percentage and disk storage',
 			expectedKeywords: ['system_stats']
+		},
+		{
+			query: 'Switch system appearance to light mode',
+			expectedKeywords: ['dark_mode']
+		},
+		{
+			query: 'Speak hello world aloud',
+			expectedKeywords: ['say_speech']
+		},
+		{
+			query: 'Put the Mac computer to sleep',
+			expectedKeywords: ['system_power']
+		},
+		{
+			query: 'Check my wifi network status',
+			expectedKeywords: ['wifi_control']
+		},
+		{
+			query: 'Type my username krishnakanth on screen',
+			expectedKeywords: ['keystroke']
+		},
+		{
+			query: 'Press command option escape keys',
+			expectedKeywords: ['keystroke']
+		},
+		{
+			query: 'Open spotlight search by pressing command and space keys',
+			expectedKeywords: ['keystroke']
 		}
 	];
 
@@ -107,6 +135,39 @@ async function testRAGSelection() {
 		const result = await registry.callTool('take_screenshot', {});
 		console.log('Result:', result);
 		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
+	} catch (error) {
+		console.log('❌ EXECUTION FAILED:', error.message);
+	}
+
+	// 5. Direct execution test of keystroke_action
+	console.log('\n==================================================');
+	console.log('EXECUTING: keystroke_action (type)');
+	console.log('==================================================');
+	try {
+		const result = await registry.callTool('keystroke_action', { action: 'type', text: 'Hello!' });
+		console.log('Result:', result);
+		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
+	} catch (error) {
+		console.log('❌ EXECUTION FAILED:', error.message);
+	}
+
+	// 6. Direct execution test of Spotlight Search via Keystroke automation
+	console.log('\n==================================================');
+	console.log('EXECUTING: Spotlight Search Simulation via Keystroke');
+	console.log('==================================================');
+	try {
+		console.log('1. Pressing Cmd+Space to open Spotlight...');
+		await registry.callTool('keystroke_action', { action: 'shortcut', key: 'space', modifiers: ['command'] });
+		await new Promise(r => setTimeout(r, 1500)); // wait for overlay
+
+		console.log('2. Typing query "Safari"...');
+		await registry.callTool('keystroke_action', { action: 'type', text: 'Safari' });
+		await new Promise(r => setTimeout(r, 1000)); // wait for results
+
+		console.log('3. Pressing Enter to launch/search...');
+		const result = await registry.callTool('keystroke_action', { action: 'shortcut', key: 'enter' });
+		console.log('Result:', result);
+		console.log('✅ EXECUTION PASSED: Spotlight search simulated successfully via keyboard shortcuts.');
 	} catch (error) {
 		console.log('❌ EXECUTION FAILED:', error.message);
 	}

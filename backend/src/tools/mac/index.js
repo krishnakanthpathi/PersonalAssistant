@@ -17,6 +17,15 @@ export * from './getVolume.js';
 export * from './setBrightness.js';
 export * from './clipboard.js';
 export * from './mediaControl.js';
+export * from './darkMode.js';
+export * from './saySpeech.js';
+export * from './systemPower.js';
+export * from './wifiControl.js';
+export * from './keystroke.js';
+
+
+
+
 
 
 

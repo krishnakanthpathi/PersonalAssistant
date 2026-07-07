@@ -15,6 +15,11 @@ import { getVolumeTool } from '../tools/mac/getVolume.js';
 import { setBrightnessTool } from '../tools/mac/setBrightness.js';
 import { clipboardTool } from '../tools/mac/clipboard.js';
 import { mediaControlTool } from '../tools/mac/mediaControl.js';
+import { darkModeTool } from '../tools/mac/darkMode.js';
+import { saySpeechTool } from '../tools/mac/saySpeech.js';
+import { systemPowerTool } from '../tools/mac/systemPower.js';
+import { wifiControlTool } from '../tools/mac/wifiControl.js';
+import { keystrokeTool } from '../tools/mac/keystroke.js';
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { Embedder } from '../rag/embedder.js';
@@ -45,6 +50,11 @@ class ToolRegistry {
 		this.tools.set(setBrightnessTool.definition.name, setBrightnessTool);
 		this.tools.set(clipboardTool.definition.name, clipboardTool);
 		this.tools.set(mediaControlTool.definition.name, mediaControlTool);
+		this.tools.set(darkModeTool.definition.name, darkModeTool);
+		this.tools.set(saySpeechTool.definition.name, saySpeechTool);
+		this.tools.set(systemPowerTool.definition.name, systemPowerTool);
+		this.tools.set(wifiControlTool.definition.name, wifiControlTool);
+		this.tools.set(keystrokeTool.definition.name, keystrokeTool);
 	}
 
 	// Ensure database connection is loaded
@@ -136,7 +146,7 @@ class ToolRegistry {
 
 			// Rank all tools using RAG
 			const cachedToolsList = this.vectorDb.getAll();
-			
+
 			// Filter tools list to only include tools that are currently registered and active
 			const availableToolNames = new Set(allTools.map(t => t.function?.name || t.name));
 			const activeCachedTools = cachedToolsList.filter(item => {
