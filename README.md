@@ -1,57 +1,56 @@
 # Personal Assistant
 
-An agentic, multi-turn personal assistant backend built with Node.js, Express, Ollama, and the Model Context Protocol (MCP).
-
-## Current Features
-* **Agent Reasoning Loop**: Continuously evaluates tool outputs and loops until the task is complete.
-* **Fallback XML Parser**: Dynamically extracts `<tool_call>` blocks from conversational text for models that fallback to XML.
-* **Modular MCP Switchboard**: Automatically loads local/external tools and connects to MCP servers over standard input/output streams (`stdio`).
-* **Winston Logging**: High-performance color-coded terminal log formatting and persistent JSON files.
-* **Filesystem MCP**: Integrates local workspace read, write, search, and directory navigation tools.
-* **Notion MCP**: Read, write, search, and update page elements in your Notion workspace.
-* **Puppeteer MCP**: Local browser automation to search, screenshot, click, and auto-fill web forms.
+An agentic, multi-turn personal assistant platform built with Node.js, Express, React (Vite), and Model Context Protocol (MCP). It lets you automate your macOS workspace, run local/web automation flows, manage Notion notes, and query local files using a natural language interface.
 
 ---
 
-## MCP Integration Roadmap (To-Do List)
+## 🚀 Key Capabilities
 
-* [x] **Filesystem MCP** (Integrated) — Read, write, list, and search files inside the workspace.
-* [x] **Notion MCP** (Integrated) — Connect to your Notion workspace to manage structured notes and documents.
-* [x] **Puppeteer MCP** (Integrated) — Browse, scrape, and auto-fill web forms.
-* [ ] **Brave Search MCP** — Retrieve real-time search engine results from the web.
-* [ ] **Memory MCP** — Enable graph-based long-term memory to record personal preferences and facts.
-* [ ] **SQLite MCP** — Query and store structured personal data in a local SQLite file.
-* [ ] **Google Workspace MCP** — Integrate Google Calendar and Gmail to manage schedules and draft emails.
-* [ ] **Todoist MCP** — Create, list, and organize tasks and inbox items.
-* [ ] **Spotify MCP** — Search and control playbacks of music.
-* [ ] **Home Assistant MCP** — Toggle smart lights and check local home sensor metrics.
+### 1. macOS Desktop & System Control (Custom Native Tools)
+* **Active Window Tracking**: Gets the name of the frontmost focused application.
+* **Keyboard Automation**: Simulates custom key combos (like Cmd+Space, Enter, Escape) or types multi-line text (pasted via clipboard backup/restore to protect slashes, newlines, and layout format).
+* **System Settings**: Controls system speaker volume levels, display monitor brightness, and locks screens instantly.
+* **Network & Stats**: Monitors Wi-Fi SSID network connection names (and toggles Wi-Fi status cards) and reads real-time battery and disk diagnostics.
+* **Application Control**: Indexes all installed GUI applications, launches them, and gracefully terminates them.
+* **Clipboard Manager**: Interacts natively with clipboard text (read/write).
+* **System Utilities**: Controls Apple Music / Spotify track states, empties Finder trash, toggles Dark/Light appearance modes, and takes screen captures.
+* **Text-To-Speech**: Synthesizes speech out loud via macOS `say`.
+
+### 2. Model Context Protocol (MCP) Integration
+* **Filesystem MCP**: Grants read, write, search, and directory tree navigation inside the workspace.
+* **Notion MCP**: Integrates search, creation, reading, and updating pages/databases in your Notion workspace.
+* **Puppeteer MCP**: Enables browser automation to scrap pages, auto-fill forms, and click selectors.
+
+### 3. Dynamic RAG Tool Embedding System
+* Uses a local vector database to index descriptions of all registered tools (local + MCP).
+* Dynamically ranks the most relevant tools for your query on each prompt to keep the LLM context window small and maximize inference performance.
+
+### 4. Live Streaming Web Dashboard
+* Built with Vite + React + Tailwind CSS.
+* Connects to the backend server via Server-Sent Events (SSE) to display real-time LLM token streams, reasoning steps, tool calls, and tool execution success status.
 
 ---
 
-## Getting Started
+## 🛠️ Getting Started
 
-### 1. Configure Environment Variables
+### 1. Setup Environment Configuration
 Create or update your `backend/.env` file:
 ```env
-PORT=3000
+PORT=5001
 NODE_ENV=development
 LOG_LEVEL=info
 
 # LLM Provider: 'ollama' or 'openai'
 LLM_PROVIDER=openai
 
-# Ollama Settings (if provider is ollama)
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b
-
-# OpenAI Settings (if provider is openai, e.g. for GLM 5.2 or custom compatible endpoints)
+# OpenAI Settings (e.g. for compatible endpoints like GLM 4 or OpenAI GPTs)
 OPENAI_API_KEY=your-api-key-here
-OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/ # Optional custom base URL (e.g. Zhipu)
+OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/ # Optional custom base URL
 OPENAI_MODEL=glm-4                                    # Active model name/ID
 ```
 
 ### 2. Configure MCP Servers
-Expose allowed paths and servers in `backend/mcp-config.json`:
+Add external servers inside `backend/mcp-config.json`:
 ```json
 {
 	"mcpServers": {
@@ -81,32 +80,13 @@ Expose allowed paths and servers in `backend/mcp-config.json`:
 }
 ```
 
-### 3. Run the Development Servers
-
-You can launch both the backend API and the frontend dashboard concurrently using the root-level script:
+### 3. Start the Platform
+You can run the backend API server and frontend React dashboard concurrently from the root directory:
 ```bash
-# From the project root, run:
+# Start both services
 bash start.sh
 ```
 
-Alternatively, you can run them in separate terminals:
-
-#### Running the Backend API:
-```bash
-cd backend
-npm run dev
-```
-
-#### Running the Frontend Web Dashboard:
-```bash
-cd frontend
-npm install # if not already installed
-npm run dev
-```
-
-### 4. Puppeteer Setup (Browser Autofill & Search)
-The Puppeteer MCP server requires a specific version of Chrome. If you receive a "Could not find Chrome" error, install the required version by running:
-```bash
-cd backend
-npx puppeteer browsers install chrome@131.0.6778.204
-```
+Alternatively, run them separately:
+* **Backend**: `cd backend && npm run dev`
+* **Frontend**: `cd frontend && npm run dev`
