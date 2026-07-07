@@ -22,6 +22,11 @@ export * from './systemPower.js';
 export * from './wifiControl.js';
 export * from './keystroke.js';
 export * from './runAppleScriptTool.js';
+export * from './moveMouseTool.js';
+export * from './getUIElements.js';
+export * from './mouseClick.js';
+export * from './annotateScreen.js';
+
 
 
 

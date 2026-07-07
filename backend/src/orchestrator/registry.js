@@ -22,6 +22,11 @@ import { wifiControlTool } from '../tools/mac/wifiControl.js';
 import { keystrokeTool } from '../tools/mac/keystroke.js';
 import { activeWindowTool } from '../tools/mac/activeWindow.js';
 import { runAppleScriptTool } from '../tools/mac/runAppleScriptTool.js';
+import { moveMouseTool } from '../tools/mac/moveMouseTool.js';
+import { getUIElementsTool } from '../tools/mac/getUIElements.js';
+import { mouseClickTool } from '../tools/mac/mouseClick.js';
+import { annotateScreenTool } from '../tools/mac/annotateScreen.js';
+
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { Embedder } from '../rag/embedder.js';
@@ -59,6 +64,10 @@ class ToolRegistry {
 		this.tools.set(keystrokeTool.definition.name, keystrokeTool);
 		this.tools.set(activeWindowTool.definition.name, activeWindowTool);
 		this.tools.set(runAppleScriptTool.definition.name, runAppleScriptTool);
+		this.tools.set(moveMouseTool.definition.name, moveMouseTool);
+		this.tools.set(getUIElementsTool.definition.name, getUIElementsTool);
+		this.tools.set(mouseClickTool.definition.name, mouseClickTool);
+		this.tools.set(annotateScreenTool.definition.name, annotateScreenTool);
 	}
 
 	// Ensure database connection is loaded
