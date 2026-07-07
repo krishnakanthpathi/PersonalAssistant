@@ -84,7 +84,7 @@ export const keystrokeTool = {
 				cpProcess.stdin.write(text);
 				cpProcess.stdin.end();
 				// A small delay ensures the clipboard buffer is updated by OS
-				await new Promise(r => setTimeout(r, 100));
+				await new Promise(r => setTimeout(r, 50));
 			} catch (err) {
 				throw new Error('Failed to copy text to clipboard: ' + err.message);
 			}
@@ -93,7 +93,7 @@ export const keystrokeTool = {
 			try {
 				await execAsync(`osascript -e 'tell application "System Events" to keystroke "v" using command down'`);
 				// Wait for the target active application to process paste event
-				await new Promise(r => setTimeout(r, 200));
+				await new Promise(r => setTimeout(r, 100));
 			} catch (err) {
 				throw new Error('Failed to paste text: ' + err.message);
 			}
