@@ -31,13 +31,23 @@ An agentic, multi-turn personal assistant backend built with Node.js, Express, O
 ## Getting Started
 
 ### 1. Configure Environment Variables
-Create a `backend/.env` file:
+Create or update your `backend/.env` file:
 ```env
 PORT=3000
 NODE_ENV=development
 LOG_LEVEL=info
+
+# LLM Provider: 'ollama' or 'openai'
+LLM_PROVIDER=openai
+
+# Ollama Settings (if provider is ollama)
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:7b
+
+# OpenAI Settings (if provider is openai, e.g. for GLM 5.2 or custom compatible endpoints)
+OPENAI_API_KEY=your-api-key-here
+OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/ # Optional custom base URL (e.g. Zhipu)
+OPENAI_MODEL=glm-4                                    # Active model name/ID
 ```
 
 ### 2. Configure MCP Servers
@@ -71,9 +81,26 @@ Expose allowed paths and servers in `backend/mcp-config.json`:
 }
 ```
 
-### 3. Run the Development Server
+### 3. Run the Development Servers
+
+You can launch both the backend API and the frontend dashboard concurrently using the root-level script:
+```bash
+# From the project root, run:
+bash start.sh
+```
+
+Alternatively, you can run them in separate terminals:
+
+#### Running the Backend API:
 ```bash
 cd backend
+npm run dev
+```
+
+#### Running the Frontend Web Dashboard:
+```bash
+cd frontend
+npm install # if not already installed
 npm run dev
 ```
 

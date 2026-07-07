@@ -1,4 +1,5 @@
 import axios from 'axios';
+import OpenAI from 'openai';
 import { registry } from './registry.js';
 import { env } from '../config/env.js';
 import { catchErrors } from '../utils/errors.js';
@@ -29,50 +30,97 @@ For Google Calendar operations:
 		const MAX_ITERATIONS = 15;
 		let iteration = 0;
 
-		// Helper to call Ollama with detailed logging
-		const callOllama = async (msgs, includeTools = false) => {
-			const payload = {
-				model: env.OLLAMA_MODEL,
-				messages: msgs,
-				stream: false,
-				options: {
-					num_ctx: 16384
-				}
-			};
-			if (includeTools) {
-				payload.tools = tools;
-			}
+		// Helper to call LLM (Ollama or OpenAI) with detailed logging
+		const callLLM = async (msgs, includeTools = false) => {
+			const provider = env.LLM_PROVIDER;
+			logger.info(`Calling LLM via provider: ${provider}`);
 
-			const payloadSize = JSON.stringify(payload).length;
-			logger.info(`Ollama request: model=${env.OLLAMA_MODEL}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
-			logger.debug(`Ollama message roles: [${msgs.map(m => m.role).join(', ')}]`);
-
-			try {
-				const res = await axios.post(`${env.OLLAMA_URL}/api/chat`, payload);
-				const data = res.data;
-				logger.info(`Ollama response: status=${res.status}, done=${data.done}, done_reason=${data.done_reason || 'N/A'}, eval_count=${data.eval_count || 'N/A'}, tool_calls=${data.message?.tool_calls?.length || 0}`);
-				logger.debug(`Ollama response content (first 500 chars): ${(data.message?.content || '').substring(0, 500)}`);
-				return data;
-			} catch (error) {
-				// Log detailed axios error info
-				if (error.response) {
-					logger.error(`Ollama HTTP error: status=${error.response.status}, statusText=${error.response.statusText}`);
-					logger.error(`Ollama error response body: ${JSON.stringify(error.response.data).substring(0, 1000)}`);
-					logger.error(`Ollama request payload size was ${payloadSize} chars with ${msgs.length} messages`);
-				} else if (error.request) {
-					logger.error(`Ollama request failed (no response): ${error.message}`);
-				} else {
-					logger.error(`Ollama request setup error: ${error.message}`);
+			if (provider === 'openai') {
+				if (!env.OPENAI_API_KEY) {
+					throw new Error('OPENAI_API_KEY is not defined in the environment variables.');
 				}
-				throw error;
+				const openaiInstance = new OpenAI({
+					apiKey: env.OPENAI_API_KEY,
+					baseURL: env.OPENAI_BASE_URL || undefined
+				});
+
+				const payload = {
+					model: env.OPENAI_MODEL,
+					messages: msgs,
+					stream: false
+				};
+
+				if (includeTools && tools.length > 0) {
+					payload.tools = tools;
+				}
+
+				const payloadSize = JSON.stringify(payload).length;
+				logger.info(`OpenAI request: model=${env.OPENAI_MODEL}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
+
+				try {
+					const res = await openaiInstance.chat.completions.create(payload);
+					const responseMessage = res.choices[0].message;
+					logger.info(`OpenAI response: role=${responseMessage.role}, tool_calls=${responseMessage.tool_calls?.length || 0}`);
+					logger.debug(`OpenAI response content (first 500 chars): ${(responseMessage.content || '').substring(0, 500)}`);
+					
+					return {
+						message: {
+							role: 'assistant',
+							content: responseMessage.content || '',
+							tool_calls: responseMessage.tool_calls ? responseMessage.tool_calls.map(tc => ({
+								id: tc.id,
+								type: tc.type,
+								function: {
+									name: tc.function.name,
+									arguments: tc.function.arguments
+								}
+							})) : undefined
+						}
+					};
+				} catch (error) {
+					logger.error(`OpenAI request failed: ${error.message}`);
+					throw error;
+				}
+			} else {
+				const payload = {
+					model: env.OLLAMA_MODEL,
+					messages: msgs,
+					stream: false,
+					options: {
+						num_ctx: 16384
+					}
+				};
+				if (includeTools && tools.length > 0) {
+					payload.tools = tools;
+				}
+
+				const payloadSize = JSON.stringify(payload).length;
+				logger.info(`Ollama request: model=${env.OLLAMA_MODEL}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
+				logger.debug(`Ollama message roles: [${msgs.map(m => m.role).join(', ')}]`);
+
+				try {
+					const res = await axios.post(`${env.OLLAMA_URL}/api/chat`, payload);
+					const data = res.data;
+					logger.info(`Ollama response: status=${res.status}, done=${data.done}, done_reason=${data.done_reason || 'N/A'}, eval_count=${data.eval_count || 'N/A'}, tool_calls=${data.message?.tool_calls?.length || 0}`);
+					logger.debug(`Ollama response content (first 500 chars): ${(data.message?.content || '').substring(0, 500)}`);
+					return data;
+				} catch (error) {
+					if (error.response) {
+						logger.error(`Ollama HTTP error: status=${error.response.status}, statusText=${error.response.statusText}`);
+						logger.error(`Ollama error response body: ${JSON.stringify(error.response.data).substring(0, 1000)}`);
+					} else {
+						logger.error(`Ollama request failed: ${error.message}`);
+					}
+					throw error;
+				}
 			}
 		};
 
-		// 3. First call to Ollama including the tools list
+		// 3. First call to LLM including the tools list
 		if (onStatusUpdate) {
 			onStatusUpdate('Thinking...');
 		}
-		const response = await callOllama(messages, true);
+		const response = await callLLM(messages, true);
 
 		let message = response.message;
 
@@ -118,7 +166,15 @@ For Google Calendar operations:
 
 			for (const call of message.tool_calls) {
 				const toolName = call.function.name;
-				const toolArgs = call.function.arguments;
+				let toolArgs = call.function.arguments;
+
+				if (typeof toolArgs === 'string') {
+					try {
+						toolArgs = JSON.parse(toolArgs);
+					} catch (e) {
+						logger.error(`Failed to parse tool arguments: ${toolArgs}`, e);
+					}
+				}
 
 				logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
 				if (onStatusUpdate) {
@@ -169,11 +225,11 @@ For Google Calendar operations:
 				}
 			}
 
-			// Call Ollama again with the tool results to get the next step
+			// Call LLM again with the tool results to get the next step
 			if (onStatusUpdate) {
 				onStatusUpdate(`Thinking... (step ${iteration})`);
 			}
-			const nextResponse = await callOllama(messages, false);
+			const nextResponse = await callLLM(messages, false);
 			message = nextResponse.message;
 
 			// Parse XML tool calls in the subsequent response

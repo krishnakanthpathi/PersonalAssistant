@@ -6,6 +6,7 @@ import cors from 'cors';
 
 import { mcpManager } from './mcp/mcpManager.js';
 import { Agent } from "./orchestrator/agent.js";
+import { registry } from "./orchestrator/registry.js";
 
 import { logger } from './utils/logger.js';
 import { platform } from 'os';
@@ -30,6 +31,25 @@ app.get("/", (req, res) => {
 		}
 	)
 })
+
+app.get("/api/tools", async (req, res) => {
+	try {
+		const tools = await registry.getOllamaTools();
+		res.json({ success: true, tools });
+	} catch (error) {
+		res.status(500).json({ success: false, error: error.message });
+	}
+});
+
+app.get("/api/config", (req, res) => {
+	res.json({
+		success: true,
+		provider: env.LLM_PROVIDER,
+		model: env.LLM_PROVIDER === 'openai' ? env.OPENAI_MODEL : env.OLLAMA_MODEL,
+		openaiBaseUrl: env.OPENAI_BASE_URL || 'default',
+		port: env.PORT
+	});
+});
 
 app.post("/api/chat", async (req, res) => {
 	const { prompt } = req.body;

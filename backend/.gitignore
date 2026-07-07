@@ -27,6 +27,5 @@ data/vector-store/
 # OS Files
 .DS_Store
 Thumbs.db
-
-# GCP OAuth Keys
 gcp-oauth.keys.json
+google-credentials.json

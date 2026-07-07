@@ -12,5 +12,9 @@ export const env = {
 	OLLAMA_MODEL: process.env.OLLAMA_MODEL || 'llama3.1',
 	NOTION_TOKEN: process.env.NOTION_TOKEN,
 	NOTION_PARENT_PAGE_ID: process.env.NOTION_PARENT_PAGE_ID,
+	OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+	OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
+	OPENAI_MODEL: process.env.OPENAI_MODEL || 'glm-4',
+	LLM_PROVIDER: process.env.LLM_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'ollama'),
 };
 
