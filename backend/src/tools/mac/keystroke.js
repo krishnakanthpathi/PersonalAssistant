@@ -40,8 +40,8 @@ export const keystrokeTool = {
 			properties: {
 				action: {
 					type: 'string',
-					enum: ['type', 'shortcut'],
-					description: 'Whether to type plain text characters ("type") or send a keyboard key/shortcut combo ("shortcut").'
+					enum: ['type', 'shortcut', 'press'],
+					description: 'Whether to type plain text characters ("type"), or press a specific key/shortcut ("shortcut" or "press" — both mean the same thing). Use "shortcut"/"press" with the key parameter to press Enter, Escape, Space, arrow keys, or modifier combos like Cmd+C.'
 				},
 				text: {
 					type: 'string',
@@ -110,8 +110,8 @@ export const keystrokeTool = {
 			}
 
 			return `Typed text successfully with formatting preserved.`;
-		} else if (action === 'shortcut') {
-			if (!key) throw new Error('Key parameter is required for shortcut action');
+		} else if (action === 'shortcut' || action === 'press') {
+			if (!key) throw new Error('Key parameter is required for shortcut/press action');
 			const lowerKey = key.toLowerCase();
 			logger.info(`Sending keyboard shortcut: ${modifiers.join('+') + (modifiers.length ? '+' : '')}${key}`);
 
@@ -135,7 +135,10 @@ export const keystrokeTool = {
 
 			const command = `osascript -e 'tell application "System Events" to ${actionScript}'`;
 			await execAsync(command);
+			logger.info(`Shortcut action completed successfully.`);
 			return `Shortcut action completed successfully.`;
+		} else {
+			throw new Error(`Unknown action "${action}". Valid values are: "type", "shortcut", "press".`);
 		}
 	}, 'Failed to execute keystroke action')
 };

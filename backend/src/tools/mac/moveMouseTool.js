@@ -20,11 +20,11 @@ function buildSwiftScript(ix, iy, action) {
 
 	if (action === 'move') return moveCode;
 
-	const isRight  = action === 'right_click';
+	const isRight = action === 'right_click';
 	const isDouble = action === 'double_click';
 	const downType = isRight ? 'CGEventType.rightMouseDown' : 'CGEventType.leftMouseDown';
-	const upType   = isRight ? 'CGEventType.rightMouseUp'   : 'CGEventType.leftMouseUp';
-	const btn      = isRight ? 'CGMouseButton.right'        : 'CGMouseButton.left';
+	const upType = isRight ? 'CGEventType.rightMouseUp' : 'CGEventType.leftMouseUp';
+	const btn = isRight ? 'CGMouseButton.right' : 'CGMouseButton.left';
 
 	const singleClick = [
 		`let down = CGEvent(mouseEventSource: nil, mouseType: ${downType}, mouseCursorPosition: point, mouseButton: ${btn})!`,
@@ -88,11 +88,11 @@ export const moveMouseTool = {
 			if (action === 'move') {
 				pyCode = `import Quartz\npos=Quartz.CGPointMake(${ix},${iy})\nQuartz.CGWarpMouseCursorPosition(pos)\nQuartz.CGAssociateMouseAndMouseCursorPosition(True)`;
 			} else {
-				const isRight  = action === 'right_click';
+				const isRight = action === 'right_click';
 				const isDouble = action === 'double_click';
-				const evDown   = isRight ? 'Quartz.kCGEventRightMouseDown' : 'Quartz.kCGEventLeftMouseDown';
-				const evUp     = isRight ? 'Quartz.kCGEventRightMouseUp'   : 'Quartz.kCGEventLeftMouseUp';
-				const btn      = isRight ? 'Quartz.kCGMouseButtonRight'    : 'Quartz.kCGMouseButtonLeft';
+				const evDown = isRight ? 'Quartz.kCGEventRightMouseDown' : 'Quartz.kCGEventLeftMouseDown';
+				const evUp = isRight ? 'Quartz.kCGEventRightMouseUp' : 'Quartz.kCGEventLeftMouseUp';
+				const btn = isRight ? 'Quartz.kCGMouseButtonRight' : 'Quartz.kCGMouseButtonLeft';
 				pyCode = [
 					`import Quartz,time`,
 					`pos=Quartz.CGPointMake(${ix},${iy})`,
@@ -158,10 +158,10 @@ export const moveMouseTool = {
 		}
 
 		const actionLabel = {
-			move:         `moved to (${ix}, ${iy})`,
-			click:        `clicked at (${ix}, ${iy})`,
+			move: `moved to (${ix}, ${iy})`,
+			click: `clicked at (${ix}, ${iy})`,
 			double_click: `double-clicked at (${ix}, ${iy})`,
-			right_click:  `right-clicked at (${ix}, ${iy})`
+			right_click: `right-clicked at (${ix}, ${iy})`
 		}[action];
 
 		return `Mouse ${actionLabel} successfully.`;
