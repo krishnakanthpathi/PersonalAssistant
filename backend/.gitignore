@@ -2,6 +2,7 @@
 node_modules/
 
 # Production / Build
+data/screenshots
 dist/
 out/
 build/

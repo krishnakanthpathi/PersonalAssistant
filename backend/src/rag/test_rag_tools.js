@@ -36,6 +36,18 @@ async function testRAGSelection() {
 		{
 			query: 'Take a screenshot of my screen',
 			expectedKeywords: ['screenshot']
+		},
+		{
+			query: 'Copy hello to my clipboard',
+			expectedKeywords: ['clipboard']
+		},
+		{
+			query: 'Pause the currently playing track in Spotify',
+			expectedKeywords: ['media_control']
+		},
+		{
+			query: 'Check my battery percentage and disk storage',
+			expectedKeywords: ['system_stats']
 		}
 	];
 

@@ -6,6 +6,15 @@ import { volumeSetTool } from '../tools/mac/volumeSet.js';
 import { listApplicationsTool } from '../tools/mac/listApplications.js';
 import { openApplicationTool } from '../tools/mac/openApplication.js';
 import { screenshotTool } from '../tools/mac/screenshot.js';
+import { closeApplicationTool } from '../tools/mac/closeApplication.js';
+import { openUrlTool } from '../tools/mac/openUrl.js';
+import { emptyTrashTool } from '../tools/mac/emptyTrash.js';
+import { getSystemStatsTool } from '../tools/mac/getSystemStats.js';
+import { lockScreenTool } from '../tools/mac/lockScreen.js';
+import { getVolumeTool } from '../tools/mac/getVolume.js';
+import { setBrightnessTool } from '../tools/mac/setBrightness.js';
+import { clipboardTool } from '../tools/mac/clipboard.js';
+import { mediaControlTool } from '../tools/mac/mediaControl.js';
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { Embedder } from '../rag/embedder.js';
@@ -27,6 +36,15 @@ class ToolRegistry {
 		this.tools.set(listApplicationsTool.definition.name, listApplicationsTool);
 		this.tools.set(openApplicationTool.definition.name, openApplicationTool);
 		this.tools.set(screenshotTool.definition.name, screenshotTool);
+		this.tools.set(closeApplicationTool.definition.name, closeApplicationTool);
+		this.tools.set(openUrlTool.definition.name, openUrlTool);
+		this.tools.set(emptyTrashTool.definition.name, emptyTrashTool);
+		this.tools.set(getSystemStatsTool.definition.name, getSystemStatsTool);
+		this.tools.set(lockScreenTool.definition.name, lockScreenTool);
+		this.tools.set(getVolumeTool.definition.name, getVolumeTool);
+		this.tools.set(setBrightnessTool.definition.name, setBrightnessTool);
+		this.tools.set(clipboardTool.definition.name, clipboardTool);
+		this.tools.set(mediaControlTool.definition.name, mediaControlTool);
 	}
 
 	// Ensure database connection is loaded
