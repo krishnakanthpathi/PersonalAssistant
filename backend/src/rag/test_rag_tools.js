@@ -24,6 +24,10 @@ async function testRAGSelection() {
 		{
 			query: 'List the files in the directory',
 			expectedKeywords: ['file', 'directory', 'list']
+		},
+		{
+			query: 'Show me what applications are installed on this computer',
+			expectedKeywords: ['application']
 		}
 	];
 
@@ -48,6 +52,19 @@ async function testRAGSelection() {
 		} else {
 			console.log('❌ TEST FAILED: No expected tool matches found.');
 		}
+	}
+
+	// 2. Direct execution test of list_applications
+	console.log('\n==================================================');
+	console.log('EXECUTING: list_applications');
+	console.log('==================================================');
+	try {
+		const result = await registry.callTool('list_applications', {});
+		console.log('Result (first 500 chars):');
+		console.log(result.substring(0, 500) + '...');
+		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
+	} catch (error) {
+		console.log('❌ EXECUTION FAILED:', error.message);
 	}
 
 	console.log('\nEnding RAG selection test.');

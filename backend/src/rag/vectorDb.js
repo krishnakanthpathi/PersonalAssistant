@@ -9,9 +9,16 @@ import { logger } from '../utils/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_FILE_PATH = path.join(__dirname, '../../data/tool_embeddings.json');
 
+function extractToolMeta(tool) {
+	const name = tool.function?.name || tool.name || '';
+	const description = tool.function?.description || tool.description || '';
+	const parameters = tool.function?.parameters || tool.parameters || tool.inputSchema || {};
+	return { name, description, parameters };
+}
+
 export class VectorDB {
 	constructor() {
-		this.toolsCache = new Map(); // key: toolName -> { tool, embedding }
+		this.toolsCache = new Map(); // key: toolName -> { tool, embedding, embeddingModel }
 	}
 
 	async connect() {
@@ -28,7 +35,8 @@ export class VectorDB {
 						if (item.name && item.tool && Array.isArray(item.embedding)) {
 							this.toolsCache.set(item.name, {
 								tool: item.tool,
-								embedding: item.embedding
+								embedding: item.embedding,
+								embeddingModel: item.embeddingModel || 'default'
 							});
 						}
 					}
@@ -49,7 +57,8 @@ export class VectorDB {
 			const data = Array.from(this.toolsCache.entries()).map(([name, val]) => ({
 				name,
 				tool: val.tool,
-				embedding: val.embedding
+				embedding: val.embedding,
+				embeddingModel: val.embeddingModel
 			}));
 			fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), 'utf8');
 			logger.info(`Saved ${data.length} tool embeddings to disk.`);
@@ -62,22 +71,26 @@ export class VectorDB {
 		return this.toolsCache.get(name);
 	}
 
-	set(name, tool, embedding) {
-		this.toolsCache.set(name, { tool, embedding });
+	set(name, tool, embedding, embeddingModel) {
+		this.toolsCache.set(name, { tool, embedding, embeddingModel });
 	}
 
-	isUpToDate(name, toolDef) {
+	isUpToDate(name, toolDef, currentModel) {
 		const cached = this.toolsCache.get(name);
 		if (!cached) return false;
 		
-		const cachedDef = cached.tool;
-		// Check description and function parameters
-		const descriptionMatch = (cachedDef.description || '') === (toolDef.description || '');
+		// Invalidate if the embedding model changed
+		if (cached.embeddingModel !== currentModel) {
+			logger.info(`Invalidating cache for tool "${name}" because model changed: ${cached.embeddingModel} -> ${currentModel}`);
+			return false;
+		}
 		
-		// Stringify check for parameter schema to capture edits to parameters
-		const cachedParams = cachedDef.parameters || cachedDef.inputSchema || {};
-		const currentParams = toolDef.parameters || toolDef.inputSchema || {};
-		const parametersMatch = JSON.stringify(cachedParams) === JSON.stringify(currentParams);
+		const cachedMeta = extractToolMeta(cached.tool);
+		const currentMeta = extractToolMeta(toolDef);
+		
+		// Check description and function parameters
+		const descriptionMatch = cachedMeta.description === currentMeta.description;
+		const parametersMatch = JSON.stringify(cachedMeta.parameters) === JSON.stringify(currentMeta.parameters);
 
 		return descriptionMatch && parametersMatch;
 	}
@@ -90,3 +103,4 @@ export class VectorDB {
 		this.toolsCache.clear();
 	}
 }
+

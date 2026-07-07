@@ -3,6 +3,7 @@
  */
 
 import { volumeSetTool } from '../tools/mac/volumeSet.js';
+import { listApplicationsTool } from '../tools/mac/listApplications.js';
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { Embedder } from '../rag/embedder.js';
@@ -19,8 +20,9 @@ class ToolRegistry {
 	}
 
 	initialize() {
-		// Register the new setter tool
+		// Register local tools
 		this.tools.set(volumeSetTool.definition.name, volumeSetTool);
+		this.tools.set(listApplicationsTool.definition.name, listApplicationsTool);
 	}
 
 	// Ensure database connection is loaded
@@ -68,6 +70,10 @@ class ToolRegistry {
 			return allTools;
 		}
 
+		const currentModel = env.LLM_PROVIDER === 'openai'
+			? (env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small')
+			: (env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text');
+
 		try {
 			// Find out which tools are outdated or not cached
 			const toolsToEmbed = [];
@@ -75,7 +81,7 @@ class ToolRegistry {
 
 			for (const tool of allTools) {
 				const toolName = tool.function?.name || tool.name;
-				const isCached = this.vectorDb.isUpToDate(toolName, tool);
+				const isCached = this.vectorDb.isUpToDate(toolName, tool, currentModel);
 
 				if (!isCached) {
 					const description = tool.function?.description || tool.description || '';
@@ -87,12 +93,12 @@ class ToolRegistry {
 
 			// Batch embed any new or modified tools
 			if (toolsToEmbed.length > 0) {
-				logger.info(`Generating embeddings for ${toolsToEmbed.length} new/updated tools...`);
+				logger.info(`Generating embeddings for ${toolsToEmbed.length} new/updated tools using model: ${currentModel}...`);
 				const embeddings = await this.embedder.embedBatch(toolsToEmbedTexts);
 				for (let i = 0; i < toolsToEmbed.length; i++) {
 					const tool = toolsToEmbed[i];
 					const toolName = tool.function?.name || tool.name;
-					this.vectorDb.set(toolName, tool, embeddings[i]);
+					this.vectorDb.set(toolName, tool, embeddings[i], currentModel);
 				}
 				// Save updated cache to disk
 				await this.vectorDb.save();
