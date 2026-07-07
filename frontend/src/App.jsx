@@ -146,7 +146,7 @@ function App() {
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: inputMsg })
+        body: JSON.stringify({ prompt: inputMsg, history: messages })
       });
 
       if (!response.body) {
@@ -401,7 +401,7 @@ function App() {
                 {/* Active loop status display */}
                 {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (
                   <div className="process-logs">
-                    <span className="spinner"></span>
+                    {isProcessing && idx === messages.length - 1 && <span className="spinner"></span>}
                     <div>
                       <strong>Reasoning path:</strong>{' '}
                       {msg.logs.map((log, lIdx) => (

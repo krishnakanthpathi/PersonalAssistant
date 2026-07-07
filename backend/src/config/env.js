@@ -16,5 +16,11 @@ export const env = {
 	OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
 	OPENAI_MODEL: process.env.OPENAI_MODEL || 'glm-4',
 	LLM_PROVIDER: process.env.LLM_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'ollama'),
+	MAX_RELEVANT_TOOLS: parseInt(process.env.MAX_RELEVANT_TOOLS || '10', 10),
+	TOOL_SIMILARITY_THRESHOLD: parseFloat(process.env.TOOL_SIMILARITY_THRESHOLD || '0.25'),
+	OPENAI_EMBEDDING_MODEL: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+	OLLAMA_EMBEDDING_MODEL: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
 };
+
+
 

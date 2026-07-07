@@ -21,8 +21,10 @@ data/logs/
 
 # Local databases and vector stores
 data/vector-store/
+data/tool_embeddings.json
 *.db
 *.sqlite
+
 
 # OS Files
 .DS_Store

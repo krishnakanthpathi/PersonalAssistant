@@ -6,7 +6,25 @@ import { catchErrors } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
 export class Agent {
-	run = catchErrors(async (prompt, onStatusUpdate) => {
+	run = catchErrors(async (prompt, historyOrStatusUpdate, maybeStatusUpdate) => {
+		let history = [];
+		let onStatusUpdate = null;
+
+		if (typeof historyOrStatusUpdate === 'function') {
+			onStatusUpdate = historyOrStatusUpdate;
+		} else {
+			history = historyOrStatusUpdate || [];
+			onStatusUpdate = maybeStatusUpdate;
+		}
+
+		// Sanitize and map standard message fields from history
+		const cleanedHistory = history
+			.map(m => ({
+				role: m.role,
+				content: m.content
+			}))
+			.filter(m => m.role && m.content);
+
 		// 1. Prepare message history
 		const messages = [
 			{
@@ -20,12 +38,20 @@ For Notion operations:
 For Google Calendar operations:
 - You can read, create, update, delete, and list events on Google Calendar.`
 			},
+			...cleanedHistory,
 			{ role: 'user', content: prompt }
 		];
 
-		// 2. Fetch tool definitions
-		const tools = await registry.getOllamaTools();
+		// Generate a search query for tool selection that combines previous user inputs
+		// to maintain context (e.g. if the user says "set it to 50" after "set volume to 80")
+		const userMessages = cleanedHistory.filter(m => m.role === 'user').slice(-2);
+		const combinedRAGQuery = [...userMessages.map(m => m.content), prompt].join(' ');
+
+		// 2. Fetch tool definitions using RAG selection
+		const tools = await registry.getRelevantTools(combinedRAGQuery);
 		logger.info(`Loaded ${tools.length} tools for agent`);
+
+
 
 		const MAX_ITERATIONS = 15;
 		let iteration = 0;

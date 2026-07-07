@@ -52,7 +52,7 @@ app.get("/api/config", (req, res) => {
 });
 
 app.post("/api/chat", async (req, res) => {
-	const { prompt } = req.body;
+	const { prompt, history } = req.body;
 	logger.info(`Received chat request: ${prompt}`);
 
 	// Set headers for Server-Sent Events (SSE)
@@ -66,7 +66,7 @@ app.post("/api/chat", async (req, res) => {
 	};
 
 	try {
-		const response = await agent.run(prompt, (status) => {
+		const response = await agent.run(prompt, history, (status) => {
 			sendSSE('status', status);
 		});
 		sendSSE('result', response);
