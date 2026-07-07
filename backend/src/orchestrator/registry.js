@@ -175,6 +175,16 @@ class ToolRegistry {
 				env.MAX_RELEVANT_TOOLS
 			);
 
+			// Always ensure say_speech is included if it exists in allTools to support voice feedback
+			const hasSaySpeech = selectedTools.some(t => (t.function?.name || t.name) === 'say_speech');
+			if (!hasSaySpeech) {
+				const saySpeechToolObj = allTools.find(t => (t.function?.name || t.name) === 'say_speech');
+				if (saySpeechToolObj) {
+					selectedTools.push(saySpeechToolObj);
+					logger.info('Forced inclusion of "say_speech" tool to support voice feedback.');
+				}
+			}
+
 			logger.info(`RAG selected ${selectedTools.length} / ${allTools.length} tools for the user query.`);
 			return selectedTools;
 		} catch (error) {
