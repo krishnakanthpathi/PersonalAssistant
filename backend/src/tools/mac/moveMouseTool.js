@@ -5,6 +5,43 @@ import { logger } from '../../utils/logger.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * Builds a Swift CoreGraphics inline script for mouse move and click events.
+ * Swift is available on any macOS system with Xcode command line tools (zero extra deps).
+ */
+function buildSwiftScript(ix, iy, action) {
+	const moveCode = [
+		'import CoreGraphics',
+		'import Foundation',
+		`let point = CGPoint(x: ${ix}, y: ${iy})`,
+		'CGWarpMouseCursorPosition(point)',
+		'CGAssociateMouseAndMouseCursorPosition(1)'
+	].join('\n');
+
+	if (action === 'move') return moveCode;
+
+	const isRight  = action === 'right_click';
+	const isDouble = action === 'double_click';
+	const downType = isRight ? 'CGEventType.rightMouseDown' : 'CGEventType.leftMouseDown';
+	const upType   = isRight ? 'CGEventType.rightMouseUp'   : 'CGEventType.leftMouseUp';
+	const btn      = isRight ? 'CGMouseButton.right'        : 'CGMouseButton.left';
+
+	const singleClick = [
+		`let down = CGEvent(mouseEventSource: nil, mouseType: ${downType}, mouseCursorPosition: point, mouseButton: ${btn})!`,
+		`let up   = CGEvent(mouseEventSource: nil, mouseType: ${upType},   mouseCursorPosition: point, mouseButton: ${btn})!`,
+		'down.post(tap: .cghidEventTap)',
+		'Thread.sleep(forTimeInterval: 0.05)',
+		'up.post(tap: .cghidEventTap)'
+	].join('\n');
+
+	return [
+		moveCode,
+		'Thread.sleep(forTimeInterval: 0.05)',
+		singleClick,
+		isDouble ? `Thread.sleep(forTimeInterval: 0.08)\n${singleClick}` : ''
+	].filter(Boolean).join('\n');
+}
+
 export const moveMouseTool = {
 	definition: {
 		name: 'move_mouse',
@@ -37,77 +74,59 @@ export const moveMouseTool = {
 
 		const ix = Math.round(x);
 		const iy = Math.round(y);
-
 		logger.info(`Mouse action "${action}" at (${ix}, ${iy})`);
 
-		// --- Tier 1: cliclick (brew install cliclick) ---
+		// --- Tier 1: cliclick (brew install cliclick) — fastest ---
 		const tryCliclick = async () => {
-			const flag = {
-				move:         'm',
-				click:        'c',
-				double_click: 'dc',
-				right_click:  'rc'
-			}[action] || 'm';
+			const flag = { move: 'm', click: 'c', double_click: 'dc', right_click: 'rc' }[action] || 'm';
 			await execAsync(`cliclick ${flag}:${ix},${iy}`);
 		};
 
-		// --- Tier 2: Python / Quartz (pip install pyobjc-framework-Quartz) ---
+		// --- Tier 2: Python pyobjc-Quartz (pip install pyobjc-framework-Quartz) ---
 		const tryPython = async () => {
-			let pyAction = '';
+			let pyCode;
 			if (action === 'move') {
-				pyAction = `
-import Quartz
-pos = Quartz.CGPointMake(${ix}, ${iy})
-Quartz.CGWarpMouseCursorPosition(pos)
-Quartz.CGAssociateMouseAndMouseCursorPosition(True)
-`;
+				pyCode = `import Quartz\npos=Quartz.CGPointMake(${ix},${iy})\nQuartz.CGWarpMouseCursorPosition(pos)\nQuartz.CGAssociateMouseAndMouseCursorPosition(True)`;
 			} else {
-				const buttonDown = {
-					click:        'Quartz.kCGEventLeftMouseDown',
-					double_click: 'Quartz.kCGEventLeftMouseDown',
-					right_click:  'Quartz.kCGEventRightMouseDown'
-				}[action];
-				const buttonUp = {
-					click:        'Quartz.kCGEventLeftMouseUp',
-					double_click: 'Quartz.kCGEventLeftMouseUp',
-					right_click:  'Quartz.kCGEventRightMouseUp'
-				}[action];
-				const button = (action === 'right_click')
-					? 'Quartz.kCGMouseButtonRight'
-					: 'Quartz.kCGMouseButtonLeft';
-
-				pyAction = `
-import Quartz, time
-pos = Quartz.CGPointMake(${ix}, ${iy})
-Quartz.CGWarpMouseCursorPosition(pos)
-Quartz.CGAssociateMouseAndMouseCursorPosition(True)
-time.sleep(0.05)
-def click(evType, btn):
-    e = Quartz.CGEventCreateMouseEvent(None, evType, pos, btn)
-    Quartz.CGEventPost(Quartz.kCGHIDEventTap, e)
-    time.sleep(0.05)
-click(${buttonDown}, ${button})
-click(${buttonUp}, ${button})
-${action === 'double_click' ? `click(${buttonDown}, ${button})\nclick(${buttonUp}, ${button})` : ''}
-`;
+				const isRight  = action === 'right_click';
+				const isDouble = action === 'double_click';
+				const evDown   = isRight ? 'Quartz.kCGEventRightMouseDown' : 'Quartz.kCGEventLeftMouseDown';
+				const evUp     = isRight ? 'Quartz.kCGEventRightMouseUp'   : 'Quartz.kCGEventLeftMouseUp';
+				const btn      = isRight ? 'Quartz.kCGMouseButtonRight'    : 'Quartz.kCGMouseButtonLeft';
+				pyCode = [
+					`import Quartz,time`,
+					`pos=Quartz.CGPointMake(${ix},${iy})`,
+					`Quartz.CGWarpMouseCursorPosition(pos)`,
+					`Quartz.CGAssociateMouseAndMouseCursorPosition(True)`,
+					`time.sleep(0.05)`,
+					`def ck(t,b):`,
+					` e=Quartz.CGEventCreateMouseEvent(None,t,pos,b)`,
+					` Quartz.CGEventPost(Quartz.kCGHIDEventTap,e)`,
+					` time.sleep(0.05)`,
+					`ck(${evDown},${btn})`,
+					`ck(${evUp},${btn})`,
+					isDouble ? `ck(${evDown},${btn})\nck(${evUp},${btn})` : ''
+				].filter(Boolean).join('\n');
 			}
-			const script = pyAction.trim().replace(/'/g, "'\\''");
-			await execAsync(`python3 -c '${script}'`);
+			const escaped = pyCode.replace(/'/g, "'\\''");
+			await execAsync(`python3 -c '${escaped}'`);
 		};
 
-		// --- Tier 3: Pure AppleScript via System Events (always available on macOS) ---
-		// Supports click, double_click, right_click. Move-only is a no-op (warn only).
+		// --- Tier 3: Swift CoreGraphics — zero deps, built into every macOS with Xcode CLI ---
+		const trySwift = async () => {
+			const swiftCode = buildSwiftScript(ix, iy, action);
+			await execAsync(`swift - << 'SWIFT_EOF'\n${swiftCode}\nSWIFT_EOF`, { timeout: 10000 });
+		};
+
+		// --- Tier 4: AppleScript System Events — click-only last resort ---
 		const tryAppleScript = async () => {
 			if (action === 'move') {
-				logger.warn('move-only action is not supported without cliclick or pyobjc. Install with: brew install cliclick');
-				return; // graceful no-op — no crash
+				throw new Error('move-only is not supported by AppleScript. Install cliclick: brew install cliclick');
 			}
-
 			let script;
 			if (action === 'double_click') {
-				script = `tell application "System Events"\nclick at {${ix}, ${iy}}\ndelay 0.05\nclick at {${ix}, ${iy}}\nend tell`;
+				script = `tell application "System Events"\nclick at {${ix}, ${iy}}\ndelay 0.08\nclick at {${ix}, ${iy}}\nend tell`;
 			} else if (action === 'right_click') {
-				// Control+click is the AppleScript equivalent of right-click
 				script = `tell application "System Events"\nkey down control\nclick at {${ix}, ${iy}}\nkey up control\nend tell`;
 			} else {
 				script = `tell application "System Events"\nclick at {${ix}, ${iy}}\nend tell`;
@@ -116,16 +135,25 @@ ${action === 'double_click' ? `click(${buttonDown}, ${button})\nclick(${buttonUp
 			await new Promise(r => setTimeout(r, 150));
 		};
 
-		// Run the fallback chain
+		// Run the full fallback chain
 		try {
 			await tryCliclick();
+			logger.info('move_mouse: used cliclick');
 		} catch {
-			logger.warn('cliclick not found; falling back to Python/Quartz...');
+			logger.warn('cliclick not found; trying Python/Quartz...');
 			try {
 				await tryPython();
+				logger.info('move_mouse: used Python/Quartz');
 			} catch {
-				logger.warn('Python/Quartz not available; falling back to AppleScript System Events...');
-				await tryAppleScript();
+				logger.warn('Python/Quartz not available; trying Swift CoreGraphics...');
+				try {
+					await trySwift();
+					logger.info('move_mouse: used Swift CoreGraphics');
+				} catch (swiftErr) {
+					logger.warn(`Swift failed (${swiftErr.message.split('\n')[0]}); trying AppleScript...`);
+					await tryAppleScript();
+					logger.info('move_mouse: used AppleScript System Events');
+				}
 			}
 		}
 
@@ -139,4 +167,3 @@ ${action === 'double_click' ? `click(${buttonDown}, ${button})\nclick(${buttonUp
 		return `Mouse ${actionLabel} successfully.`;
 	}, 'Failed to execute move_mouse action')
 };
-
