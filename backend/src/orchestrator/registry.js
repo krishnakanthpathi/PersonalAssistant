@@ -26,6 +26,8 @@ import { moveMouseTool } from '../tools/mac/moveMouseTool.js';
 import { getUIElementsTool } from '../tools/mac/getUIElements.js';
 import { mouseClickTool } from '../tools/mac/mouseClick.js';
 import { annotateScreenTool } from '../tools/mac/annotateScreen.js';
+import { timerTool } from '../tools/mac/timer.js';
+
 
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
@@ -68,6 +70,7 @@ class ToolRegistry {
 		this.tools.set(getUIElementsTool.definition.name, getUIElementsTool);
 		this.tools.set(mouseClickTool.definition.name, mouseClickTool);
 		this.tools.set(annotateScreenTool.definition.name, annotateScreenTool);
+		this.tools.set(timerTool.definition.name, timerTool);
 	}
 
 	// Ensure database connection is loaded

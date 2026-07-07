@@ -26,6 +26,7 @@ export * from './moveMouseTool.js';
 export * from './getUIElements.js';
 export * from './mouseClick.js';
 export * from './annotateScreen.js';
+export * from './timer.js';
 
 
 
