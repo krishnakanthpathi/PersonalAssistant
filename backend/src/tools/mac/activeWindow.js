@@ -1,4 +1,4 @@
-import { runAppleScript } from './appleScript.js';
+import { runAppleScript } from '../../utils/appleScript.js';
 import { catchErrors } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 
