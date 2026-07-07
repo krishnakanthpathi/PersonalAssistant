@@ -76,6 +76,10 @@ async function testRAGSelection() {
 		{
 			query: 'Open spotlight search by pressing command and space keys',
 			expectedKeywords: ['keystroke']
+		},
+		{
+			query: 'Get the current active application or window',
+			expectedKeywords: ['active_window']
 		}
 	];
 
@@ -168,6 +172,18 @@ async function testRAGSelection() {
 		const result = await registry.callTool('keystroke_action', { action: 'shortcut', key: 'enter' });
 		console.log('Result:', result);
 		console.log('✅ EXECUTION PASSED: Spotlight search simulated successfully via keyboard shortcuts.');
+	} catch (error) {
+		console.log('❌ EXECUTION FAILED:', error.message);
+	}
+
+	// 7. Direct execution test of get_active_window
+	console.log('\n==================================================');
+	console.log('EXECUTING: get_active_window');
+	console.log('==================================================');
+	try {
+		const result = await registry.callTool('get_active_window', {});
+		console.log('Result:', result);
+		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
 	} catch (error) {
 		console.log('❌ EXECUTION FAILED:', error.message);
 	}

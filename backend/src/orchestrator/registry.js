@@ -20,6 +20,7 @@ import { saySpeechTool } from '../tools/mac/saySpeech.js';
 import { systemPowerTool } from '../tools/mac/systemPower.js';
 import { wifiControlTool } from '../tools/mac/wifiControl.js';
 import { keystrokeTool } from '../tools/mac/keystroke.js';
+import { activeWindowTool } from '../tools/mac/activeWindow.js';
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { Embedder } from '../rag/embedder.js';
@@ -55,6 +56,7 @@ class ToolRegistry {
 		this.tools.set(systemPowerTool.definition.name, systemPowerTool);
 		this.tools.set(wifiControlTool.definition.name, wifiControlTool);
 		this.tools.set(keystrokeTool.definition.name, keystrokeTool);
+		this.tools.set(activeWindowTool.definition.name, activeWindowTool);
 	}
 
 	// Ensure database connection is loaded
