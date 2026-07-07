@@ -27,11 +27,11 @@ async function testRAGSelection() {
 		},
 		{
 			query: 'Show me what applications are installed on this computer',
-			expectedKeywords: ['desktop']
+			expectedKeywords: ['application']
 		},
 		{
-			query: 'Click on the element @e12 in Google Chrome',
-			expectedKeywords: ['desktop']
+			query: 'Open Safari application',
+			expectedKeywords: ['open_application']
 		}
 	];
 
@@ -58,18 +58,31 @@ async function testRAGSelection() {
 		}
 	}
 
-	// 2. Direct execution test of agent_desktop_action (apps)
+	// 2. Direct execution test of list_applications
 	console.log('\n==================================================');
-	console.log('EXECUTING: agent_desktop_action (apps)');
+	console.log('EXECUTING: list_applications');
 	console.log('==================================================');
 	try {
-		const result = await registry.callTool('agent_desktop_action', { action: 'apps' });
+		const result = await registry.callTool('list_applications', {});
 		console.log('Result (first 500 chars):');
 		console.log(result.substring(0, 500) + '...');
 		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
 	} catch (error) {
 		console.log('❌ EXECUTION FAILED:', error.message);
 	}
+
+	// 3. Direct execution test of open_application (Safari)
+	console.log('\n==================================================');
+	console.log('EXECUTING: open_application (Safari)');
+	console.log('==================================================');
+	try {
+		const result = await registry.callTool('open_application', { app: 'Safari' });
+		console.log('Result:', result);
+		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
+	} catch (error) {
+		console.log('❌ EXECUTION FAILED:', error.message);
+	}
+
 
 	console.log('\nEnding RAG selection test.');
 	process.exit(0);

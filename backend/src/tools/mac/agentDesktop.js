@@ -8,18 +8,18 @@ const execAsync = promisify(exec);
 export const agentDesktopTool = {
 	definition: {
 		name: 'agent_desktop_action',
-		description: 'Allows complete GUI control and desktop automation. Can interact with any running application window, click any element or button on the screen, type messages, send keyboard hotkeys, and perform arbitrary desktop actions.',
+		description: 'Allows complete GUI control, desktop automation, and process monitoring. Can list running applications, get UI window snapshots, click any element or button on the screen, type messages, send keyboard hotkeys, and perform desktop actions.',
 		parameters: {
 			type: 'object',
 			properties: {
 				action: {
 					type: 'string',
-					enum: ['apps', 'snapshot', 'click', 'type', 'press', 'screenshot'],
+					enum: ['apps', 'snapshot', 'click', 'type', 'press', 'screenshot', 'launch', 'close-app', 'status'],
 					description: 'The action to perform.'
 				},
 				app: {
 					type: 'string',
-					description: 'The name of the target application (required for snapshot/screenshot).'
+					description: 'The name of the target application (required for snapshot/screenshot/launch/close-app).'
 				},
 				ref: {
 					type: 'string',
@@ -58,7 +58,17 @@ export const agentDesktopTool = {
 			if (!app) throw new Error('App name is required for screenshot');
 			const outputPath = `./data/screenshot_${Date.now()}.png`;
 			cmdArgs = ['screenshot', '--app', `"${app}"`, '--output', outputPath];
+		} else if (action === 'launch') {
+			if (!app) throw new Error('App name is required for launch');
+			cmdArgs = ['launch', `"${app}"`];
+		} else if (action === 'close-app') {
+			if (!app) throw new Error('App name is required for close-app');
+			cmdArgs = ['close-app', `"${app}"`];
+		} else if (action === 'status') {
+			cmdArgs = ['status'];
 		}
+
+
 
 		// Run using npx to guarantee availability without manual global installation
 		const command = `npx --yes agent-desktop ${cmdArgs.join(' ')}`;

@@ -3,7 +3,8 @@
  */
 
 import { volumeSetTool } from '../tools/mac/volumeSet.js';
-import { agentDesktopTool } from '../tools/mac/agentDesktop.js';
+import { listApplicationsTool } from '../tools/mac/listApplications.js';
+import { openApplicationTool } from '../tools/mac/openApplication.js';
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { Embedder } from '../rag/embedder.js';
@@ -22,7 +23,8 @@ class ToolRegistry {
 	initialize() {
 		// Register local tools
 		this.tools.set(volumeSetTool.definition.name, volumeSetTool);
-		this.tools.set(agentDesktopTool.definition.name, agentDesktopTool);
+		this.tools.set(listApplicationsTool.definition.name, listApplicationsTool);
+		this.tools.set(openApplicationTool.definition.name, openApplicationTool);
 	}
 
 	// Ensure database connection is loaded
