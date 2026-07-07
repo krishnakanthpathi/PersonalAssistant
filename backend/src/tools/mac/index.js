@@ -21,6 +21,8 @@ export * from './saySpeech.js';
 export * from './systemPower.js';
 export * from './wifiControl.js';
 export * from './keystroke.js';
+export * from './runAppleScriptTool.js';
+
 
 
 

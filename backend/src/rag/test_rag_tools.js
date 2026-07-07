@@ -80,6 +80,10 @@ async function testRAGSelection() {
 		{
 			query: 'Get the current active application or window',
 			expectedKeywords: ['active_window']
+		},
+		{
+			query: 'Run a custom AppleScript script to check finder files',
+			expectedKeywords: ['applescript']
 		}
 	];
 
@@ -182,6 +186,18 @@ async function testRAGSelection() {
 	console.log('==================================================');
 	try {
 		const result = await registry.callTool('get_active_window', {});
+		console.log('Result:', result);
+		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
+	} catch (error) {
+		console.log('❌ EXECUTION FAILED:', error.message);
+	}
+
+	// 8. Direct execution test of run_applescript
+	console.log('\n==================================================');
+	console.log('EXECUTING: run_applescript');
+	console.log('==================================================');
+	try {
+		const result = await registry.callTool('run_applescript', { script: 'get name of Application "Finder"' });
 		console.log('Result:', result);
 		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
 	} catch (error) {
