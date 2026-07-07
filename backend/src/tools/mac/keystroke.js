@@ -67,12 +67,49 @@ export const keystrokeTool = {
 	execute: catchErrors(async ({ action, text, key, modifiers = [] }) => {
 		if (action === 'type') {
 			if (!text) throw new Error('Text parameter is required for typing action');
-			logger.info(`Typing text via keystroke: "${text}"`);
-			// Sanitize double quotes and backslashes for AppleScript
-			const escaped = text.replace(/["\\]/g, '\\$&');
-			const command = `osascript -e 'tell application "System Events" to keystroke "${escaped}"'`;
-			await execAsync(command);
-			return `Typed text "${text}" successfully.`;
+			logger.info(`Typing text via clipboard paste: "${text.substring(0, 30)}..."`);
+			
+			// 1. Fetch current clipboard content to restore later
+			let originalClipboard = '';
+			try {
+				const { stdout } = await execAsync('pbpaste');
+				originalClipboard = stdout;
+			} catch (err) {
+				logger.warn('Failed to read current clipboard:', err.message);
+			}
+
+			// 2. Write target text to clipboard
+			try {
+				const cpProcess = exec('pbcopy');
+				cpProcess.stdin.write(text);
+				cpProcess.stdin.end();
+				// A small delay ensures the clipboard buffer is updated by OS
+				await new Promise(r => setTimeout(r, 100));
+			} catch (err) {
+				throw new Error('Failed to copy text to clipboard: ' + err.message);
+			}
+
+			// 3. Simulate Cmd+V keystroke to paste the text instantly
+			try {
+				await execAsync(`osascript -e 'tell application "System Events" to keystroke "v" using command down'`);
+				// Wait for the target active application to process paste event
+				await new Promise(r => setTimeout(r, 200));
+			} catch (err) {
+				throw new Error('Failed to paste text: ' + err.message);
+			}
+
+			// 4. Restore the original clipboard content
+			if (originalClipboard) {
+				try {
+					const cpProcess = exec('pbcopy');
+					cpProcess.stdin.write(originalClipboard);
+					cpProcess.stdin.end();
+				} catch (err) {
+					logger.warn('Failed to restore original clipboard:', err.message);
+				}
+			}
+
+			return `Typed text successfully with formatting preserved.`;
 		} else if (action === 'shortcut') {
 			if (!key) throw new Error('Key parameter is required for shortcut action');
 			const lowerKey = key.toLowerCase();
