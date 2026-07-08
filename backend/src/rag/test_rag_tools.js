@@ -53,10 +53,7 @@ async function testRAGSelection() {
 			query: 'Switch system appearance to light mode',
 			expectedKeywords: ['dark_mode']
 		},
-		{
-			query: 'Speak hello world aloud',
-			expectedKeywords: ['say_speech']
-		},
+
 		{
 			query: 'Put the Mac computer to sleep',
 			expectedKeywords: ['system_power']

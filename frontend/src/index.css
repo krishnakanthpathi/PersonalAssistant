@@ -1,6 +1,5 @@
-@import "tailwindcss";
-
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
 
 @theme {
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -57,3 +56,55 @@ body {
 .markdown-body pre { @apply bg-black/40 border border-white/5 rounded-lg p-3 my-3 font-mono text-sm overflow-x-auto text-gray-200; }
 .markdown-body strong { @apply font-semibold text-white; }
 .markdown-body br { @apply mb-1; }
+
+/* Speech bubble styling */
+.speech-bubble-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-top: 8px;
+  max-width: 100%;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.05);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.speech-icon {
+  color: var(--color-accent-purple);
+  margin-top: 2px;
+  flex-shrink: 0;
+  animation: talkPulse 1.5s infinite ease-in-out;
+}
+
+.speech-text {
+  font-size: 0.9rem;
+  color: #e9d5ff; /* light purple-grey */
+  font-style: italic;
+  line-height: 1.4;
+}
+
+@keyframes talkPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

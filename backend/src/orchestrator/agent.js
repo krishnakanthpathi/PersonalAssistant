@@ -4,6 +4,7 @@ import { registry } from './registry.js';
 import { env } from '../config/env.js';
 import { catchErrors } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { saySpeechTool } from '../tools/mac/saySpeech.js';
 import { metricsService } from '../utils/metrics.js';
 
 export class Agent {
@@ -37,10 +38,21 @@ export class Agent {
 					content: `
 You are a local computer personal assistant running on macOS. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
 
-## Voice Output / Speech Synthesis (IMPORTANT)
-To behave as an agent and read out responses/status:
-- You must "say speech after completion of the tool" (i.e. call the \`say_speech\` tool with the summary of what the tool accomplished).
-- Alternatively, "lastly execute the result" by calling the \`say_speech\` tool with your final answer to read it aloud to the user as your final step.
+## Response Formatting & Voice Output (IMPORTANT)
+Every response you generate MUST be split into two sections:
+1. <speech>: A concise, conversational sentence or two describing what you are doing or what you have found, written exactly as you want it spoken out loud to the user. Keep it natural and short. Do not include markdown, URLs, symbols, or formatting in this section, as it will be read aloud.
+2. <action>: A detailed description of the outcome, findings, and any actions taken. You can use rich markdown formatting, lists, code blocks, or system information here.
+
+Example:
+<speech>
+I've updated your system volume to fifty percent.
+</speech>
+<action>
+### System Volume Updated
+- **Old Volume**: 20%
+- **New Volume**: 50%
+- **Status**: Success
+</action>
 
 ## UI Automation Workflow (IMPORTANT)
 When you need to interact with a desktop application's UI (click buttons, select contacts, fill inputs, press Send):
@@ -343,10 +355,67 @@ You can read, create, update, delete, and list events on Google Calendar.`
 
 			logger.info(`Agent finished after ${iteration} tool-calling iteration(s).`);
 			metricsService.endRequest(requestId, true);
-			return message.content;
+
+			const parsed = parseAgentResponse(message.content || '');
+			if (parsed.speech) {
+				logger.info(`Manually triggering speech synthesizer for: "${parsed.speech}"`);
+				saySpeechTool.execute({ text: parsed.speech }).catch(err => {
+					logger.error(`Manual speech execution failed: ${err.message}`);
+				});
+			}
+
+			return parsed;
 		} catch (error) {
 			metricsService.endRequest(requestId, false, error.message);
 			throw error;
 		}
 	}, 'Agent reasoning loop failed');
 }
+
+function parseAgentResponse(rawContent) {
+	const speechMatch = rawContent.match(/<speech>([\s\S]*?)<\/speech>/i);
+	const actionMatch = rawContent.match(/<action>([\s\S]*?)<\/action>/i);
+
+	let speech = '';
+	let action = '';
+
+	if (speechMatch) {
+		speech = speechMatch[1].trim();
+	}
+	if (actionMatch) {
+		action = actionMatch[1].trim();
+	}
+
+	// Fallbacks if tags are missing
+	if (!speechMatch && !actionMatch) {
+		// If no tags at all, treat the entire thing as the action, and speech is a simplified summary
+		action = rawContent.trim();
+		speech = cleanTextForSpeech(action);
+	} else if (speechMatch && !actionMatch) {
+		// If only speech tag is present, treat the rest of the text as action
+		action = rawContent.replace(/<speech>[\s\S]*?<\/speech>/gi, '').trim();
+	} else if (!speechMatch && actionMatch) {
+		// If only action tag is present
+		action = actionMatch[1].trim();
+		speech = cleanTextForSpeech(action);
+	}
+
+	return { speech, content: action };
+}
+
+function cleanTextForSpeech(text) {
+	let clean = text
+		.replace(/```[\s\S]*?```/g, '') // remove code blocks
+		.replace(/`([^`]+)`/g, '$1') // remove inline code backticks
+		.replace(/[#*_\-]/g, '') // remove markdown symbols
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // remove links, keep text
+		.split('\n')
+		.map(line => line.trim())
+		.filter(line => line.length > 0)
+		.join('. ');
+
+	// Limit speech to first 2 sentences for clean voice output
+	const sentences = clean.split(/[.!?]+/);
+	return sentences.slice(0, 2).join('. ').trim();
+}
+

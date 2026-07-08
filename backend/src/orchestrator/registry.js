@@ -15,7 +15,6 @@ import { getVolumeTool } from '../tools/mac/getVolume.js';
 import { clipboardTool } from '../tools/mac/clipboard.js';
 import { mediaControlTool } from '../tools/mac/mediaControl.js';
 import { darkModeTool } from '../tools/mac/darkMode.js';
-import { saySpeechTool } from '../tools/mac/saySpeech.js';
 import { systemPowerTool } from '../tools/mac/systemPower.js';
 import { wifiControlTool } from '../tools/mac/wifiControl.js';
 import { keystrokeTool } from '../tools/mac/keystroke.js';
@@ -58,7 +57,6 @@ class ToolRegistry {
 		this.tools.set(clipboardTool.definition.name, clipboardTool);
 		this.tools.set(mediaControlTool.definition.name, mediaControlTool);
 		this.tools.set(darkModeTool.definition.name, darkModeTool);
-		this.tools.set(saySpeechTool.definition.name, saySpeechTool);
 		this.tools.set(systemPowerTool.definition.name, systemPowerTool);
 		this.tools.set(wifiControlTool.definition.name, wifiControlTool);
 		this.tools.set(keystrokeTool.definition.name, keystrokeTool);
@@ -176,15 +174,6 @@ class ToolRegistry {
 				env.MAX_RELEVANT_TOOLS
 			);
 
-			// Always ensure say_speech is included if it exists in allTools to support voice feedback
-			const hasSaySpeech = selectedTools.some(t => (t.function?.name || t.name) === 'say_speech');
-			if (!hasSaySpeech) {
-				const saySpeechToolObj = allTools.find(t => (t.function?.name || t.name) === 'say_speech');
-				if (saySpeechToolObj) {
-					selectedTools.push(saySpeechToolObj);
-					logger.info('Forced inclusion of "say_speech" tool to support voice feedback.');
-				}
-			}
 
 			logger.info(`RAG selected ${selectedTools.length} / ${allTools.length} tools for the user query.`);
 			return selectedTools;

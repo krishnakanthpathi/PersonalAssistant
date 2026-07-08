@@ -274,7 +274,12 @@ function App() {
                 setMessages(prev => {
                   const updated = [...prev];
                   if (updated[assistantMsgIndex]) {
-                    updated[assistantMsgIndex].content = content;
+                    if (content && typeof content === 'object') {
+                      updated[assistantMsgIndex].content = content.content || '';
+                      updated[assistantMsgIndex].speech = content.speech || '';
+                    } else {
+                      updated[assistantMsgIndex].content = content;
+                    }
                   }
                   return updated;
                 });
@@ -510,6 +515,13 @@ function App() {
                         <div className="markdown-body" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) || (msg.isError ? 'An error occurred' : 'Thinking...') }} />
                       )}
                     </div>
+                    
+                    {msg.role === 'assistant' && msg.speech && (
+                      <div className="speech-bubble-container">
+                        <Volume2 className="speech-icon" size={14} />
+                        <span className="speech-text">"{msg.speech}"</span>
+                      </div>
+                    )}
                     
                     {/* Active loop status display */}
                     {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (
