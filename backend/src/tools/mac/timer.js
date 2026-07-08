@@ -119,6 +119,34 @@ export const timerTool = {
 			}
 
 			const timerLabel = label || 'Timer';
+
+			// Check if the user has a shortcut named "Start Timer" to trigger the built-in Clock app
+			let hasStartTimerShortcut = false;
+			try {
+				const { stdout } = await execAsync('shortcuts list');
+				const shortcuts = stdout.split('\n').map(s => s.trim().toLowerCase());
+				if (shortcuts.includes('start timer')) {
+					hasStartTimerShortcut = true;
+				}
+			} catch (err) {
+				logger.warn(`Failed to list shortcuts: ${err.message}`);
+			}
+
+			if (hasStartTimerShortcut) {
+				// Convert to minutes (most shortcuts "Start Timer" accept minutes, or customize)
+				const durationInMinutes = Math.max(1, Math.round(durationMs / 60000));
+				logger.info(`Found "Start Timer" shortcut. Running it with input ${durationInMinutes} minutes.`);
+				await execAsync(`shortcuts run "Start Timer" -i ${durationInMinutes}`);
+				
+				return JSON.stringify({
+					status: 'started_native',
+					label: timerLabel,
+					duration: formatDuration(durationMs),
+					message: `Started native macOS Clock timer for ${formatDuration(durationMs)} using "Start Timer" shortcut.`
+				}, null, 2);
+			}
+
+			// Background Node-based timer fallback
 			const timerId = `timer_${Math.random().toString(36).substr(2, 9)}`;
 			const startAt = Date.now();
 			const expiresAt = startAt + durationMs;
