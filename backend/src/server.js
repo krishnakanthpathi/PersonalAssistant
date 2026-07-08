@@ -11,6 +11,7 @@ import { registry } from "./orchestrator/registry.js";
 import { logger } from './utils/logger.js';
 import { platform } from 'os';
 import { env } from './config/env.js';
+import { metricsService } from './utils/metrics.js';
 
 
 const app = express();
@@ -48,6 +49,21 @@ app.get("/api/config", (req, res) => {
 		model: env.LLM_PROVIDER === 'openai' ? env.OPENAI_MODEL : env.OLLAMA_MODEL,
 		openaiBaseUrl: env.OPENAI_BASE_URL || 'default',
 		port: env.PORT
+	});
+});
+
+app.get("/api/metrics", (req, res) => {
+	res.json({
+		success: true,
+		metrics: metricsService.getMetrics()
+	});
+});
+
+app.delete("/api/metrics", (req, res) => {
+	metricsService.clear();
+	res.json({
+		success: true,
+		message: "Metrics cleared successfully."
 	});
 });
 
