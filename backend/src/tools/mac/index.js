@@ -13,7 +13,6 @@ export * from './emptyTrash.js';
 export * from './getSystemStats.js';
 export * from './lockScreen.js';
 export * from './getVolume.js';
-export * from './setBrightness.js';
 export * from './clipboard.js';
 export * from './mediaControl.js';
 export * from './darkMode.js';

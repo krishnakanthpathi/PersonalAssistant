@@ -12,7 +12,6 @@ import { emptyTrashTool } from '../tools/mac/emptyTrash.js';
 import { getSystemStatsTool } from '../tools/mac/getSystemStats.js';
 import { lockScreenTool } from '../tools/mac/lockScreen.js';
 import { getVolumeTool } from '../tools/mac/getVolume.js';
-import { setBrightnessTool } from '../tools/mac/setBrightness.js';
 import { clipboardTool } from '../tools/mac/clipboard.js';
 import { mediaControlTool } from '../tools/mac/mediaControl.js';
 import { darkModeTool } from '../tools/mac/darkMode.js';
@@ -56,7 +55,6 @@ class ToolRegistry {
 		this.tools.set(getSystemStatsTool.definition.name, getSystemStatsTool);
 		this.tools.set(lockScreenTool.definition.name, lockScreenTool);
 		this.tools.set(getVolumeTool.definition.name, getVolumeTool);
-		this.tools.set(setBrightnessTool.definition.name, setBrightnessTool);
 		this.tools.set(clipboardTool.definition.name, clipboardTool);
 		this.tools.set(mediaControlTool.definition.name, mediaControlTool);
 		this.tools.set(darkModeTool.definition.name, darkModeTool);
