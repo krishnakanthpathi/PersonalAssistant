@@ -24,6 +24,15 @@
 			"env": {
 				"GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json"
 			}
+		},
+		"youtube": {
+			"command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/.venv/bin/python",
+			"args": [
+				"/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/youtube_server.py"
+			],
+			"env": {
+				"YOUTUBE_API_KEY": "YOUR_YOUTUBE_API_KEY_HERE"
+			}
 		}
 	}
 }

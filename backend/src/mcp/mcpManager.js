@@ -54,6 +54,14 @@ export class MCPManager {
 			await calendarClient.connect();
 			this.servers.set('google-calendar', calendarClient);
 		}
+
+		// 5. Initialize YouTube Client if configured
+		if (config.mcpServers.youtube) {
+			const { YoutubeClient } = await import('./clients/youtube.js');
+			const youtubeClient = new YoutubeClient(config.mcpServers.youtube);
+			await youtubeClient.connect();
+			this.servers.set('youtube', youtubeClient);
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**
