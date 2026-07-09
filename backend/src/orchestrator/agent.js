@@ -72,7 +72,10 @@ You can view, create, edit, search, or list files and directories in the local w
 The default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID when creating new pages or retrieving notes unless specified otherwise.
 
 ## Google Calendar Operations
-You can read, create, update, delete, and list events on Google Calendar.`
+You can read, create, update, delete, and list events on Google Calendar.
+
+## YouTube Operations
+You can search for YouTube videos and retrieve video transcripts. Use these tools when the user asks about video content, queries topic summaries, or requests transcripts.`
 				},
 				...cleanedHistory,
 				{ role: 'user', content: prompt }

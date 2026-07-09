@@ -29,34 +29,65 @@ import {
 const parseMarkdown = (text) => {
   if (!text) return '';
   
+  // Strip XML tags like <action>, </action>, <speech>, </speech>
+  const cleanedText = text
+    .replace(/<\/?action>/gi, '')
+    .replace(/<\/?speech>/gi, '');
+
   // Escape HTML entities to prevent XSS
-  let html = text
+  let html = cleanedText
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+
+  // Extract and stash code blocks to prevent parsing links/markdown inside code elements
+  const codeBlocks = [];
+  html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+    const id = `__CODE_BLOCK_${codeBlocks.length}__`;
+    codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
+    return id;
+  });
+  
+  // Extract and stash inline code blocks
+  const inlineCodes = [];
+  html = html.replace(/`([^`]+)`/g, (match, code) => {
+    const id = `__INLINE_CODE_${inlineCodes.length}__`;
+    inlineCodes.push(`<code>${code}</code>`);
+    return id;
+  });
     
   // Headers
   html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
 
-  // Code blocks
-  html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
-    return `<pre><code>${code.trim()}</code></pre>`;
-  });
-  
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  
   // Bold
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   
   // Bullet lists
   html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>');
-  // Wrap consecutive <li> elements in <ul>
   html = html.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
-  // Fix double <ul> wrapping
   html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+  // Markdown links: [Text](Url)
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-accent-blue hover:underline font-medium">$1</a>');
+
+  // Raw URLs (excluding ones already converted or starting with href= or inside tags)
+  html = html.replace(/(?<!href=")(?<!">)(https?:\/\/[^\s<]+)/g, (url) => {
+    // Strip trailing punctuation from the url text for clean link boundaries
+    const cleanUrl = url.replace(/[.,;:)]$^/, '');
+    return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="text-accent-blue hover:underline font-medium">${cleanUrl}</a>`;
+  });
+
+  // Restore inline codes
+  inlineCodes.forEach((code, idx) => {
+    html = html.replace(`__INLINE_CODE_${idx}__`, code);
+  });
+
+  // Restore code blocks
+  codeBlocks.forEach((code, idx) => {
+    html = html.replace(`__CODE_BLOCK_${idx}__`, code);
+  });
   
   // Paragraphs and Line Breaks
   const paragraphs = html.split(/\n\n+/);
