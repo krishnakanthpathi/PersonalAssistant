@@ -19,6 +19,7 @@ import {
   Save,
   Copy
 } from 'lucide-react';
+import SiriOrb from './components/SiriOrb.jsx';
 
 // Helper to parse markdown tables into premium HTML tables
 const parseTables = (text) => {
@@ -1479,6 +1480,12 @@ function App() {
           </div>
         </div>
       )}
+      <SiriOrb
+        isProcessing={isProcessing}
+        currentStatusLog={currentStatusLog}
+        messages={messages}
+        onSendPrompt={handleSend}
+      />
     </div>
   );
 }

@@ -108,3 +108,108 @@ body {
   }
 }
 
+/* Siri-like Orb CSS */
+
+@keyframes siri-morph {
+  0% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
+  25% { border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%; }
+  50% { border-radius: 30% 70% 70% 30% / 50% 60% 40% 50%; }
+  75% { border-radius: 60% 40% 30% 70% / 40% 50% 60% 40%; }
+  100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
+}
+
+@keyframes siri-gradient-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes siri-pulse-ripple {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes siri-breathing {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 35px rgba(168, 85, 247, 0.7), 0 0 60px rgba(59, 130, 246, 0.5);
+  }
+}
+
+.siri-orb-base {
+  background: linear-gradient(-45deg, #a855f7, #3b82f6, #06b6d4, #ec4899);
+  background-size: 400% 400%;
+  animation: siri-gradient-rotate 6s ease infinite, siri-morph 4s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 40px rgba(59, 130, 246, 0.2);
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.siri-orb-idle {
+  animation: siri-gradient-rotate 10s ease infinite, siri-morph 6s ease-in-out infinite;
+  opacity: 0.85;
+}
+
+.siri-orb-idle:hover {
+  transform: scale(1.15);
+  opacity: 1;
+  box-shadow: 0 0 30px rgba(168, 85, 247, 0.6), 0 0 50px rgba(59, 130, 246, 0.4);
+}
+
+.siri-orb-listening {
+  transform: scale(1.2);
+  animation: siri-gradient-rotate 3s ease infinite, siri-morph 2s ease-in-out infinite;
+  box-shadow: 0 0 40px rgba(6, 182, 212, 0.8), 0 0 60px rgba(236, 72, 153, 0.6);
+}
+
+.siri-orb-thinking {
+  animation: siri-gradient-rotate 4s ease infinite, siri-morph 4s ease-in-out infinite, siri-breathing 2s ease-in-out infinite;
+}
+
+.siri-orb-completed {
+  background: linear-gradient(-45deg, #10b981, #3b82f6, #10b981);
+  background-size: 200% 200%;
+  animation: siri-gradient-rotate 4s ease infinite, siri-morph 5s ease-in-out infinite;
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.6), 0 0 50px rgba(59, 130, 246, 0.4);
+}
+
+.siri-ripple-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(168, 85, 247, 0.4);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.siri-ripple-ring-1 {
+  animation: siri-pulse-ripple 2.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+}
+
+.siri-ripple-ring-2 {
+  animation: siri-pulse-ripple 2.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  animation-delay: 0.8s;
+}
+
+.siri-ripple-ring-3 {
+  animation: siri-pulse-ripple 2.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  animation-delay: 1.6s;
+}
+
+
