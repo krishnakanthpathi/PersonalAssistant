@@ -33,31 +33,58 @@ const parseTables = (text) => {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    if (line.startsWith('|') && line.endsWith('|')) {
-      const cells = line.split('|').slice(1, -1).map(c => c.trim());
-      
+    // A table separator line matches pattern of dashes, colons, pipes, and whitespace
+    const isSeparator = line.includes('|') && line.match(/^[\s:-|]+$/);
+    // A table content line has at least one pipe
+    const isTableLine = line.includes('|');
+
+    if (isTableLine) {
+      let cells = line.split('|').map(c => c.trim());
+      if (line.startsWith('|') && cells[0] === '') cells.shift();
+      if (line.endsWith('|') && cells[cells.length - 1] === '') cells.pop();
+
       if (!inTable) {
-        inTable = true;
-        headers = cells;
-        columnAlignments = [];
-      } else if (line.match(/^\|[\s:-|]+$/)) {
-        const alignCells = line.split('|').slice(1, -1).map(c => c.trim());
-        columnAlignments = alignCells.map(cell => {
-          if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
-          if (cell.endsWith(':')) return 'right';
-          return 'left';
-        });
+        // Look ahead to see if the next line is a separator row
+        const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
+        const nextIsSeparator = nextLine.includes('|') && nextLine.match(/^[\s:-|]+$/);
         
-        tableHtml = '<div class="overflow-x-auto my-4"><table class="w-full text-left text-xs border-collapse border border-white/10 rounded-xl overflow-hidden shadow-sm">';
-        tableHtml += '<thead class="bg-white/[0.02] border-b border-white/10 text-gray-300 font-semibold">';
-        tableHtml += '<tr>';
-        headers.forEach((header, idx) => {
-          const alignClass = columnAlignments[idx] === 'center' ? 'text-center' : columnAlignments[idx] === 'right' ? 'text-right' : 'text-left';
-          tableHtml += `<th class="py-2.5 px-3 font-semibold ${alignClass}">${header}</th>`;
-        });
-        tableHtml += '</tr></thead>';
-        tableHtml += '<tbody class="divide-y divide-white/5">';
+        if (nextIsSeparator) {
+          inTable = true;
+          headers = cells;
+          columnAlignments = [];
+          
+          // Skip the next line since it is the separator
+          i++; 
+          
+          // Parse alignments from separator line
+          let sepCells = nextLine.split('|').map(c => c.trim());
+          if (nextLine.startsWith('|') && sepCells[0] === '') sepCells.shift();
+          if (nextLine.endsWith('|') && sepCells[sepCells.length - 1] === '') sepCells.pop();
+          
+          columnAlignments = sepCells.map(cell => {
+            if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+            if (cell.endsWith(':')) return 'right';
+            return 'left';
+          });
+
+          tableHtml = '<div class="overflow-x-auto my-4"><table class="w-full text-left text-xs border-collapse border border-white/10 rounded-xl overflow-hidden shadow-sm">';
+          tableHtml += '<thead class="bg-white/[0.02] border-b border-white/10 text-gray-300 font-semibold">';
+          tableHtml += '<tr>';
+          headers.forEach((header, idx) => {
+            const alignClass = columnAlignments[idx] === 'center' ? 'text-center' : columnAlignments[idx] === 'right' ? 'text-right' : 'text-left';
+            tableHtml += `<th class="py-2.5 px-3 font-semibold ${alignClass}">${header}</th>`;
+          });
+          tableHtml += '</tr></thead>';
+          tableHtml += '<tbody class="divide-y divide-white/5">';
+        } else {
+          // Not a table start, treat as normal text line
+          outputLines.push(lines[i]);
+        }
       } else {
+        // Inside a table, append row
+        if (isSeparator) {
+          continue;
+        }
         tableHtml += '<tr class="hover:bg-white/[0.02] border-b border-white/5 transition-all">';
         cells.forEach((cell, idx) => {
           const alignClass = columnAlignments[idx] === 'center' ? 'text-center' : columnAlignments[idx] === 'right' ? 'text-right' : 'text-left';
@@ -80,12 +107,12 @@ const parseTables = (text) => {
       outputLines.push(lines[i]);
     }
   }
-  
+
   if (inTable) {
     tableHtml += '</tbody></table></div>';
     outputLines.push('\n\n' + tableHtml + '\n\n');
   }
-  
+
   return outputLines.join('\n');
 };
 
@@ -120,7 +147,25 @@ const parseMarkdown = (text) => {
     return id;
   });
 
-  // Parse markdown tables wrapped in custom <tabular> tags
+  // Parse raw HTML tables: match escaped table tags, decode them, and inject premium Tailwind classes
+  html = html.replace(/&lt;table([\s\S]*?)&lt;\/table&gt;/gi, (match) => {
+    let unescaped = match
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+    
+    unescaped = unescaped.replace(/<table([^>]*)>/gi, '<div class="overflow-x-auto my-4"><table class="w-full text-left text-xs border-collapse border border-white/10 rounded-xl overflow-hidden shadow-sm"$1>');
+    unescaped = unescaped.replace(/<\/table>/gi, '</table></div>');
+    unescaped = unescaped.replace(/<thead([^>]*)>/gi, '<thead class="bg-white/[0.02] border-b border-white/10 text-gray-300 font-semibold"$1>');
+    unescaped = unescaped.replace(/<tbody([^>]*)>/gi, '<tbody class="divide-y divide-white/5"$1>');
+    unescaped = unescaped.replace(/<tr([^>]*)>/gi, '<tr class="hover:bg-white/[0.02] border-b border-white/5 transition-all"$1>');
+    unescaped = unescaped.replace(/<th([^>]*)>/gi, '<th class="py-2.5 px-3 font-semibold text-left text-gray-300"$1>');
+    unescaped = unescaped.replace(/<td([^>]*)>/gi, '<td class="py-2 px-3 font-mono text-[11px] text-gray-300 text-left"$1>');
+    
+    return '\n\n' + unescaped + '\n\n';
+  });
+
+  // Also support the <tabular> markdown wrapper as a legacy parse
   html = html.replace(/(?:&lt;|<)tabular(?:&gt;|>)([\s\S]*?)(?:&lt;|<)\/tabular(?:&gt;|>)/gi, (match, tableText) => {
     const decodedText = tableText
       .replace(/&amp;/g, '&')
@@ -128,6 +173,9 @@ const parseMarkdown = (text) => {
       .replace(/&gt;/g, '>');
     return '\n\n' + parseTables(decodedText) + '\n\n';
   });
+  
+  // Also parse standard markdown tables globally (fallback)
+  html = parseTables(html);
     
   // Headers
   html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');

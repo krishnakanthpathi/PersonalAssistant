@@ -77,14 +77,25 @@ When you need to interact with a desktop application's UI (click buttons, select
 - You can do this by using a direct browser tool call, or by running a command/AppleScript to open Chrome, opening a new tab (e.g. Command+T), and pasting the link.
 
 ## Presentation of Tabular Data (IMPORTANT)
-- Whenever you need to present lists of steps, comparisons, schedules, or structured tabular data, you MUST format them as a standard markdown table (with headers, pipe separators, and row delimiters) and wrap the entire table block inside \`<tabular>\` and \`</tabular>\` tags.
+- Whenever you need to present lists of steps, comparisons, schedules, or structured tabular data, you MUST format them as a raw HTML table (using \`<table>\`, \`<thead>\`, \`<tbody>\`, \`<tr>\`, \`<th>\`, and \`<td>\` tags).
+- Do not use markdown pipes (\`|\`) or dashes (\`---\`) for tables.
 - Example:
-  <tabular>
-  | Item | Description | Cost |
-  | :--- | :--- | :--- |
-  | Apple Mac | Computer assistant | $1200 |
-  </tabular>
-- Do not put text or explanations inside the \`<tabular>\` tags other than the markdown table itself.
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Description</th>
+        <th>Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Apple Mac</td>
+        <td>Computer assistant</td>
+        <td>$1200</td>
+      </tr>
+    </tbody>
+  </table>
 
 ## File System Operations
 You can view, create, edit, search, or list files and directories in the local workspace directory.
