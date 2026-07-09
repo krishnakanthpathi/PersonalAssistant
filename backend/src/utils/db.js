@@ -18,6 +18,7 @@ try {
 	// Optimize SQLite settings for development/local execution
 	db.pragma('journal_mode = WAL');
 	db.pragma('synchronous = NORMAL');
+	db.pragma('foreign_keys = ON');
 	logger.info(`SQLite database connected successfully at: ${DB_FILE_PATH}`);
 } catch (error) {
 	logger.error(`Failed to connect to SQLite database: ${error.message}`);
@@ -49,8 +50,10 @@ db.exec(`
 		name TEXT,
 		args TEXT,
 		latency REAL,
+		latency_from_request_start REAL,
 		success INTEGER,
 		error TEXT,
+		result_summary TEXT,
 		FOREIGN KEY(request_id) REFERENCES telemetry_logs(id) ON DELETE CASCADE
 	);
 
@@ -61,6 +64,20 @@ db.exec(`
 		created_at TEXT DEFAULT CURRENT_TIMESTAMP
 	);
 `);
+
+// Run migrations to add missing columns to tool_calls if database already exists
+try {
+	db.prepare("ALTER TABLE tool_calls ADD COLUMN latency_from_request_start REAL").run();
+	logger.info("Added column latency_from_request_start to tool_calls table.");
+} catch (err) {
+	// Column already exists or table is new
+}
+try {
+	db.prepare("ALTER TABLE tool_calls ADD COLUMN result_summary TEXT").run();
+	logger.info("Added column result_summary to tool_calls table.");
+} catch (err) {
+	// Column already exists or table is new
+}
 
 // Seed system_prompts if empty
 try {

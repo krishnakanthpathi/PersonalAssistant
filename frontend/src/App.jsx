@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { 
   Sparkles, 
   Wrench, 
@@ -20,6 +21,7 @@ import {
   Copy
 } from 'lucide-react';
 import SiriOrb from './components/SiriOrb.jsx';
+import AdminDashboard from './components/AdminDashboard.jsx';
 
 // Helper to parse markdown tables into premium HTML tables
 const parseTables = (text) => {
@@ -263,8 +265,9 @@ const getToolIcon = (name) => {
   return <Wrench className="w-4 h-4 text-gray-400" />;
 };
 
-function App() {
-  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'dashboard'
+function MainApp() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'system-prompt'
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -278,26 +281,10 @@ function App() {
     port: 3000
   });
 
-  // Metrics Dashboard States
+  // Metrics Dashboard States (for Sidebar requests history list)
   const [metrics, setMetrics] = useState({
-    requests: [],
-    aggregates: {
-      totalRequests: 0,
-      successfulRequests: 0,
-      failedRequests: 0,
-      averageTotalDuration: 0,
-      averageRetrievalTime: 0,
-      averageGenerationTime: 0,
-      averageContextProcessingTime: 0,
-      totalScreenshots: 0,
-      totalAppleScripts: 0,
-      totalFetchUis: 0,
-      totalAnnotations: 0,
-      tools: {}
-    }
+    requests: []
   });
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
 
   // System Prompt States
   const [systemPrompts, setSystemPrompts] = useState({ activePrompt: null, history: [] });
@@ -345,39 +332,14 @@ function App() {
 
   // Fetch Telemetry metrics
   const fetchMetrics = async () => {
-    setIsLoadingMetrics(true);
     try {
       const res = await fetch('http://localhost:3000/api/metrics');
       const data = await res.json();
       if (data.success) {
         setMetrics(data.metrics);
-        // Refresh selectedRequest if it's currently open
-        if (selectedRequest) {
-          const updated = data.metrics.requests.find(r => r.id === selectedRequest.id);
-          if (updated) {
-            setSelectedRequest(updated);
-          }
-        }
       }
     } catch (error) {
       console.error('Failed to fetch metrics:', error);
-    } finally {
-      setIsLoadingMetrics(false);
-    }
-  };
-
-  // Clear Telemetry metrics
-  const handleClearTelemetry = async () => {
-    if (!window.confirm('Are you sure you want to clear all telemetry data?')) return;
-    try {
-      const res = await fetch('http://localhost:3000/api/metrics', { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        fetchMetrics();
-        setSelectedRequest(null);
-      }
-    } catch (error) {
-      console.error('Failed to clear metrics:', error);
     }
   };
 
@@ -477,10 +439,10 @@ function App() {
     fetchMetrics();
   }, []);
 
-  // Poll metrics every 5 seconds when dashboard is active or processing a chat request
+  // Poll metrics every 5 seconds when chat tab is active or processing a chat request
   useEffect(() => {
     let interval = null;
-    if (activeTab === 'dashboard' || isProcessing) {
+    if (activeTab === 'chat' || isProcessing) {
       fetchMetrics(); // initial fetch
       interval = setInterval(() => {
         fetchMetrics();
@@ -639,16 +601,13 @@ function App() {
             <MessageSquare className="w-4 h-4" />
             Chat Assistant
           </button>
-          <button 
-            onClick={() => {
-              setActiveTab('dashboard');
-              fetchMetrics();
-            }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'dashboard' ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+          <Link 
+            to="/admin"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
           >
             <LayoutDashboard className="w-4 h-4" />
             Admin Dashboard
-          </button>
+          </Link>
           <button 
             onClick={() => {
               setActiveTab('system-prompt');
@@ -699,19 +658,13 @@ function App() {
               </div>
             ) : (
               metrics.requests?.map((req) => {
-                const isSelected = selectedRequest?.id === req.id;
                 return (
                   <button
                     key={req.id}
                     onClick={() => {
-                      setSelectedRequest(req);
-                      setActiveTab('dashboard');
+                      navigate('/admin', { state: { initialRequest: req } });
                     }}
-                    className={`p-3 text-left rounded-xl transition-all duration-200 border text-xs ${
-                      isSelected
-                        ? 'bg-accent-blue/10 border-accent-blue/30 text-white font-semibold'
-                        : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
-                    }`}
+                    className="p-3 text-left rounded-xl transition-all duration-200 border border-transparent bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full ${req.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
@@ -895,348 +848,6 @@ function App() {
                     ))}
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-        ) : activeTab === 'dashboard' ? (
-          /* ADMIN METRICS DASHBOARD VIEW */
-          <div className="flex flex-grow h-full overflow-hidden">
-            {/* Dashboard main content area */}
-            <div className="flex-grow flex flex-col h-full overflow-y-auto bg-bg-primary/20 p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                
-                {/* Left Area (2/3 width): Telemetry drill-down or diagnostics aggregates */}
-                <div className="lg:col-span-2 flex flex-col gap-6">
-                  {selectedRequest ? (
-                    /* REQUEST DETAIL VIEW */
-                    <div className="flex flex-col gap-6">
-                      {/* Detail Header */}
-                      <div className="flex items-center justify-between pb-4 border-b border-border-color">
-                        <div className="flex items-center gap-3">
-                          <button 
-                            onClick={() => setSelectedRequest(null)}
-                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition"
-                          >
-                            ← Back to Aggregates
-                          </button>
-                          <span className="text-sm font-semibold text-gray-400">Request Details</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                          <span>ID: {selectedRequest.id}</span>
-                          <span>•</span>
-                          <span>{new Date(selectedRequest.timestamp).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Prompt Box */}
-                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">User Prompt</span>
-                        <p className="text-sm text-white font-medium select-text">{selectedRequest.prompt}</p>
-                      </div>
-
-                      {/* Summary performance metrics */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">Status</span>
-                          <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded ${selectedRequest.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
-                            {selectedRequest.success ? 'SUCCESS' : 'FAILED'}
-                          </span>
-                        </div>
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">Total Duration</span>
-                          <span className="font-mono text-sm font-bold text-white">{selectedRequest.totalDuration} ms</span>
-                        </div>
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">RAG Retrieval</span>
-                          <span className="font-mono text-sm font-bold text-accent-purple">{selectedRequest.retrievalDuration || 0} ms</span>
-                        </div>
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">Tools Executed</span>
-                          <span className="font-mono text-sm font-bold text-accent-blue">{selectedRequest.toolCalls?.length || 0} calls</span>
-                        </div>
-                      </div>
-
-                      {/* Targeted Action Telemetries */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
-                          <span className="text-gray-400">Screenshots:</span>
-                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.screenshotCount || 0}</span>
-                        </div>
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
-                          <span className="text-gray-400">Apple Scripts:</span>
-                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.appleScriptCount || 0}</span>
-                        </div>
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
-                          <span className="text-gray-400">Fetch UI:</span>
-                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.fetchUiCount || 0}</span>
-                        </div>
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
-                          <span className="text-gray-400">Annotations:</span>
-                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.annotateCount || 0}</span>
-                        </div>
-                      </div>
-
-                      {/* Visual Step Timeline */}
-                      <div>
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Execution Steps & Latency Breakdown</h4>
-                        {selectedRequest.toolCalls?.length === 0 ? (
-                          <div className="text-xs text-gray-500 py-4 bg-white/5 border border-white/5 border-dashed rounded-2xl text-center">
-                            No tools were executed during this reasoning run.
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-3">
-                            {selectedRequest.toolCalls.map((step, idx) => (
-                              <div key={idx} className="bg-bg-secondary/40 border border-white/5 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div className="flex items-start gap-3">
-                                  <span className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-gray-400 flex-shrink-0 mt-0.5">{idx + 1}</span>
-                                  <div>
-                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                      <span className="font-mono text-xs font-bold text-white">{step.name}</span>
-                                      <span className={`text-[8px] font-bold font-mono px-1 rounded ${step.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
-                                        {step.success ? 'SUCCESS' : 'FAILED'}
-                                      </span>
-                                    </div>
-                                    <span className="text-[10px] text-gray-500 block font-mono mb-2">Args: {JSON.stringify(step.args)}</span>
-                                    {step.error && (
-                                      <span className="text-[10px] text-red-400 block font-mono">Error: {step.error}</span>
-                                    )}
-                                    {step.resultSummary && (
-                                      <div className="text-[10px] text-gray-400 bg-black/20 p-2 rounded border border-white/5 font-mono max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                                        Result: {step.resultSummary}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex flex-row md:flex-col items-end gap-4 md:gap-1.5 shrink-0 border-t md:border-t-0 border-white/5 pt-2 md:pt-0">
-                                  <div className="text-right">
-                                    <span className="text-[9px] text-gray-500 block">Tool Execution Latency</span>
-                                    <span className="font-mono text-xs font-semibold text-white">{step.latency} ms</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-[9px] text-gray-500 block">Start from request time</span>
-                                    <span className="font-mono text-xs font-semibold text-accent-blue">{step.latencyFromRequestStart} ms</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Given Context & Generated Context */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-72 overflow-hidden">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-3 flex-shrink-0">RAG Context Given</span>
-                          <div className="flex-grow bg-black/20 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
-                            {selectedRequest.givenContext || 'No additional context loaded.'}
-                          </div>
-                        </div>
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-72 overflow-hidden">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-3 flex-shrink-0">Assistant Output & Action Logs</span>
-                          <div className="flex-grow bg-black/20 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
-                            {selectedRequest.generatedContext || 'No assistant logs recorded.'}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    /* METRICS AGGREGATES VIEW */
-                    <div className="flex flex-col gap-6">
-                      {/* Dashboard Title Header */}
-                      <div className="flex items-center justify-between pb-4 border-b border-border-color">
-                        <div>
-                          <h2 className="text-md font-semibold text-white font-sans">Diagnostics & Performance</h2>
-                          <p className="text-xs text-gray-400">Review metrics, API diagnostics, and tool latencies in real time.</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={fetchMetrics}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition"
-                            title="Refresh statistics"
-                          >
-                            <RefreshCw size={12} className={isLoadingMetrics ? 'animate-spin' : ''} /> Refresh
-                          </button>
-                          <button 
-                            onClick={handleClearTelemetry}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition"
-                            title="Delete logs history"
-                          >
-                            <Trash2 size={12} /> Clear Telemetry
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Summary metrics cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Card 1: Total requests & Success rate */}
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Requests</span>
-                          <div className="flex items-baseline gap-2 mb-2">
-                            <span className="text-3xl font-extrabold text-white">{metrics.aggregates?.totalRequests || 0}</span>
-                            <span className="text-xs text-gray-500">runs</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                            <span className="text-gray-400">Success Rate:</span>
-                            <span className="font-semibold text-accent-emerald">
-                              {metrics.aggregates?.totalRequests ? `${((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100).toFixed(0)}%` : '0%'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Card 2: Average latencies */}
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Average Latency</span>
-                          <div className="flex items-baseline gap-2 mb-2">
-                            <span className="text-3xl font-extrabold text-accent-purple">{metrics.aggregates?.averageDuration ? `${(metrics.aggregates.averageDuration / 1000).toFixed(1)}s` : '0.0s'}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                            <span className="text-gray-400">Avg RAG Duration:</span>
-                            <span className="font-semibold text-accent-purple">{metrics.aggregates?.averageRetrievalDuration || 0} ms</span>
-                          </div>
-                        </div>
-
-                        {/* Card 3: Execution metrics */}
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Tools Execution</span>
-                          <div className="flex items-baseline gap-2 mb-2">
-                            <span className="text-3xl font-extrabold text-accent-blue">{metrics.aggregates?.totalToolCalls || 0}</span>
-                            <span className="text-xs text-gray-500">calls</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                            <span className="text-gray-400">Avg Calls/Run:</span>
-                            <span className="font-semibold text-accent-blue">
-                              {metrics.aggregates?.totalRequests ? (metrics.aggregates.totalToolCalls / metrics.aggregates.totalRequests).toFixed(1) : '0.0'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Card 4: Accuracy Metrics */}
-                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Reliability</span>
-                          <div className="flex items-baseline gap-2 mb-2">
-                            <span className="text-3xl font-extrabold text-accent-emerald">
-                              {metrics.aggregates?.totalToolCalls ? `${((metrics.aggregates.successfulToolCalls / metrics.aggregates.totalToolCalls) * 100).toFixed(0)}%` : '100%'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                            <span className="text-gray-400">Failed tool runs:</span>
-                            <span className="font-semibold text-red-400">{metrics.aggregates?.failedToolCalls || 0}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Cumulative telemetries */}
-                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Total Interaction Breakdown</span>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                            <span className="text-gray-400">Screenshots:</span>
-                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalScreenshots || 0}</span>
-                          </div>
-                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                            <span className="text-gray-400">Apple Scripts:</span>
-                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAppleScripts || 0}</span>
-                          </div>
-                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                            <span className="text-gray-400">Fetch UI (elements):</span>
-                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalFetchUis || 0}</span>
-                          </div>
-                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                            <span className="text-gray-400">Annotations:</span>
-                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAnnotations || 0}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Tool latencies and success statistics table */}
-                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Detailed Tool Execution Performance</span>
-                        
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs border-collapse">
-                            <thead>
-                              <tr className="bg-white/[0.02] text-gray-400 border-b border-white/10">
-                                <th className="font-semibold py-3 px-4 rounded-l-xl pr-4 text-left">Tool Name</th>
-                                <th className="font-semibold py-3 px-4 text-center">Total Calls</th>
-                                <th className="font-semibold py-3 px-4 text-center">Response (Success) Rate</th>
-                                <th className="font-semibold py-3 px-4 text-right">Avg Execution Latency</th>
-                                <th className="font-semibold py-3 px-4 rounded-r-xl text-right">Avg Latency (Reasoning)</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                              {Object.keys(metrics.aggregates?.tools || {}).length === 0 ? (
-                                <tr>
-                                  <td colSpan={5} className="text-center py-8 text-gray-500">No tools have been called yet.</td>
-                                </tr>
-                              ) : (
-                                Object.entries(metrics.aggregates.tools).map(([name, data]) => (
-                                  <tr key={name} className="hover:bg-white/[0.03] border-b border-white/5 transition-all">
-                                    <td className="py-3 px-4 font-mono font-bold text-white flex items-center gap-2">
-                                      <span className="p-1 bg-white/5 rounded">
-                                        {getToolIcon(name)}
-                                      </span>
-                                      {name}
-                                    </td>
-                                    <td className="py-3 px-4 text-center font-mono text-gray-300">{data.calls}</td>
-                                    <td className="py-3 px-4 font-mono">
-                                      <div className="flex items-center gap-3 justify-center">
-                                        <span className={`text-xs font-bold ${data.successRate >= 0.9 ? 'text-accent-emerald' : data.successRate >= 0.5 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                          {(data.successRate * 100).toFixed(0)}%
-                                        </span>
-                                        <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden hidden sm:block border border-white/5">
-                                          <div 
-                                            className={`h-full rounded-full ${data.successRate >= 0.9 ? 'bg-accent-emerald' : data.successRate >= 0.5 ? 'bg-yellow-400' : 'bg-red-500'}`}
-                                            style={{ width: `${(data.successRate * 100).toFixed(0)}%` }}
-                                          />
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="py-3 px-4 text-right font-mono text-white font-medium">{data.averageLatency} ms</td>
-                                    <td className="py-3 px-4 text-right font-mono text-accent-blue font-semibold">{data.averageLatencyFromRequestStart} ms</td>
-                                  </tr>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Area (1/3 width): Available Tools list card */}
-                <div className="flex flex-col gap-6 lg:sticky lg:top-6">
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col max-h-[calc(100vh-80px)] overflow-hidden">
-                    <div className="flex items-center gap-2 mb-4 text-gray-200">
-                      <Wrench className="w-4 h-4 text-accent-purple" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Available Tools ({tools.length})</span>
-                    </div>
-                    <div className="flex flex-col gap-2 overflow-y-auto pr-1">
-                      {tools.length === 0 ? (
-                        <div className="text-gray-500 text-xs text-center py-4 border border-dashed border-white/5 rounded-xl">
-                          No active tools found.
-                        </div>
-                      ) : (
-                        tools.map((tool, idx) => {
-                          const toolName = tool.function?.name || tool.name;
-                          const toolDesc = tool.function?.description || tool.description || 'No description provided';
-                          return (
-                            <div key={idx} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-200 border border-white/5 hover:border-white/10" title={toolName}>
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="p-1 bg-white/5 rounded-lg">
-                                  {getToolIcon(toolName)}
-                                </span>
-                                <span className="font-mono text-xs font-bold text-gray-200 truncate">{toolName}</span>
-                              </div>
-                              <span className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{toolDesc}</span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-
               </div>
             </div>
           </div>
@@ -1487,6 +1098,15 @@ function App() {
         onSendPrompt={handleSend}
       />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<MainApp />} />
+      <Route path="/admin" element={<AdminDashboard />} />
+    </Routes>
   );
 }
 

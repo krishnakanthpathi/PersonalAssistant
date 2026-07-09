@@ -100,8 +100,8 @@ class MetricsService {
 
 			const insertTool = db.prepare(`
 				INSERT INTO tool_calls (
-					request_id, name, args, latency, success, error
-				) VALUES (?, ?, ?, ?, ?, ?)
+					request_id, name, args, latency, latency_from_request_start, success, error, result_summary
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 			`);
 
 			const executeTransaction = db.transaction((request, toolsList) => {
@@ -128,8 +128,10 @@ class MetricsService {
 						tool.name,
 						JSON.stringify(tool.args || {}),
 						tool.latency,
+						tool.latencyFromRequestStart || 0,
 						tool.success ? 1 : 0,
-						tool.error || null
+						tool.error || null,
+						tool.resultSummary || ''
 					);
 				}
 
@@ -175,8 +177,10 @@ class MetricsService {
 					name: tool.name,
 					args: JSON.parse(tool.args || '{}'),
 					latency: tool.latency,
+					latencyFromRequestStart: tool.latency_from_request_start || 0,
 					success: tool.success === 1,
-					error: tool.error
+					error: tool.error,
+					resultSummary: tool.result_summary || ''
 				});
 			}
 
@@ -224,7 +228,8 @@ class MetricsService {
 						successes: 0,
 						failures: 0,
 						successRate: 0,
-						averageLatency: 0
+						averageLatency: 0,
+						averageLatencyFromRequestStart: 0
 					};
 				}
 				const stats = aggregates.tools[tool.name];
@@ -239,11 +244,15 @@ class MetricsService {
 				// Re-calculate running latency sum to compute average
 				stats.totalLatency = (stats.totalLatency || 0) + tool.latency;
 				stats.averageLatency = Math.round(stats.totalLatency / stats.calls);
+
+				stats.totalLatencyFromRequestStart = (stats.totalLatencyFromRequestStart || 0) + (tool.latency_from_request_start || 0);
+				stats.averageLatencyFromRequestStart = Math.round(stats.totalLatencyFromRequestStart / stats.calls);
 			}
 
 			// Remove temp sum properties
 			for (const key of Object.keys(aggregates.tools)) {
 				delete aggregates.tools[key].totalLatency;
+				delete aggregates.tools[key].totalLatencyFromRequestStart;
 			}
 
 			return { requests, aggregates };
@@ -272,7 +281,10 @@ class MetricsService {
 
 	clear() {
 		try {
-			db.prepare(`DELETE FROM telemetry_logs`).run();
+			db.transaction(() => {
+				db.prepare(`DELETE FROM tool_calls`).run();
+				db.prepare(`DELETE FROM telemetry_logs`).run();
+			})();
 			logger.info('Telemetry metrics database cleared successfully.');
 		} catch (error) {
 			logger.error(`Failed to clear telemetry metrics database: ${error.message}`);
