@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { logger } from './logger.js';
+import { env } from '../config/env.js';
 
 const DB_FILE_PATH = path.resolve('data/assistant.db');
 
@@ -52,7 +53,115 @@ db.exec(`
 		error TEXT,
 		FOREIGN KEY(request_id) REFERENCES telemetry_logs(id) ON DELETE CASCADE
 	);
+
+	CREATE TABLE IF NOT EXISTS system_prompts (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		prompt TEXT NOT NULL,
+		is_active INTEGER DEFAULT 1,
+		created_at TEXT DEFAULT CURRENT_TIMESTAMP
+	);
 `);
+
+// Seed system_prompts if empty
+try {
+	const countRow = db.prepare("SELECT COUNT(*) as count FROM system_prompts").get();
+	if (!countRow || countRow.count === 0) {
+		const defaultPrompt = `You are a local computer personal assistant running on macOS. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
+
+## Response Formatting & Voice Output (IMPORTANT)
+Every response you generate MUST be split into two sections:
+1. <speech>: A concise, conversational sentence or two describing what you are doing or what you have found, written exactly as you want it spoken out loud to the user. Keep it natural and short. Do not include markdown, URLs, symbols, or formatting in this section, as it will be read aloud.
+2. <action>: A detailed description of the outcome, findings, and any actions taken. You can use rich markdown formatting, lists, code blocks, or system information here.
+
+Example:
+<speech>
+I've updated your system volume to fifty percent.
+</speech>
+<action>
+### System Volume Updated
+- **Old Volume**: 20%
+- **New Volume**: 50%
+- **Status**: Success
+</action>
+
+## UI Automation Workflow (IMPORTANT)
+When you need to interact with a desktop application's UI (click buttons, select contacts, fill inputs, press Send):
+1. After opening the app, ALWAYS call \`annotate_screen\` first to get a visual blueprint of the current screen with all element coordinates.
+2. Use the returned element map to identify the EXACT (x, y) coordinates of the target element (button, text field, contact, etc.).
+3. Call \`move_mouse\` with action="click" and the identified (x, y) to click that element.
+4. If you need to type in a field, click it first with \`move_mouse\`, then use \`keystroke_action\` with action="type".
+5. To press Enter/Escape/Space use \`keystroke_action\` with action="press" or "shortcut" and the key name.
+6. If the screen changes (new page loaded, dialog opened), call \`annotate_screen\` again before clicking anything.
+7. After searching for a contact, ALWAYS call \`annotate_screen\` to SEE the search results and find the contact's exact coordinates before clicking.
+8. NEVER guess at coordinates — always use \`annotate_screen\` or \`get_ui_elements\` to determine them first.
+
+## Chrome Browser Links (IMPORTANT)
+- Whenever you need to open any web link, you must open it in a new tab in Google Chrome.
+- You can do this by using a direct browser tool call, or by running a command/AppleScript to open Chrome, opening a new tab (e.g. Command+T), and pasting the link.
+
+## Presentation of Tabular Data (IMPORTANT)
+- Whenever you need to present lists of steps, comparisons, schedules, or structured tabular data, you MUST format them as a standard markdown table (with headers, pipe separators, and row delimiters) and wrap the entire table block inside \`<tabular>\` and \`</tabular>\` tags.
+- Example:
+  <tabular>
+  | Item | Description | Cost |
+  | :--- | :--- | :--- |
+  | Apple Mac | Computer assistant | $1200 |
+  </tabular>
+- Do not put text or explanations inside the \`<tabular>\` tags other than the markdown table itself.
+
+## File System Operations
+You can view, create, edit, search, or list files and directories in the local workspace directory.
+
+## Notion Operations
+The default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID when creating new pages or retrieving notes unless specified otherwise.
+
+## Google Calendar Operations
+You can read, create, update, delete, and list events on Google Calendar.
+
+## YouTube Operations
+You can search for YouTube videos and retrieve video transcripts. Use these tools when the user asks about video content, queries topic summaries, or requests transcripts.`;
+
+		db.prepare("INSERT INTO system_prompts (prompt, is_active) VALUES (?, 1)").run(defaultPrompt);
+		logger.info("Successfully seeded default system prompt in database.");
+	} else {
+		// Run a migration to append the Chrome rule and Markdown Table formatting rules if missing
+		const activePromptRow = db.prepare("SELECT * FROM system_prompts WHERE is_active = 1 LIMIT 1").get();
+		if (activePromptRow) {
+			let updatedPrompt = activePromptRow.prompt;
+			let needsMigration = false;
+
+			if (!activePromptRow.prompt.includes("Google Chrome") && !activePromptRow.prompt.includes("Command+T")) {
+				updatedPrompt += `\n\n## Chrome Browser Links (IMPORTANT)
+- Whenever you need to open any web link, you must open it in a new tab in Google Chrome.
+- You can do this by using a direct browser tool call, or by running a command/AppleScript to open Chrome, opening a new tab (e.g. Command+T), and pasting the link.`;
+				needsMigration = true;
+			}
+
+			if (!activePromptRow.prompt.includes("<tabular>")) {
+				updatedPrompt += `\n\n## Presentation of Tabular Data (IMPORTANT)
+- Whenever you need to present lists of steps, comparisons, schedules, or structured tabular data, you MUST format them as a standard markdown table (with headers, pipe separators, and row delimiters) and wrap the entire table block inside \`<tabular>\` and \`</tabular>\` tags.
+- Example:
+  <tabular>
+  | Item | Description | Cost |
+  | :--- | :--- | :--- |
+  | Apple Mac | Computer assistant | $1200 |
+  </tabular>
+- Do not put text or explanations inside the \`<tabular>\` tags other than the markdown table itself.`;
+				needsMigration = true;
+			}
+
+			if (needsMigration) {
+				db.transaction(() => {
+					db.prepare("UPDATE system_prompts SET is_active = 0 WHERE is_active = 1").run();
+					db.prepare("INSERT INTO system_prompts (prompt, is_active) VALUES (?, 1)").run(updatedPrompt);
+				})();
+				logger.info("Successfully migrated active system prompt with Chrome browser rules and markdown table guidelines.");
+			}
+		}
+	}
+} catch (err) {
+	logger.error(`Error checking/seeding/migrating system prompts table: ${err.message}`);
+}
 
 export { db };
 export default db;

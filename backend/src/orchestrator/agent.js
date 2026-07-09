@@ -6,6 +6,7 @@ import { catchErrors } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { saySpeechTool } from '../tools/mac/saySpeech.js';
 import { metricsService } from '../utils/metrics.js';
+import { db } from '../utils/db.js';
 
 export class Agent {
 	run = catchErrors(async (prompt, historyOrStatusUpdate, maybeStatusUpdate) => {
@@ -31,12 +32,18 @@ export class Agent {
 		const requestId = metricsService.startRequest(prompt);
 
 		try {
-			// 1. Prepare message history
-			const messages = [
-				{
-					role: 'system',
-					content: `
-You are a local computer personal assistant running on macOS. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
+			// Load system prompt from DB
+			let systemPromptText;
+			try {
+				const row = db.prepare("SELECT prompt FROM system_prompts WHERE is_active = 1 ORDER BY id DESC LIMIT 1").get();
+				systemPromptText = row?.prompt;
+			} catch (error) {
+				logger.error(`Failed to load system prompt from DB: ${error.message}`);
+			}
+
+			if (!systemPromptText) {
+				// Fallback default
+				systemPromptText = `You are a local computer personal assistant running on macOS. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
 
 ## Response Formatting & Voice Output (IMPORTANT)
 Every response you generate MUST be split into two sections:
@@ -65,6 +72,20 @@ When you need to interact with a desktop application's UI (click buttons, select
 7. After searching for a contact, ALWAYS call \`annotate_screen\` to SEE the search results and find the contact's exact coordinates before clicking.
 8. NEVER guess at coordinates — always use \`annotate_screen\` or \`get_ui_elements\` to determine them first.
 
+## Chrome Browser Links (IMPORTANT)
+- Whenever you need to open any web link, you must open it in a new tab in Google Chrome.
+- You can do this by using a direct browser tool call, or by running a command/AppleScript to open Chrome, opening a new tab (e.g. Command+T), and pasting the link.
+
+## Presentation of Tabular Data (IMPORTANT)
+- Whenever you need to present lists of steps, comparisons, schedules, or structured tabular data, you MUST format them as a standard markdown table (with headers, pipe separators, and row delimiters) and wrap the entire table block inside \`<tabular>\` and \`</tabular>\` tags.
+- Example:
+  <tabular>
+  | Item | Description | Cost |
+  | :--- | :--- | :--- |
+  | Apple Mac | Computer assistant | $1200 |
+  </tabular>
+- Do not put text or explanations inside the \`<tabular>\` tags other than the markdown table itself.
+
 ## File System Operations
 You can view, create, edit, search, or list files and directories in the local workspace directory.
 
@@ -75,7 +96,14 @@ The default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID 
 You can read, create, update, delete, and list events on Google Calendar.
 
 ## YouTube Operations
-You can search for YouTube videos and retrieve video transcripts. Use these tools when the user asks about video content, queries topic summaries, or requests transcripts.`
+You can search for YouTube videos and retrieve video transcripts. Use these tools when the user asks about video content, queries topic summaries, or requests transcripts.`;
+			}
+
+			// 1. Prepare message history
+			const messages = [
+				{
+					role: 'system',
+					content: systemPromptText
 				},
 				...cleanedHistory,
 				{ role: 'user', content: prompt }

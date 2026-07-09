@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, 
-  Cpu, 
   Wrench, 
   Send, 
   Trash2, 
@@ -10,20 +9,85 @@ import {
   FileText, 
   Calendar, 
   Globe,
-  Check, 
   AlertCircle,
   LayoutDashboard,
   MessageSquare,
-  ChevronRight,
-  Clock,
-  Code,
-  FileCode,
   CheckCircle,
-  XCircle,
-  Activity,
   History,
-  Timer
+  Settings,
+  Edit3,
+  Save,
+  Copy
 } from 'lucide-react';
+
+// Helper to parse markdown tables into premium HTML tables
+const parseTables = (text) => {
+  if (!text) return '';
+  const lines = text.split('\n');
+  let inTable = false;
+  let tableHtml = '';
+  const outputLines = [];
+  let headers = [];
+  let columnAlignments = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.split('|').slice(1, -1).map(c => c.trim());
+      
+      if (!inTable) {
+        inTable = true;
+        headers = cells;
+        columnAlignments = [];
+      } else if (line.match(/^\|[\s:-|]+$/)) {
+        const alignCells = line.split('|').slice(1, -1).map(c => c.trim());
+        columnAlignments = alignCells.map(cell => {
+          if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+          if (cell.endsWith(':')) return 'right';
+          return 'left';
+        });
+        
+        tableHtml = '<div class="overflow-x-auto my-4"><table class="w-full text-left text-xs border-collapse border border-white/10 rounded-xl overflow-hidden shadow-sm">';
+        tableHtml += '<thead class="bg-white/[0.02] border-b border-white/10 text-gray-300 font-semibold">';
+        tableHtml += '<tr>';
+        headers.forEach((header, idx) => {
+          const alignClass = columnAlignments[idx] === 'center' ? 'text-center' : columnAlignments[idx] === 'right' ? 'text-right' : 'text-left';
+          tableHtml += `<th class="py-2.5 px-3 font-semibold ${alignClass}">${header}</th>`;
+        });
+        tableHtml += '</tr></thead>';
+        tableHtml += '<tbody class="divide-y divide-white/5">';
+      } else {
+        tableHtml += '<tr class="hover:bg-white/[0.02] border-b border-white/5 transition-all">';
+        cells.forEach((cell, idx) => {
+          const alignClass = columnAlignments[idx] === 'center' ? 'text-center' : columnAlignments[idx] === 'right' ? 'text-right' : 'text-left';
+          tableHtml += `<td class="py-2 px-3 font-mono text-[11px] text-gray-300 ${alignClass}">${cell}</td>`;
+        });
+        if (cells.length < headers.length) {
+          for (let j = cells.length; j < headers.length; j++) {
+            tableHtml += '<td class="py-2 px-3"></td>';
+          }
+        }
+        tableHtml += '</tr>';
+      }
+    } else {
+      if (inTable) {
+        tableHtml += '</tbody></table></div>';
+        outputLines.push('\n\n' + tableHtml + '\n\n');
+        inTable = false;
+        tableHtml = '';
+      }
+      outputLines.push(lines[i]);
+    }
+  }
+  
+  if (inTable) {
+    tableHtml += '</tbody></table></div>';
+    outputLines.push('\n\n' + tableHtml + '\n\n');
+  }
+  
+  return outputLines.join('\n');
+};
 
 // Markdown parser with simple regex
 const parseMarkdown = (text) => {
@@ -54,6 +118,15 @@ const parseMarkdown = (text) => {
     const id = `__INLINE_CODE_${inlineCodes.length}__`;
     inlineCodes.push(`<code>${code}</code>`);
     return id;
+  });
+
+  // Parse markdown tables wrapped in custom <tabular> tags
+  html = html.replace(/(?:&lt;|<)tabular(?:&gt;|>)([\s\S]*?)(?:&lt;|<)\/tabular(?:&gt;|>)/gi, (match, tableText) => {
+    const decodedText = tableText
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+    return '\n\n' + parseTables(decodedText) + '\n\n';
   });
     
   // Headers
@@ -92,17 +165,21 @@ const parseMarkdown = (text) => {
   // Paragraphs and Line Breaks
   const paragraphs = html.split(/\n\n+/);
   return paragraphs.map(p => {
+    const trimmed = p.trim();
+    if (!trimmed) return '';
     if (
-      p.startsWith('<pre>') || 
-      p.startsWith('<ul>') || 
-      p.startsWith('<h3>') || 
-      p.startsWith('<h2>') || 
-      p.startsWith('<h1>')
+      trimmed.startsWith('<pre>') || 
+      trimmed.startsWith('<ul>') || 
+      trimmed.startsWith('<h3>') || 
+      trimmed.startsWith('<h2>') || 
+      trimmed.startsWith('<h1>') ||
+      trimmed.startsWith('<div') ||
+      trimmed.startsWith('<table')
     ) {
-      return p;
+      return trimmed;
     }
-    return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
-  }).join('');
+    return `<p>${trimmed.replace(/\n/g, '<br/>')}</p>`;
+  }).filter(Boolean).join('');
 };
 
 // Helper to get tool icons dynamically
@@ -150,6 +227,16 @@ function App() {
   });
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+
+  // System Prompt States
+  const [systemPrompts, setSystemPrompts] = useState({ activePrompt: null, history: [] });
+  const [editPromptText, setEditPromptText] = useState('');
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+  const [isFetchingPrompt, setIsFetchingPrompt] = useState(false);
+  const [promptError, setPromptError] = useState(null);
+  const [promptSuccessMessage, setPromptSuccessMessage] = useState(null);
+  const [selectedHistoryPrompt, setSelectedHistoryPrompt] = useState(null);
 
   const chatEndRef = useRef(null);
 
@@ -209,7 +296,7 @@ function App() {
   };
 
   // Clear Telemetry metrics
-  const clearMetrics = async () => {
+  const handleClearTelemetry = async () => {
     if (!window.confirm('Are you sure you want to clear all telemetry data?')) return;
     try {
       const res = await fetch('http://localhost:3000/api/metrics', { method: 'DELETE' });
@@ -223,8 +310,100 @@ function App() {
     }
   };
 
+  // System Prompt Operations
+  const fetchSystemPrompt = async () => {
+    setIsFetchingPrompt(true);
+    setPromptError(null);
+    try {
+      const res = await fetch('http://localhost:3000/api/system-prompt');
+      const data = await res.json();
+      if (data.success) {
+        setSystemPrompts(data);
+        setEditPromptText(data.activePrompt?.prompt || '');
+      } else {
+        setPromptError(data.error || 'Failed to fetch system prompt');
+      }
+    } catch (err) {
+      setPromptError(err.message || 'Network error fetching system prompt');
+    } finally {
+      setIsFetchingPrompt(false);
+    }
+  };
+
+  const handleSavePrompt = async () => {
+    if (!editPromptText.trim()) return;
+    setIsSavingPrompt(true);
+    setPromptError(null);
+    setPromptSuccessMessage(null);
+    try {
+      const res = await fetch('http://localhost:3000/api/system-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: editPromptText })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromptSuccessMessage('System prompt updated successfully!');
+        setIsEditingPrompt(false);
+        await fetchSystemPrompt();
+      } else {
+        setPromptError(data.error || 'Failed to save system prompt');
+      }
+    } catch (err) {
+      setPromptError(err.message || 'Network error saving system prompt');
+    } finally {
+      setIsSavingPrompt(false);
+    }
+  };
+
+  const handleActivatePrompt = async (id) => {
+    setPromptError(null);
+    setPromptSuccessMessage(null);
+    try {
+      const res = await fetch('http://localhost:3000/api/system-prompt/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromptSuccessMessage('Prompt version activated successfully!');
+        await fetchSystemPrompt();
+      } else {
+        setPromptError(data.error || 'Failed to activate prompt');
+      }
+    } catch (err) {
+      setPromptError(err.message || 'Network error activating prompt');
+    }
+  };
+
+  const handleDeletePrompt = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this prompt revision from history?')) return;
+    setPromptError(null);
+    setPromptSuccessMessage(null);
+    try {
+      const res = await fetch(`http://localhost:3000/api/system-prompt/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromptSuccessMessage('Prompt revision deleted successfully.');
+        if (selectedHistoryPrompt?.id === id) {
+          setSelectedHistoryPrompt(null);
+        }
+        await fetchSystemPrompt();
+      } else {
+        setPromptError(data.error || 'Failed to delete prompt');
+      }
+    } catch (err) {
+      setPromptError(err.message || 'Network error deleting prompt');
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchSystemPrompt();
+    fetchMetrics();
   }, []);
 
   // Poll metrics every 5 seconds when dashboard is active or processing a chat request
@@ -399,6 +578,16 @@ function App() {
             <LayoutDashboard className="w-4 h-4" />
             Admin Dashboard
           </button>
+          <button 
+            onClick={() => {
+              setActiveTab('system-prompt');
+              fetchSystemPrompt();
+            }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'system-prompt' ? 'bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+          >
+            <Settings className="w-4 h-4" />
+            System Prompt
+          </button>
         </div>
 
         {/* Status indicator Card */}
@@ -426,31 +615,51 @@ function App() {
           </div>
         </div>
 
-        {/* Tools Section list */}
-        <div className="flex flex-col flex-grow overflow-hidden">
+        {/* Recent Requests / Chart History */}
+        <div className="flex flex-col flex-grow overflow-hidden mt-2">
           <div className="flex items-center gap-2 mb-3 text-gray-400">
-            <Wrench size={16} />
-            <h2 className="text-xs font-bold uppercase tracking-wider">Available Tools ({tools.length})</h2>
+            <History size={16} className="text-accent-purple" />
+            <h2 className="text-xs font-bold uppercase tracking-wider">Recent Requests ({metrics.requests?.length || 0})</h2>
           </div>
           <div className="flex flex-col gap-2 overflow-y-auto pr-1 flex-grow">
-            {tools.length === 0 ? (
+            {metrics.requests?.length === 0 ? (
               <div className="text-gray-500 text-xs text-center py-4 border border-dashed border-white/5 rounded-xl">
-                No active tools found.
+                No history recorded yet.
               </div>
             ) : (
-              tools.map((tool, idx) => {
-                const toolName = tool.function?.name || tool.name;
-                const toolDesc = tool.function?.description || tool.description || 'No description provided';
+              metrics.requests?.map((req) => {
+                const isSelected = selectedRequest?.id === req.id;
                 return (
-                  <div key={idx} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-200 border border-white/5 hover:border-white/10" title={toolName}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="p-1 bg-white/5 rounded-lg">
-                        {getToolIcon(toolName)}
+                  <button
+                    key={req.id}
+                    onClick={() => {
+                      setSelectedRequest(req);
+                      setActiveTab('dashboard');
+                    }}
+                    className={`p-3 text-left rounded-xl transition-all duration-200 border text-xs ${
+                      isSelected
+                        ? 'bg-accent-blue/10 border-accent-blue/30 text-white font-semibold'
+                        : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full ${req.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
+                        {req.success ? 'SUCCESS' : 'FAILED'}
                       </span>
-                      <span className="font-mono text-xs font-bold text-gray-200 truncate">{toolName}</span>
+                      <span className="text-[9px] font-mono text-gray-500">
+                        {req.totalDuration ? `${(req.totalDuration / 1000).toFixed(1)}s` : 'N/A'}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{toolDesc}</span>
-                  </div>
+                    <p className="font-medium truncate mb-1 text-gray-200">{req.prompt}</p>
+                    <div className="flex items-center justify-between text-[8px] text-gray-500">
+                      <span>{new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {req.toolCalls?.length > 0 && (
+                        <span className="font-semibold text-accent-purple">
+                          {req.toolCalls.length} tool{req.toolCalls.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </button>
                 );
               })
             )}
@@ -618,364 +827,588 @@ function App() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'dashboard' ? (
           /* ADMIN METRICS DASHBOARD VIEW */
           <div className="flex flex-grow h-full overflow-hidden">
-            {/* Left sidebar: Recent requests */}
-            <div className="w-[300px] border-r border-border-color bg-bg-secondary/20 flex flex-col flex-shrink-0 h-full overflow-hidden">
-              <div className="p-4 border-b border-border-color flex items-center justify-between bg-bg-secondary/40 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-accent-purple" />
-                  <h3 className="text-sm font-semibold text-white">Recent Requests</h3>
-                </div>
-                <span className="px-2 py-0.5 bg-white/5 rounded-full font-mono text-[10px] text-gray-400">
-                  {metrics.requests?.length || 0}
-                </span>
-              </div>
-              <div className="flex-grow overflow-y-auto p-3 flex flex-col gap-2">
-                {metrics.requests?.length === 0 ? (
-                  <div className="text-center text-xs text-gray-500 py-12">No requests recorded yet.</div>
-                ) : (
-                  metrics.requests?.map((req) => (
-                    <button
-                      key={req.id}
-                      onClick={() => setSelectedRequest(req)}
-                      className={`p-3 text-left rounded-xl transition-all duration-200 border ${selectedRequest?.id === req.id ? 'bg-accent-blue/10 border-accent-blue/30 text-white' : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'}`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className={`text-[9px] font-bold font-mono px-1.5 py-0.5 rounded-full ${req.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
-                          {req.success ? 'SUCCESS' : 'FAILED'}
-                        </span>
-                        <span className="text-[10px] font-mono text-gray-500">
-                          {req.totalDuration ? `${(req.totalDuration / 1000).toFixed(1)}s` : 'N/A'}
-                        </span>
+            {/* Dashboard main content area */}
+            <div className="flex-grow flex flex-col h-full overflow-y-auto bg-bg-primary/20 p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                
+                {/* Left Area (2/3 width): Telemetry drill-down or diagnostics aggregates */}
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                  {selectedRequest ? (
+                    /* REQUEST DETAIL VIEW */
+                    <div className="flex flex-col gap-6">
+                      {/* Detail Header */}
+                      <div className="flex items-center justify-between pb-4 border-b border-border-color">
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => setSelectedRequest(null)}
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition"
+                          >
+                            ← Back to Aggregates
+                          </button>
+                          <span className="text-sm font-semibold text-gray-400">Request Details</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                          <span>ID: {selectedRequest.id}</span>
+                          <span>•</span>
+                          <span>{new Date(selectedRequest.timestamp).toLocaleString()}</span>
+                        </div>
                       </div>
-                      <p className="text-xs font-medium truncate mb-1 text-gray-200">{req.prompt}</p>
-                      <div className="flex items-center justify-between text-[9px] text-gray-500">
-                        <span>{new Date(req.timestamp).toLocaleTimeString()}</span>
-                        {req.toolCalls?.length > 0 && (
-                          <span className="font-semibold text-accent-purple">
-                            {req.toolCalls.length} tool{req.toolCalls.length > 1 ? 's' : ''}
+
+                      {/* Prompt Box */}
+                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">User Prompt</span>
+                        <p className="text-sm text-white font-medium select-text">{selectedRequest.prompt}</p>
+                      </div>
+
+                      {/* Summary performance metrics */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
+                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">Status</span>
+                          <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded ${selectedRequest.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
+                            {selectedRequest.success ? 'SUCCESS' : 'FAILED'}
                           </span>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
+                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">Total Duration</span>
+                          <span className="font-mono text-sm font-bold text-white">{selectedRequest.totalDuration} ms</span>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
+                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">RAG Retrieval</span>
+                          <span className="font-mono text-sm font-bold text-accent-purple">{selectedRequest.retrievalDuration || 0} ms</span>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
+                          <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">Tools Executed</span>
+                          <span className="font-mono text-sm font-bold text-accent-blue">{selectedRequest.toolCalls?.length || 0} calls</span>
+                        </div>
+                      </div>
+
+                      {/* Targeted Action Telemetries */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
+                          <span className="text-gray-400">Screenshots:</span>
+                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.screenshotCount || 0}</span>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
+                          <span className="text-gray-400">Apple Scripts:</span>
+                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.appleScriptCount || 0}</span>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
+                          <span className="text-gray-400">Fetch UI:</span>
+                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.fetchUiCount || 0}</span>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
+                          <span className="text-gray-400">Annotations:</span>
+                          <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.annotateCount || 0}</span>
+                        </div>
+                      </div>
+
+                      {/* Visual Step Timeline */}
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Execution Steps & Latency Breakdown</h4>
+                        {selectedRequest.toolCalls?.length === 0 ? (
+                          <div className="text-xs text-gray-500 py-4 bg-white/5 border border-white/5 border-dashed rounded-2xl text-center">
+                            No tools were executed during this reasoning run.
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3">
+                            {selectedRequest.toolCalls.map((step, idx) => (
+                              <div key={idx} className="bg-bg-secondary/40 border border-white/5 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                  <span className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-gray-400 flex-shrink-0 mt-0.5">{idx + 1}</span>
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                      <span className="font-mono text-xs font-bold text-white">{step.name}</span>
+                                      <span className={`text-[8px] font-bold font-mono px-1 rounded ${step.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
+                                        {step.success ? 'SUCCESS' : 'FAILED'}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-gray-500 block font-mono mb-2">Args: {JSON.stringify(step.args)}</span>
+                                    {step.error && (
+                                      <span className="text-[10px] text-red-400 block font-mono">Error: {step.error}</span>
+                                    )}
+                                    {step.resultSummary && (
+                                      <div className="text-[10px] text-gray-400 bg-black/20 p-2 rounded border border-white/5 font-mono max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                                        Result: {step.resultSummary}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-row md:flex-col items-end gap-4 md:gap-1.5 shrink-0 border-t md:border-t-0 border-white/5 pt-2 md:pt-0">
+                                  <div className="text-right">
+                                    <span className="text-[9px] text-gray-500 block">Tool Execution Latency</span>
+                                    <span className="font-mono text-xs font-semibold text-white">{step.latency} ms</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[9px] text-gray-500 block">Start from request time</span>
+                                    <span className="font-mono text-xs font-semibold text-accent-blue">{step.latencyFromRequestStart} ms</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    </button>
-                  ))
-                )}
+
+                      {/* Given Context & Generated Context */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-72 overflow-hidden">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-3 flex-shrink-0">RAG Context Given</span>
+                          <div className="flex-grow bg-black/20 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
+                            {selectedRequest.givenContext || 'No additional context loaded.'}
+                          </div>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-72 overflow-hidden">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-3 flex-shrink-0">Assistant Output & Action Logs</span>
+                          <div className="flex-grow bg-black/20 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
+                            {selectedRequest.generatedContext || 'No assistant logs recorded.'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* METRICS AGGREGATES VIEW */
+                    <div className="flex flex-col gap-6">
+                      {/* Dashboard Title Header */}
+                      <div className="flex items-center justify-between pb-4 border-b border-border-color">
+                        <div>
+                          <h2 className="text-md font-semibold text-white font-sans">Diagnostics & Performance</h2>
+                          <p className="text-xs text-gray-400">Review metrics, API diagnostics, and tool latencies in real time.</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={fetchMetrics}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition"
+                            title="Refresh statistics"
+                          >
+                            <RefreshCw size={12} className={isLoadingMetrics ? 'animate-spin' : ''} /> Refresh
+                          </button>
+                          <button 
+                            onClick={handleClearTelemetry}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition"
+                            title="Delete logs history"
+                          >
+                            <Trash2 size={12} /> Clear Telemetry
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Summary metrics cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Card 1: Total requests & Success rate */}
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Requests</span>
+                          <div className="flex items-baseline gap-2 mb-2">
+                            <span className="text-3xl font-extrabold text-white">{metrics.aggregates?.totalRequests || 0}</span>
+                            <span className="text-xs text-gray-500">runs</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                            <span className="text-gray-400">Success Rate:</span>
+                            <span className="font-semibold text-accent-emerald">
+                              {metrics.aggregates?.totalRequests ? `${((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100).toFixed(0)}%` : '0%'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card 2: Average latencies */}
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Average Latency</span>
+                          <div className="flex items-baseline gap-2 mb-2">
+                            <span className="text-3xl font-extrabold text-accent-purple">{metrics.aggregates?.averageDuration ? `${(metrics.aggregates.averageDuration / 1000).toFixed(1)}s` : '0.0s'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                            <span className="text-gray-400">Avg RAG Duration:</span>
+                            <span className="font-semibold text-accent-purple">{metrics.aggregates?.averageRetrievalDuration || 0} ms</span>
+                          </div>
+                        </div>
+
+                        {/* Card 3: Execution metrics */}
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Tools Execution</span>
+                          <div className="flex items-baseline gap-2 mb-2">
+                            <span className="text-3xl font-extrabold text-accent-blue">{metrics.aggregates?.totalToolCalls || 0}</span>
+                            <span className="text-xs text-gray-500">calls</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                            <span className="text-gray-400">Avg Calls/Run:</span>
+                            <span className="font-semibold text-accent-blue">
+                              {metrics.aggregates?.totalRequests ? (metrics.aggregates.totalToolCalls / metrics.aggregates.totalRequests).toFixed(1) : '0.0'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card 4: Accuracy Metrics */}
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Reliability</span>
+                          <div className="flex items-baseline gap-2 mb-2">
+                            <span className="text-3xl font-extrabold text-accent-emerald">
+                              {metrics.aggregates?.totalToolCalls ? `${((metrics.aggregates.successfulToolCalls / metrics.aggregates.totalToolCalls) * 100).toFixed(0)}%` : '100%'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                            <span className="text-gray-400">Failed tool runs:</span>
+                            <span className="font-semibold text-red-400">{metrics.aggregates?.failedToolCalls || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Cumulative telemetries */}
+                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Total Interaction Breakdown</span>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
+                            <span className="text-gray-400">Screenshots:</span>
+                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalScreenshots || 0}</span>
+                          </div>
+                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
+                            <span className="text-gray-400">Apple Scripts:</span>
+                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAppleScripts || 0}</span>
+                          </div>
+                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
+                            <span className="text-gray-400">Fetch UI (elements):</span>
+                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalFetchUis || 0}</span>
+                          </div>
+                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
+                            <span className="text-gray-400">Annotations:</span>
+                            <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAnnotations || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tool latencies and success statistics table */}
+                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Detailed Tool Execution Performance</span>
+                        
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-white/[0.02] text-gray-400 border-b border-white/10">
+                                <th className="font-semibold py-3 px-4 rounded-l-xl pr-4 text-left">Tool Name</th>
+                                <th className="font-semibold py-3 px-4 text-center">Total Calls</th>
+                                <th className="font-semibold py-3 px-4 text-center">Response (Success) Rate</th>
+                                <th className="font-semibold py-3 px-4 text-right">Avg Execution Latency</th>
+                                <th className="font-semibold py-3 px-4 rounded-r-xl text-right">Avg Latency (Reasoning)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {Object.keys(metrics.aggregates?.tools || {}).length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="text-center py-8 text-gray-500">No tools have been called yet.</td>
+                                </tr>
+                              ) : (
+                                Object.entries(metrics.aggregates.tools).map(([name, data]) => (
+                                  <tr key={name} className="hover:bg-white/[0.03] border-b border-white/5 transition-all">
+                                    <td className="py-3 px-4 font-mono font-bold text-white flex items-center gap-2">
+                                      <span className="p-1 bg-white/5 rounded">
+                                        {getToolIcon(name)}
+                                      </span>
+                                      {name}
+                                    </td>
+                                    <td className="py-3 px-4 text-center font-mono text-gray-300">{data.calls}</td>
+                                    <td className="py-3 px-4 font-mono">
+                                      <div className="flex items-center gap-3 justify-center">
+                                        <span className={`text-xs font-bold ${data.successRate >= 0.9 ? 'text-accent-emerald' : data.successRate >= 0.5 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                          {(data.successRate * 100).toFixed(0)}%
+                                        </span>
+                                        <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden hidden sm:block border border-white/5">
+                                          <div 
+                                            className={`h-full rounded-full ${data.successRate >= 0.9 ? 'bg-accent-emerald' : data.successRate >= 0.5 ? 'bg-yellow-400' : 'bg-red-500'}`}
+                                            style={{ width: `${(data.successRate * 100).toFixed(0)}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-mono text-white font-medium">{data.averageLatency} ms</td>
+                                    <td className="py-3 px-4 text-right font-mono text-accent-blue font-semibold">{data.averageLatencyFromRequestStart} ms</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Area (1/3 width): Available Tools list card */}
+                <div className="flex flex-col gap-6 lg:sticky lg:top-6">
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col max-h-[calc(100vh-80px)] overflow-hidden">
+                    <div className="flex items-center gap-2 mb-4 text-gray-200">
+                      <Wrench className="w-4 h-4 text-accent-purple" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Available Tools ({tools.length})</span>
+                    </div>
+                    <div className="flex flex-col gap-2 overflow-y-auto pr-1">
+                      {tools.length === 0 ? (
+                        <div className="text-gray-500 text-xs text-center py-4 border border-dashed border-white/5 rounded-xl">
+                          No active tools found.
+                        </div>
+                      ) : (
+                        tools.map((tool, idx) => {
+                          const toolName = tool.function?.name || tool.name;
+                          const toolDesc = tool.function?.description || tool.description || 'No description provided';
+                          return (
+                            <div key={idx} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-200 border border-white/5 hover:border-white/10" title={toolName}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="p-1 bg-white/5 rounded-lg">
+                                  {getToolIcon(toolName)}
+                                </span>
+                                <span className="font-mono text-xs font-bold text-gray-200 truncate">{toolName}</span>
+                              </div>
+                              <span className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{toolDesc}</span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* SYSTEM PROMPT MANAGER VIEW */
+          <div className="flex flex-grow h-full overflow-hidden p-6 flex-col">
+            {/* System Prompt Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-border-color mb-6 flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <Settings className="w-5 h-5 text-accent-emerald" />
+                <div>
+                  <h2 className="text-md font-semibold text-white font-sans">System Prompt Manager</h2>
+                  <p className="text-xs text-gray-400">Configure instructions and rules that control the AI assistant's personality and tools.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={fetchSystemPrompt}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition"
+                  title="Reload prompts from database"
+                >
+                  <RefreshCw size={12} className={isFetchingPrompt ? 'animate-spin' : ''} /> Reload
+                </button>
               </div>
             </div>
 
-            {/* Right main area: Metrics aggregates or specific request drill-down */}
-            <div className="flex-grow flex flex-col h-full overflow-y-auto bg-bg-primary/20 p-6">
-              {selectedRequest ? (
-                /* REQUEST DETAIL VIEW */
-                <div className="flex flex-col gap-6">
-                  {/* Detail Header */}
-                  <div className="flex items-center justify-between pb-4 border-b border-border-color">
-                    <div className="flex items-center gap-3">
-                      <button 
-                        onClick={() => setSelectedRequest(null)}
-                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition"
-                      >
-                        ← Back to Aggregates
-                      </button>
-                      <span className="text-sm font-semibold text-gray-400">Request Details</span>
-                    </div>
-                    <span className="font-mono text-xs text-gray-500">{selectedRequest.id}</span>
-                  </div>
+            {/* Alert Logs */}
+            {promptError && (
+              <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center flex-shrink-0 animate-fadeIn">
+                <AlertCircle size={14} className="flex-shrink-0" />
+                <span>{promptError}</span>
+              </div>
+            )}
+            {promptSuccessMessage && (
+              <div className="mb-4 p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center flex-shrink-0 animate-fadeIn">
+                <CheckCircle size={14} className="flex-shrink-0" />
+                <span>{promptSuccessMessage}</span>
+              </div>
+            )}
 
-                  {/* Prompt Box */}
-                  <div className="p-5 bg-bg-secondary/40 border border-border-color rounded-2xl">
-                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Prompt</span>
-                    <p className="text-md text-white font-medium">{selectedRequest.prompt}</p>
-                    {selectedRequest.error && (
-                      <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center">
-                        <AlertCircle size={14} className="flex-shrink-0" />
-                        <span>{selectedRequest.error}</span>
-                      </div>
-                    )}
-                  </div>
+            {/* Side-by-Side Prompt layout */}
+            <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden h-full">
+              {/* Left Side: Revision History */}
+              <div className="flex flex-col bg-white/5 border border-white/5 rounded-2xl p-5 overflow-hidden h-full">
+                <div className="flex items-center gap-2 mb-4 flex-shrink-0">
+                  <History className="w-4 h-4 text-accent-purple" />
+                  <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">Revision History</span>
+                  <span className="ml-auto px-2 py-0.5 bg-white/5 rounded-full font-mono text-[10px] text-gray-400">
+                    {systemPrompts.history?.length || 0}
+                  </span>
+                </div>
 
-                  {/* Summary performance metrics for this single request */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                        <Timer className="w-3.5 h-3.5 text-accent-purple" />
-                        Total Duration
-                      </div>
-                      <span className="font-mono text-xl font-bold text-white">
-                        {selectedRequest.totalDuration} <span className="text-xs font-normal text-gray-500">ms</span>
-                      </span>
+                <div className="flex-grow overflow-y-auto overflow-x-auto pr-1">
+                  {isFetchingPrompt && systemPrompts.history?.length === 0 ? (
+                    <div className="text-center text-xs text-gray-500 py-12 flex flex-col items-center gap-2">
+                      <RefreshCw size={16} className="animate-spin text-accent-purple" />
+                      Loading revisions...
                     </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                        <Globe className="w-3.5 h-3.5 text-accent-blue" />
-                        Retrieval Time
-                      </div>
-                      <span className="font-mono text-xl font-bold text-white">
-                        {selectedRequest.retrievalTime} <span className="text-xs font-normal text-gray-500">ms</span>
-                      </span>
-                    </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                        <Cpu className="w-3.5 h-3.5 text-accent-emerald" />
-                        LLM Gen Time
-                      </div>
-                      <span className="font-mono text-xl font-bold text-white">
-                        {selectedRequest.generationTime} <span className="text-xs font-normal text-gray-500">ms</span>
-                      </span>
-                    </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                        <Clock className="w-3.5 h-3.5 text-orange-400" />
-                        Context Processing
-                      </div>
-                      <span className="font-mono text-xl font-bold text-white">
-                        {selectedRequest.contextProcessingTime} <span className="text-xs font-normal text-gray-500">ms</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions counts in this request */}
-                  <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-3">Targeted Action Telemetries</span>
-                    <div className="grid grid-cols-4 gap-6">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400">Screenshots Taken:</span>
-                        <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.screenshotCount || 0}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400">Apple Scripts Executed:</span>
-                        <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.appleScriptCount || 0}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400">Fetch UI elements:</span>
-                        <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.fetchUiCount || 0}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400">Annotations:</span>
-                        <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.annotateCount || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Visual Step Timeline */}
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Execution Steps & Latency Breakdown</h4>
-                    {selectedRequest.toolCalls?.length === 0 ? (
-                      <div className="text-xs text-gray-500 py-4 bg-white/5 border border-white/5 border-dashed rounded-2xl text-center">
-                        No tools were executed during this reasoning run.
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3">
-                        {selectedRequest.toolCalls.map((step, idx) => (
-                          <div key={idx} className="bg-bg-secondary/40 border border-white/5 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-start gap-3">
-                              <span className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-gray-400 flex-shrink-0 mt-0.5">{idx + 1}</span>
-                              <div>
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <span className="font-mono text-xs font-bold text-white">{step.name}</span>
-                                  <span className={`text-[8px] font-bold font-mono px-1 rounded ${step.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
-                                    {step.success ? 'SUCCESS' : 'FAILED'}
-                                  </span>
+                  ) : systemPrompts.history?.length === 0 ? (
+                    <div className="text-center text-xs text-gray-500 py-12">No history recorded yet.</div>
+                  ) : (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-white/[0.02] text-gray-400 border-b border-white/10">
+                          <th className="font-semibold py-3 px-3 rounded-l-xl text-left">Revision</th>
+                          <th className="font-semibold py-3 px-3 text-left">Preview</th>
+                          <th className="font-semibold py-3 px-3 text-left">Status</th>
+                          <th className="font-semibold py-3 px-3 text-left">Date</th>
+                          <th className="font-semibold py-3 px-3 rounded-r-xl text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {systemPrompts.history.map((item) => {
+                          const isActive = item.is_active === 1;
+                          const dateStr = new Date(item.created_at).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          });
+                          return (
+                            <tr key={item.id} className={`hover:bg-white/[0.02] border-b border-white/5 transition-all ${isActive ? 'bg-accent-emerald/[0.02]' : ''}`}>
+                              <td className="py-3 px-3 font-mono font-bold text-white">#{item.id}</td>
+                              <td className="py-3 px-3 text-gray-400 max-w-[150px] truncate" title={item.prompt}>{item.prompt}</td>
+                              <td className="py-3 px-3">
+                                <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full ${isActive ? 'bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20' : 'bg-white/5 text-gray-400 border border-white/5'}`}>
+                                  {isActive ? 'ACTIVE' : 'INACTIVE'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-gray-500 text-[10px] whitespace-nowrap">{dateStr}</td>
+                              <td className="py-3 px-3 text-right">
+                                <div className="flex gap-2.5 justify-end">
+                                  <button
+                                    onClick={() => setSelectedHistoryPrompt(item)}
+                                    className="text-accent-blue hover:underline font-semibold bg-transparent border-0 cursor-pointer p-0 text-[11px]"
+                                  >
+                                    Details
+                                  </button>
+                                  {!isActive && (
+                                    <>
+                                      <button
+                                        onClick={() => handleActivatePrompt(item.id)}
+                                        className="text-accent-emerald hover:underline font-semibold bg-transparent border-0 cursor-pointer p-0 text-[11px]"
+                                      >
+                                        Activate
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeletePrompt(item.id)}
+                                        className="text-red-400 hover:text-red-300 font-semibold bg-transparent border-0 cursor-pointer p-0 text-[11px]"
+                                      >
+                                        Delete
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
-                                <span className="text-[10px] text-gray-500 block font-mono mb-2">Args: {JSON.stringify(step.args)}</span>
-                                {step.error && (
-                                  <span className="text-[10px] text-red-400 block font-mono">Error: {step.error}</span>
-                                )}
-                                {step.resultSummary && (
-                                  <div className="text-[10px] text-gray-400 bg-black/20 p-2 rounded border border-white/5 font-mono max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                                    Result: {step.resultSummary}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex flex-row md:flex-col items-end gap-4 md:gap-1.5 shrink-0 border-t md:border-t-0 border-white/5 pt-2 md:pt-0">
-                              <div className="text-right">
-                                <span className="text-[9px] text-gray-500 block">Tool Execution Latency</span>
-                                <span className="font-mono text-xs font-semibold text-white">{step.latency} ms</span>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-[9px] text-gray-500 block">Start from request time</span>
-                                <span className="font-mono text-xs font-semibold text-accent-blue">{step.latencyFromRequestStart} ms</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Given Context & Generated Context */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileCode className="w-4 h-4 text-accent-blue" />
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Given Context</h4>
-                      </div>
-                      <pre className="w-full h-80 overflow-auto bg-black/40 border border-white/5 rounded-2xl p-4 font-mono text-[10px] text-gray-300 whitespace-pre-wrap select-all">
-                        {selectedRequest.givenContext || 'No context registered.'}
-                      </pre>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Code className="w-4 h-4 text-accent-purple" />
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Generated Context</h4>
-                      </div>
-                      <pre className="w-full h-80 overflow-auto bg-black/40 border border-white/5 rounded-2xl p-4 font-mono text-[10px] text-gray-300 whitespace-pre-wrap select-all">
-                        {selectedRequest.generatedContext || 'No context generated.'}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* SYSTEM AGGREGATE DASHBOARD */
-                <div className="flex flex-col gap-6">
-                  {/* Dashboard header */}
-                  <div className="flex items-center justify-between pb-4 border-b border-border-color">
-                    <div className="flex items-center gap-2.5">
-                      <Activity className="w-5 h-5 text-accent-blue" />
-                      <h2 className="text-md font-semibold text-white">System Diagnostics & Latency Averages</h2>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={fetchMetrics}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition"
-                        title="Reload latest metrics"
-                      >
-                        <RefreshCw size={12} className={isLoadingMetrics ? 'animate-spin' : ''} /> Reload
-                      </button>
-                      <button 
-                        onClick={clearMetrics}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/10 hover:border-red-500/20 rounded-lg text-xs font-medium text-red-400 transition"
-                        title="Clear all stored logs"
-                      >
-                        <Trash2 size={12} /> Clear Telemetry
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Summary metrics cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Card 1: Total requests & Success rate */}
-                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Requests</span>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-3xl font-extrabold text-white">{metrics.aggregates?.totalRequests || 0}</span>
-                        <span className="text-xs text-gray-500">runs</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                        <span className="text-gray-400">Success Rate:</span>
-                        <span className="font-semibold text-accent-emerald">
-                          {metrics.aggregates?.totalRequests ? `${((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100).toFixed(0)}%` : '0%'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Card 2: Average latencies */}
-                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Average Latency</span>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-3xl font-extrabold text-accent-purple">
-                          {metrics.aggregates?.averageTotalDuration || 0}
-                        </span>
-                        <span className="text-xs text-gray-500">ms</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                        <span className="text-gray-400">RAG Tool Retrieval:</span>
-                        <span className="font-semibold text-white">{metrics.aggregates?.averageRetrievalTime || 0} ms</span>
-                      </div>
-                    </div>
-
-                    {/* Card 3: Context and evaluation durations */}
-                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Model Latency Breakdown</span>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-3xl font-extrabold text-accent-blue">
-                          {metrics.aggregates?.averageGenerationTime || 0}
-                        </span>
-                        <span className="text-xs text-gray-500">ms (Gen)</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                        <span className="text-gray-400">Context Processing:</span>
-                        <span className="font-semibold text-white">{metrics.aggregates?.averageContextProcessingTime || 0} ms</span>
-                      </div>
-                    </div>
-
-                    {/* Card 4: Action tallies */}
-                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Special System Actions</span>
-                      <div className="flex flex-col gap-1.5 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Screenshots:</span>
-                          <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalScreenshots || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Apple Scripts:</span>
-                          <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAppleScripts || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Fetch UI (elements):</span>
-                          <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalFetchUis || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Annotations:</span>
-                          <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAnnotations || 0}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tool latencies and success statistics table */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Detailed Tool Execution Performance</span>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-white/10 text-gray-400 pb-3">
-                            <th className="font-semibold pb-3 pr-4">Tool Name</th>
-                            <th className="font-semibold pb-3 text-center">Total Calls</th>
-                            <th className="font-semibold pb-3 text-center">Response (Success) Rate</th>
-                            <th className="font-semibold pb-3 text-right">Avg Execution Latency</th>
-                            <th className="font-semibold pb-3 text-right">Avg Latency from request time (Reasoning)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                          {Object.keys(metrics.aggregates?.tools || {}).length === 0 ? (
-                            <tr>
-                              <td colSpan={5} className="text-center py-8 text-gray-500">No tools have been called yet.</td>
+                              </td>
                             </tr>
-                          ) : (
-                            Object.entries(metrics.aggregates.tools).map(([name, data]) => (
-                              <tr key={name} className="hover:bg-white/[0.02]">
-                                <td className="py-3 font-mono font-bold text-white flex items-center gap-2">
-                                  <span className="p-1 bg-white/5 rounded">
-                                    {getToolIcon(name)}
-                                  </span>
-                                  {name}
-                                </td>
-                                <td className="py-3 text-center font-mono">{data.calls}</td>
-                                <td className="py-3 text-center font-mono">
-                                  <span className={`px-2 py-0.5 rounded font-bold ${data.successRate >= 0.9 ? 'bg-accent-emerald/10 text-accent-emerald' : data.successRate >= 0.5 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
-                                    {(data.successRate * 100).toFixed(0)}%
-                                  </span>
-                                </td>
-                                <td className="py-3 text-right font-mono text-white font-medium">{data.averageLatency} ms</td>
-                                <td className="py-3 text-right font-mono text-accent-blue font-semibold">{data.averageLatencyFromRequestStart} ms</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Right Side: Active Prompt Editor */}
+              <div className="lg:col-span-2 flex flex-col bg-white/5 border border-white/5 rounded-2xl p-5 overflow-hidden h-full">
+                <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-accent-emerald shadow-[0_0_8px_var(--color-accent-emerald)] animate-pulse"></span>
+                    <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">Active System Prompt</span>
+                  </div>
+                  {!isEditingPrompt ? (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(systemPrompts.activePrompt?.prompt || '');
+                          alert('System prompt copied to clipboard!');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition text-gray-300 hover:text-white"
+                      >
+                        <Copy size={12} /> Copy Prompt
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditPromptText(systemPrompts.activePrompt?.prompt || '');
+                          setIsEditingPrompt(true);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 hover:bg-accent-emerald/20 rounded-lg text-xs font-semibold transition"
+                      >
+                        <Edit3 size={12} /> Edit Prompt
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setIsEditingPrompt(false)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition text-gray-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSavePrompt}
+                        disabled={isSavingPrompt || !editPromptText.trim()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald text-white rounded-lg text-xs font-semibold transition hover:bg-accent-emerald/80 disabled:opacity-50"
+                      >
+                        <Save size={12} /> {isSavingPrompt ? 'Saving...' : 'Save as New Revision'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-grow overflow-hidden flex flex-col">
+                  {isEditingPrompt ? (
+                    <textarea
+                      value={editPromptText}
+                      onChange={(e) => setEditPromptText(e.target.value)}
+                      className="w-full flex-grow p-4 bg-black/40 border border-white/10 rounded-xl font-mono text-xs text-gray-200 outline-none focus:border-accent-emerald/50 resize-none overflow-y-auto leading-relaxed"
+                      placeholder="Enter system prompt guidelines here..."
+                    />
+                  ) : (
+                    <div className="w-full flex-grow p-4 bg-black/30 border border-white/5 rounded-xl font-mono text-xs text-gray-300 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
+                      {systemPrompts.activePrompt?.prompt || 'No active system prompt found.'}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* Historical Prompt Details Modal */}
+      {selectedHistoryPrompt && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-bg-secondary border border-border-color rounded-2xl w-full max-w-3xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-border-color flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="text-md font-semibold text-white">Revision #{selectedHistoryPrompt.id} Details</h3>
+                <span className="text-[10px] text-gray-400 font-mono">Created on {new Date(selectedHistoryPrompt.created_at).toLocaleString()}</span>
+              </div>
+              <span className={`text-[9px] font-bold font-mono px-2 py-0.5 rounded-full ${selectedHistoryPrompt.is_active === 1 ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-white/5 text-gray-400'}`}>
+                {selectedHistoryPrompt.is_active === 1 ? 'ACTIVE' : 'INACTIVE'}
+              </span>
+            </div>
+            
+            <div className="flex-grow overflow-y-auto p-6 font-mono text-xs text-gray-300 whitespace-pre-wrap select-text leading-relaxed bg-black/20">
+              {selectedHistoryPrompt.prompt}
+            </div>
+            
+            <div className="p-4 border-t border-border-color flex justify-between items-center bg-bg-secondary/80 flex-shrink-0">
+              <div className="flex gap-2">
+                {selectedHistoryPrompt.is_active !== 1 && (
+                  <button
+                    onClick={() => {
+                      handleActivatePrompt(selectedHistoryPrompt.id);
+                      setSelectedHistoryPrompt(null);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald text-white rounded-lg text-xs font-semibold transition hover:bg-accent-emerald/80"
+                  >
+                    Activate Revision
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedHistoryPrompt.prompt);
+                    alert('Revision copied to clipboard!');
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium text-gray-300 hover:text-white transition"
+                >
+                  <Copy size={12} /> Copy
+                </button>
+              </div>
+              <button
+                onClick={() => setSelectedHistoryPrompt(null)}
+                className="px-4 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium text-gray-300 hover:text-white transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
