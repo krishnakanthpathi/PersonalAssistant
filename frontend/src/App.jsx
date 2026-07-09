@@ -190,6 +190,28 @@ const parseMarkdown = (text) => {
   html = html.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
   html = html.replace(/<\/ul>\s*<ul>/g, '');
 
+  // Markdown images: ![Alt](Url)
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
+    let resolvedUrl = url.trim();
+    if (resolvedUrl.includes('data/screenshots/')) {
+      const parts = resolvedUrl.split('data/screenshots/');
+      resolvedUrl = `http://localhost:3000/screenshots/${parts[parts.length - 1]}`;
+    } else if (resolvedUrl.startsWith('data/')) {
+      const parts = resolvedUrl.split('data/');
+      resolvedUrl = `http://localhost:3000/screenshots/${parts[parts.length - 1]}`;
+    }
+    return `<div class="my-3 rounded-xl overflow-hidden border border-white/10 shadow-lg max-w-full lg:max-w-xl bg-black/20">
+      <img src="${resolvedUrl}" alt="${alt || 'Screenshot'}" class="w-full object-contain cursor-zoom-in" onclick="window.open(this.src, '_blank')" />
+    </div>`;
+  });
+
+  // Auto-render plain text screenshot paths
+  html = html.replace(/(?<![\w/="(:])(?:data\/screenshots\/|data\/)?(screenshot_[a-zA-Z0-9_-]+\.png|blueprint_[a-zA-Z0-9_-]+\.png)/gi, (match, fileName) => {
+    return `<div class="my-3 rounded-xl overflow-hidden border border-white/10 shadow-lg max-w-full lg:max-w-xl bg-black/20">
+      <img src="http://localhost:3000/screenshots/${fileName}" alt="Screenshot" class="w-full object-contain cursor-zoom-in" onclick="window.open(this.src, '_blank')" />
+    </div>`;
+  });
+
   // Markdown links: [Text](Url)
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-accent-blue hover:underline font-medium">$1</a>');
 

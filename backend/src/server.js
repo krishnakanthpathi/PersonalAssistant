@@ -9,10 +9,15 @@ import { logger } from './utils/logger.js';
 import { env } from './config/env.js';
 import apiRoutes from './routes/api.js';
 
+import path from 'path';
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Serve screenshots statically
+app.use('/screenshots', express.static(path.resolve('data/screenshots')));
 
 // Mount API routes
 app.use(apiRoutes);
