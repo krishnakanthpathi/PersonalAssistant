@@ -7,11 +7,11 @@ const execAsync = promisify(exec);
 
 // In-memory active timers registry
 // Key: timer ID (string)
-// Value: { id, label, durationMs, expiresAt, timeoutRef, startAt }
+// Value: { id, label, expiresAt, timeoutRef }
 const activeTimers = new Map();
 
 /**
- * Parses duration strings like "5m", "10s", "1h", "2m 30s" or raw numbers of seconds into milliseconds.
+ * Parses duration strings like "5m", "10s", "1h" or raw numbers into milliseconds.
  */
 function parseDuration(duration) {
 	if (typeof duration === 'number') {
@@ -43,38 +43,12 @@ function parseDuration(duration) {
 	if (!matched) {
 		const raw = parseInt(duration, 10);
 		if (isNaN(raw)) {
-			throw new Error(`Invalid duration format: "${duration}". Use formats like "5m", "10s", "1h", or raw seconds.`);
+			throw new Error(`Invalid duration format: "${duration}". Use formats like "5m", "10s", "1h".`);
 		}
 		return raw * 1000;
 	}
 
 	return totalMs;
-}
-
-/**
- * Formats milliseconds into a human-readable duration string.
- */
-function formatDuration(ms) {
-	if (ms <= 0) return '0s';
-	const totalSecs = Math.floor(ms / 1000);
-	const hours = Math.floor(totalSecs / 3600);
-	const minutes = Math.floor((totalSecs % 3600) / 60);
-	const seconds = totalSecs % 60;
-
-	const parts = [];
-	if (hours > 0) parts.push(`${hours}h`);
-	if (minutes > 0) parts.push(`${minutes}m`);
-	if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-	return parts.join(' ');
-}
-
-/**
- * Executes an AppleScript command safely.
- */
-function runAppleScript(script) {
-	// Escape single quotes for bash
-	const escapedScript = script.replace(/'/g, "'\\''");
-	return execAsync(`osascript -e '${escapedScript}'`);
 }
 
 export const timerTool = {
@@ -91,21 +65,22 @@ export const timerTool = {
 				},
 				duration: {
 					type: 'string',
-					description: 'The duration for the timer (e.g., "5m", "10s", "1h", "2m 30s", or raw number of seconds). Required if action is "start".'
+					description: 'The duration for the timer (e.g., "5m", "10s", "1h"). Required if action is "start".'
 				},
 				label: {
 					type: 'string',
-					description: 'A custom label or description for the timer (e.g., "Boil eggs", "Take a break").'
+					description: 'A custom label for the timer.'
 				},
 				id: {
 					type: 'string',
 					description: 'The ID of the timer to cancel. Required if action is "cancel".'
 				}
-			}
+			},
+			required: ['action']
 		}
 	},
 
-	execute: catchErrors(async ({ action = 'start', duration, label, id }) => {
+	execute: catchErrors(async ({ action, duration, label, id }) => {
 		logger.info(`mac_timer invoked with action: "${action}"`);
 
 		if (action === 'start') {
@@ -119,41 +94,11 @@ export const timerTool = {
 			}
 
 			const timerLabel = label || 'Timer';
-
-			// Check if the user has a shortcut named "Start Timer" to trigger the built-in Clock app
-			let hasStartTimerShortcut = false;
-			try {
-				const { stdout } = await execAsync('shortcuts list');
-				const shortcuts = stdout.split('\n').map(s => s.trim().toLowerCase());
-				if (shortcuts.includes('start timer')) {
-					hasStartTimerShortcut = true;
-				}
-			} catch (err) {
-				logger.warn(`Failed to list shortcuts: ${err.message}`);
-			}
-
-			if (hasStartTimerShortcut) {
-				// Convert to minutes (most shortcuts "Start Timer" accept minutes, or customize)
-				const durationInMinutes = Math.max(1, Math.round(durationMs / 60000));
-				logger.info(`Found "Start Timer" shortcut. Running it with input ${durationInMinutes} minutes.`);
-				await execAsync(`shortcuts run "Start Timer" -i ${durationInMinutes}`);
-				
-				return JSON.stringify({
-					status: 'started_native',
-					label: timerLabel,
-					duration: formatDuration(durationMs),
-					message: `Started native macOS Clock timer for ${formatDuration(durationMs)} using "Start Timer" shortcut.`
-				}, null, 2);
-			}
-
-			// Background Node-based timer fallback
-			const timerId = `timer_${Math.random().toString(36).substr(2, 9)}`;
-			const startAt = Date.now();
-			const expiresAt = startAt + durationMs;
+			const timerId = `timer_${Math.random().toString(36).substring(2, 9)}`;
+			const expiresAt = Date.now() + durationMs;
 
 			const timeoutRef = setTimeout(() => {
-				logger.info(`Timer "${timerLabel}" (ID: ${timerId}) expired. Triggering alerts...`);
-				
+				logger.info(`Timer "${timerLabel}" expired. Triggering alerts...`);
 				const sanitizedLabel = timerLabel.replace(/["\\]/g, '\\$&');
 
 				// 1. Play native sound (Glass sound)
@@ -167,38 +112,31 @@ export const timerTool = {
 				});
 
 				// 3. Native desktop notification
-				runAppleScript(`display notification "${sanitizedLabel}" with title "Timer Finished" sound name "Glass"`).catch(err => {
+				execAsync(`osascript -e 'display notification "${sanitizedLabel}" with title "Timer Finished" sound name "Glass"'`).catch(err => {
 					logger.error(`Failed to trigger notification: ${err.message}`);
 				});
 
-				// 4. GUI alert popup dialog (interactive modal)
-				runAppleScript(`display dialog "Timer \\"${sanitizedLabel}\\" is finished!" buttons {"OK"} default button "OK" with title "Timer Alert"`).catch(err => {
+				// 4. GUI alert popup dialog
+				execAsync(`osascript -e 'display dialog "Timer \\"${sanitizedLabel}\\" is finished!" buttons {"OK"} default button "OK" with title "Timer Alert"'`).catch(err => {
 					logger.error(`Failed to show alert dialog: ${err.message}`);
 				});
 
-				// Remove from active list
 				activeTimers.delete(timerId);
 			}, durationMs);
 
 			activeTimers.set(timerId, {
 				id: timerId,
 				label: timerLabel,
-				durationMs,
-				startAt,
 				expiresAt,
 				timeoutRef
 			});
-
-			const formattedDuration = formatDuration(durationMs);
-			const localTimeStr = new Date(expiresAt).toLocaleTimeString();
 
 			return JSON.stringify({
 				status: 'started',
 				id: timerId,
 				label: timerLabel,
-				duration: formattedDuration,
-				expiresAt: localTimeStr,
-				message: `Timer "${timerLabel}" started. It will go off in ${formattedDuration} (at ${localTimeStr}).`
+				duration: duration,
+				message: `Timer "${timerLabel}" started. It will go off in ${duration}.`
 			}, null, 2);
 		}
 
@@ -208,8 +146,7 @@ export const timerTool = {
 				return {
 					id: t.id,
 					label: t.label,
-					duration: formatDuration(t.durationMs),
-					timeLeft: formatDuration(timeLeftMs),
+					timeLeftSeconds: Math.round(timeLeftMs / 1000),
 					expiresAt: new Date(t.expiresAt).toLocaleTimeString()
 				};
 			});

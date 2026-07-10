@@ -41,7 +41,7 @@ export const keystrokeTool = {
 				action: {
 					type: 'string',
 					enum: ['type', 'shortcut', 'press'],
-					description: 'Whether to type plain text characters ("type"), or press a specific key/shortcut ("shortcut" or "press" — both mean the same thing). Use "shortcut"/"press" with the key parameter to press Enter, Escape, Space, arrow keys, or modifier combos like Cmd+C.'
+					description: 'Whether to type plain text characters ("type"), or press a specific key/shortcut ("shortcut" or "press").'
 				},
 				text: {
 					type: 'string',
@@ -49,7 +49,7 @@ export const keystrokeTool = {
 				},
 				key: {
 					type: 'string',
-					description: 'The target key to press (e.g. "enter", "escape", "space", "a", "c", etc. Required for action: "shortcut").'
+					description: 'The target key to press (e.g. "enter", "escape", "space", "c". Required for action: "shortcut").'
 				},
 				modifiers: {
 					type: 'array',
@@ -57,7 +57,7 @@ export const keystrokeTool = {
 						type: 'string',
 						enum: ['command', 'option', 'control', 'shift']
 					},
-					description: 'Optional modifier keys to hold down during the shortcut (e.g., ["command"] for Cmd + Key).'
+					description: 'Optional modifier keys to hold down during the shortcut.'
 				}
 			},
 			required: ['action']
@@ -69,7 +69,7 @@ export const keystrokeTool = {
 			if (!text) throw new Error('Text parameter is required for typing action');
 			logger.info(`Typing text via clipboard paste: "${text.substring(0, 30)}..."`);
 			
-			// 1. Fetch current clipboard content to restore later
+			// Restore clipboard later to keep system clipboard intact
 			let originalClipboard = '';
 			try {
 				const { stdout } = await execAsync('pbpaste');
@@ -78,52 +78,33 @@ export const keystrokeTool = {
 				logger.warn('Failed to read current clipboard:', err.message);
 			}
 
-			// 2. Write target text to clipboard
-			try {
-				const cpProcess = exec('pbcopy');
-				cpProcess.stdin.write(text);
-				cpProcess.stdin.end();
-				// A small delay ensures the clipboard buffer is updated by OS
-				await new Promise(r => setTimeout(r, 50));
-			} catch (err) {
-				throw new Error('Failed to copy text to clipboard: ' + err.message);
-			}
+			// Write target text to clipboard
+			const cpProcess = exec('pbcopy');
+			cpProcess.stdin.write(text);
+			cpProcess.stdin.end();
+			await new Promise(r => setTimeout(r, 50));
 
-			// 3. Simulate Cmd+V keystroke to paste the text instantly
-			try {
-				await execAsync(`osascript -e 'tell application "System Events" to keystroke "v" using command down'`);
-				// Wait for the target active application to process paste event
-				await new Promise(r => setTimeout(r, 100));
-			} catch (err) {
-				throw new Error('Failed to paste text: ' + err.message);
-			}
+			// Paste instantly via Cmd+V
+			await execAsync(`osascript -e 'tell application "System Events" to keystroke "v" using command down'`);
+			await new Promise(r => setTimeout(r, 100));
 
-			// 4. Restore the original clipboard content
+			// Restore clipboard
 			if (originalClipboard) {
-				try {
-					const cpProcess = exec('pbcopy');
-					cpProcess.stdin.write(originalClipboard);
-					cpProcess.stdin.end();
-				} catch (err) {
-					logger.warn('Failed to restore original clipboard:', err.message);
-				}
+				const restoreProcess = exec('pbcopy');
+				restoreProcess.stdin.write(originalClipboard);
+				restoreProcess.stdin.end();
 			}
 
-			return `Typed text successfully with formatting preserved.`;
+			return `Typed text successfully.`;
 		} else if (action === 'shortcut' || action === 'press') {
 			if (!key) throw new Error('Key parameter is required for shortcut/press action');
 			const lowerKey = key.toLowerCase();
 			logger.info(`Sending keyboard shortcut: ${modifiers.join('+') + (modifiers.length ? '+' : '')}${key}`);
 
-			// Build AppleScript instruction
-			let actionScript = '';
-			if (KEY_CODES[lowerKey]) {
-				actionScript = `key code ${KEY_CODES[lowerKey]}`;
-			} else {
-				actionScript = `keystroke "${lowerKey.substring(0, 1)}"`;
-			}
+			let actionScript = KEY_CODES[lowerKey] 
+				? `key code ${KEY_CODES[lowerKey]}` 
+				: `keystroke "${lowerKey.substring(0, 1)}"`;
 
-			// Add modifiers if provided
 			if (modifiers && modifiers.length > 0) {
 				const applescriptMods = modifiers
 					.map(m => MODIFIER_MAP[m.toLowerCase()])
@@ -133,12 +114,10 @@ export const keystrokeTool = {
 				}
 			}
 
-			const command = `osascript -e 'tell application "System Events" to ${actionScript}'`;
-			await execAsync(command);
-			logger.info(`Shortcut action completed successfully.`);
+			await execAsync(`osascript -e 'tell application "System Events" to ${actionScript}'`);
 			return `Shortcut action completed successfully.`;
 		} else {
-			throw new Error(`Unknown action "${action}". Valid values are: "type", "shortcut", "press".`);
+			throw new Error(`Unknown action "${action}".`);
 		}
 	}, 'Failed to execute keystroke action')
 };
