@@ -19,8 +19,13 @@ export default function SiriOrb({
 
   const recognitionRef = useRef(null);
   const prevIsProcessingRef = useRef(isProcessing);
+  const onSendPromptRef = useRef(onSendPrompt);
+  const transcriptRef = useRef('');
+  const submittedRef = useRef(false);
 
-  // Initialize Speech Recognition
+  onSendPromptRef.current = onSendPrompt;
+
+  // Initialize Speech Recognition once; use refs for callbacks to avoid duplicate sends
   useEffect(() => {
     if (!SpeechRecognition) {
       console.warn("Speech recognition is not supported in this browser.");
@@ -33,6 +38,8 @@ export default function SiriOrb({
     rec.lang = 'en-US';
 
     rec.onstart = () => {
+      submittedRef.current = false;
+      transcriptRef.current = '';
       setIsListening(true);
       setOrbState('listening');
       setTranscript('');
@@ -53,7 +60,8 @@ export default function SiriOrb({
         }
       }
       if (final) {
-        setTranscript(prev => prev + final);
+        transcriptRef.current += final;
+        setTranscript(transcriptRef.current);
       }
       setInterimTranscript(interim);
     };
@@ -61,8 +69,7 @@ export default function SiriOrb({
     rec.onerror = (event) => {
       console.error("Speech recognition error:", event.error);
       if (event.error === 'not-allowed') {
-        setHasMicPermission(false);
-        setErrorMsg('Microphone access denied. Enable permissions.');
+        setErrorMsg('Microphone access denied. Enable permissions in your browser settings.');
       } else if (event.error !== 'no-speech') {
         setErrorMsg(`Speech recognition error: ${event.error}`);
       }
@@ -72,30 +79,41 @@ export default function SiriOrb({
 
     rec.onend = () => {
       setIsListening(false);
-      // Capture what was transcribed
-      setTranscript(prev => {
-        const finalPrompt = prev.trim();
-        if (finalPrompt) {
-          onSendPrompt(finalPrompt);
-          setOrbState('thinking');
-        } else {
-          setOrbState('idle');
-        }
-        return prev;
-      });
+      if (submittedRef.current) return;
+
+      const finalPrompt = transcriptRef.current.trim();
+      if (finalPrompt) {
+        submittedRef.current = true;
+        onSendPromptRef.current(finalPrompt);
+        setOrbState('thinking');
+      } else {
+        setOrbState('idle');
+      }
     };
 
     recognitionRef.current = rec;
 
-    // Check microphone permission to prompt early if needed
-    navigator.mediaDevices?.getUserMedia({ audio: true })
-      .catch(() => {});
-  }, [onSendPrompt]);
+    navigator.mediaDevices?.getUserMedia({ audio: true }).catch(() => {});
+
+    return () => {
+      rec.onstart = null;
+      rec.onresult = null;
+      rec.onerror = null;
+      rec.onend = null;
+      try {
+        rec.abort?.();
+      } catch {
+        try { rec.stop(); } catch { /* already stopped */ }
+      }
+      if (recognitionRef.current === rec) {
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
 
   // Monitor backend execution (isProcessing) changes
   useEffect(() => {
     if (prevIsProcessingRef.current && !isProcessing) {
-      // Transition from processing -> idle/complete
       const assistantMsgs = messages.filter(m => m.role === 'assistant');
       if (assistantMsgs.length > 0) {
         const lastMsg = assistantMsgs[assistantMsgs.length - 1];
@@ -107,7 +125,6 @@ export default function SiriOrb({
           setOrbState('completed');
           setShowCard(true);
 
-          // Return to idle state after 8 seconds
           const timer = setTimeout(() => {
             setOrbState(prev => prev === 'completed' ? 'idle' : prev);
           }, 8000);
@@ -117,7 +134,6 @@ export default function SiriOrb({
         setOrbState('idle');
       }
     } else if (!prevIsProcessingRef.current && isProcessing) {
-      // Transition from idle -> processing
       setOrbState('thinking');
       setCompletedAction('');
       setErrorMsg('');
@@ -128,23 +144,19 @@ export default function SiriOrb({
 
   const handleOrbClick = () => {
     if (!SpeechRecognition) {
-      alert("Voice Command is only supported in browsers that support Web Speech API (like Google Chrome).");
+      alert("Voice commands require a browser with Web Speech API support (e.g. Google Chrome).");
       return;
     }
 
     if (orbState === 'listening' || isListening) {
-      // Stop listening manually
       recognitionRef.current?.stop();
     } else if (isProcessing) {
-      // Don't interrupt processing
       setShowCard(true);
     } else {
-      // Start recording
       try {
         recognitionRef.current?.start();
       } catch (err) {
         console.error("Failed to start speech recognition:", err);
-        // If already running, stop it first
         recognitionRef.current?.stop();
       }
     }
@@ -163,14 +175,13 @@ export default function SiriOrb({
     switch (orbState) {
       case 'listening': return 'Listening...';
       case 'thinking': return 'Thinking...';
-      case 'completed': return 'Action Completed';
+      case 'completed': return 'Done';
       default: return 'Voice Assistant';
     }
   };
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
-      {/* Siri Status / Completed Action Card */}
       {showCard && (
         <div className="absolute bottom-20 right-0 w-80 bg-bg-secondary/90 border border-white/10 rounded-2xl p-4 shadow-xl z-50 flex flex-col gap-2.5 transition-all duration-300 transform scale-100 origin-bottom-right backdrop-blur-xl">
           <div className="flex items-center justify-between border-b border-white/5 pb-2">
@@ -192,11 +203,10 @@ export default function SiriOrb({
             </button>
           </div>
 
-          {/* Card Body */}
           <div className="text-sm text-gray-200">
             {orbState === 'listening' && (
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs text-gray-400 font-medium">Say something like: "Set volume to 50%"</p>
+                <p className="text-xs text-gray-400 font-medium">Try: "Set volume to 50%"</p>
                 <div className="bg-black/25 rounded-xl p-3 border border-white/5 min-h-[50px] flex items-center justify-center">
                   {(transcript || interimTranscript) ? (
                     <p className="text-xs italic leading-relaxed text-white font-medium">
@@ -214,7 +224,7 @@ export default function SiriOrb({
 
             {orbState === 'thinking' && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs text-gray-400">Executing request...</p>
+                <p className="text-xs text-gray-400">Working on your request...</p>
                 <div className="flex items-center gap-2.5 bg-black/20 rounded-xl p-3 border border-white/5 text-xs text-accent-blue font-mono">
                   <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
                   <span className="truncate">{currentStatusLog || 'Thinking...'}</span>
@@ -226,7 +236,7 @@ export default function SiriOrb({
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-accent-emerald font-semibold text-xs mb-1">
                   <CheckCircle size={14} />
-                  <span>Action completed</span>
+                  <span>Done</span>
                 </div>
                 <div className="bg-accent-emerald/5 border border-accent-emerald/10 rounded-xl p-3 flex gap-2">
                   <Volume2 size={16} className="text-accent-emerald shrink-0 mt-0.5" />
@@ -246,20 +256,18 @@ export default function SiriOrb({
 
             {orbState === 'idle' && !errorMsg && !completedAction && (
               <p className="text-xs text-gray-400 leading-relaxed text-center py-2">
-                Click the Siri Orb below and speak a command to control your Mac, manage Notion, or query your Calendar!
+                Tap the orb and speak a command to control your Mac, Notion, or Calendar.
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Siri Orb Button */}
       <button
         onClick={handleOrbClick}
         className={`relative w-14 h-14 rounded-full flex items-center justify-center cursor-pointer select-none z-50 border border-white/10 shadow-lg outline-none focus:outline-none transition-all duration-300 ${getOrbStateClass()}`}
-        title="Trigger Voice Assistant"
+        title="Voice Assistant"
       >
-        {/* Animated Ripple Waves under orb during listening */}
         {orbState === 'listening' && (
           <>
             <div className="siri-ripple-ring siri-ripple-ring-1"></div>
@@ -268,7 +276,6 @@ export default function SiriOrb({
           </>
         )}
 
-        {/* Center icon representation */}
         <div className="siri-orb-base w-full h-full rounded-full flex items-center justify-center">
           {orbState === 'listening' ? (
             <Mic className="w-5 h-5 text-white animate-pulse" />

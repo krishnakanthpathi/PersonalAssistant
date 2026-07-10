@@ -775,6 +775,11 @@ function MainApp() {
                     <div className={`p-4 rounded-2xl border text-sm leading-relaxed ${msg.role === 'user' ? 'bg-accent-purple/10 border-accent-purple/20 text-white rounded-tr-none' : 'bg-bg-secondary/40 border-white/5 rounded-tl-none'}`}>
                       {msg.role === 'user' ? (
                         <p>{msg.content}</p>
+                      ) : !msg.content && !msg.isError && isProcessing && idx === messages.length - 1 ? (
+                        <div className="flex items-center gap-3">
+                          <span className="w-2.5 h-2.5 rounded-full bg-accent-blue animate-pulse shadow-[0_0_8px_var(--color-accent-blue)]"></span>
+                          <span className="text-xs text-gray-400 font-mono">{currentStatusLog || 'Thinking...'}</span>
+                        </div>
                       ) : (
                         <div className="markdown-body" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) || (msg.isError ? 'An error occurred' : 'Thinking...') }} />
                       )}
@@ -805,16 +810,6 @@ function MainApp() {
                 ))
               )}
 
-              {/* Running indicator for current action */}
-              {isProcessing && currentStatusLog && (
-                <div className="flex flex-col gap-1 mr-auto items-start max-w-[85%]">
-                  <div className="text-[10px] text-gray-500 font-semibold tracking-wider px-1">ASSISTANT</div>
-                  <div className="p-4 rounded-2xl border bg-bg-secondary/40 border-white/5 rounded-tl-none flex items-center gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full bg-accent-blue animate-pulse shadow-[0_0_8px_var(--color-accent-blue)]"></span>
-                    <span className="text-xs text-gray-400 font-mono">{currentStatusLog}</span>
-                  </div>
-                </div>
-              )}
               <div ref={chatEndRef} />
             </div>
 
