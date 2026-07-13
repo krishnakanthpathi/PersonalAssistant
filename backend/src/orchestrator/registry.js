@@ -25,6 +25,7 @@ import { getUIElementsTool } from '../tools/mac/getUIElements.js';
 import { mouseClickTool } from '../tools/mac/mouseClick.js';
 import { annotateScreenTool } from '../tools/mac/annotateScreen.js';
 import { timerTool } from '../tools/mac/timer.js';
+import { rdsQueryTool } from '../tools/rdsQuery.js';
 
 
 import { mcpManager } from '../mcp/mcpManager.js';
@@ -67,6 +68,7 @@ class ToolRegistry {
 		this.tools.set(mouseClickTool.definition.name, mouseClickTool);
 		this.tools.set(annotateScreenTool.definition.name, annotateScreenTool);
 		this.tools.set(timerTool.definition.name, timerTool);
+		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
 	}
 
 	// Ensure database connection is loaded
