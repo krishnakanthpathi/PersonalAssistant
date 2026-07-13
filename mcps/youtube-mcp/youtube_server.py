@@ -8,6 +8,7 @@ import re
 from urllib.parse import parse_qs, urlparse
 import asyncio
 from yt_dlp import YoutubeDL
+import httpx
 
 # Initialize FastMCP server
 mcp = FastMCP("youtube")
@@ -162,15 +163,16 @@ def get_youtube_transcript(video_url_or_title: str) -> Dict[str, Any]:
         return {"error": f"Failed to get transcript: {str(e)}. Make sure the video has captions available and the video ID/URL is correct."}
 
 @mcp.tool()
-async def download_youtube_video(video_url_or_title: str, ctx: Context) -> str:
+async def download_youtube_video(video_url_or_title: str, quality: str = "best") -> str:
     """
     Download a YouTube video.
 
     Args:
         video_url_or_title: The YouTube video URL or ID.
+        quality: Preferred video quality. Choose from: 'best', '1080p', '720p', '480p', '360p', 'audio_only'. Default is 'best'.
         
     Returns:
-        A message indicating success and where the video was saved.
+        A message indicating success and where the video was saved, plus download link.
     """
     try:
         # Resolve ID / URL format (ensure we extract it or keep as-is)
@@ -179,51 +181,122 @@ async def download_youtube_video(video_url_or_title: str, ctx: Context) -> str:
         if video_id:
             url = f"https://www.youtube.com/watch?v={video_id}"
             
-        loop = asyncio.get_running_loop()
-        
-        def progress_hook(d):
-            if d['status'] == 'downloading':
-                downloaded = d.get('downloaded_bytes', 0)
-                total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
-                filename = os.path.basename(d.get('filename', 'video.mp4'))
-                
-                if total > 0:
-                    percent = (downloaded / total) * 100
-                    percent_str = f"{percent:.1f}%"
-                    asyncio.run_coroutine_threadsafe(
-                        ctx.report_progress(progress=downloaded, total=total, message=f"Downloading {filename}: {percent_str}"),
-                        loop
-                    )
-                else:
-                    asyncio.run_coroutine_threadsafe(
-                        ctx.report_progress(progress=downloaded, message=f"Downloading {filename}..."),
-                        loop
-                    )
-            elif d['status'] == 'finished':
-                filename = os.path.basename(d.get('filename', 'video.mp4'))
-                asyncio.run_coroutine_threadsafe(
-                    ctx.report_progress(progress=100, total=100, message=f"Finished downloading {filename}"),
-                    loop
-                )
-
-        download_dir = os.path.expanduser("~/Downloads")
+        # Resolve target downloads directory inside the backend
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        download_dir = os.path.join(base_dir, 'backend', 'data', 'downloads')
         os.makedirs(download_dir, exist_ok=True)
         
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
-            'progress_hooks': [progress_hook],
-            'quiet': True,
-            'no_warnings': True,
+        # 1. Resolve video metadata first (highly optimized, completes in <1s)
+        def extract_info():
+            ydl_opts_info = {
+                'quiet': True,
+                'no_warnings': True,
+            }
+            with YoutubeDL(ydl_opts_info) as ydl:
+                return ydl.extract_info(url, download=False)
+
+        info = await asyncio.to_thread(extract_info)
+        title = info.get('title', 'video')
+        
+        filename_template = os.path.join(download_dir, '%(title)s.%(ext)s')
+        
+        # Get the exact output path
+        with YoutubeDL({'outtmpl': filename_template}) as temp_ydl:
+            filepath = temp_ydl.prepare_filename(info)
+            
+        filename = os.path.basename(filepath)
+        
+        # Map quality to format option in yt-dlp
+        format_mapping = {
+            'best': 'best',
+            '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+            '720p': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+            '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]',
+            '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]',
+            'audio_only': 'bestaudio/best'
         }
+        ydl_format = format_mapping.get(quality, 'best')
+        
+        # 2. Configure options for background download
+        task_id = f"youtube_download_{video_id or 'unknown'}"
         
         def run_download():
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                return ydl.prepare_filename(info)
+            try:
+                # Post initial starting state
+                httpx.post("http://localhost:3000/api/mcp/progress", json={
+                    "server": "youtube",
+                    "taskId": task_id,
+                    "progress": 0,
+                    "total": 100,
+                    "status": "running",
+                    "message": f"Starting download: {filename}"
+                }, timeout=2.0)
+            except Exception as e:
+                print(f"Failed to post initial progress: {e}")
                 
-        filepath = await asyncio.to_thread(run_download)
-        return f"Successfully downloaded video to {filepath}"
+            def progress_hook(d):
+                payload = {
+                    "server": "youtube",
+                    "taskId": task_id,
+                    "status": "running",
+                    "message": f"Downloading {filename}"
+                }
+                if d['status'] == 'downloading':
+                    downloaded = d.get('downloaded_bytes', 0)
+                    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                    payload["progress"] = downloaded
+                    payload["total"] = total
+                    if total > 0:
+                        pct = (downloaded / total) * 100
+                        payload["message"] = f"Downloading {filename} ({pct:.1f}%)"
+                elif d['status'] == 'finished':
+                    payload["status"] = "finished"
+                    payload["progress"] = 100
+                    payload["total"] = 100
+                    payload["message"] = f"Successfully downloaded: {filename}"
+                
+                try:
+                    httpx.post("http://localhost:3000/api/mcp/progress", json=payload, timeout=2.0)
+                except Exception as e:
+                    print(f"Failed to post progress: {e}")
+
+            ydl_opts_bg = {
+                'format': ydl_format,
+                'outtmpl': filename_template,
+                'progress_hooks': [progress_hook],
+                'quiet': True,
+                'no_warnings': True,
+            }
+            
+            try:
+                with YoutubeDL(ydl_opts_bg) as ydl:
+                    ydl.download([url])
+            except Exception as e:
+                print(f"Background download failed: {str(e)}")
+                try:
+                    httpx.post("http://localhost:3000/api/mcp/progress", json={
+                        "server": "youtube",
+                        "taskId": task_id,
+                        "status": "failed",
+                        "message": f"Download failed: {str(e)}"
+                    }, timeout=2.0)
+                except:
+                    pass
+                
+        # 3. Start download in a background daemon thread so it doesn't block the client
+        import threading
+        thread = threading.Thread(target=run_download, daemon=True)
+        thread.start()
+        
+        # URL encode filename for links
+        from urllib.parse import quote
+        safe_filename = quote(filename)
+        
+        return (
+            f"Successfully started downloading '{title}' in the background ({quality}).\n"
+            f"- Local file path: {filepath}\n"
+            f"- Browser download link: http://localhost:3000/downloads/{safe_filename}"
+        )
     except Exception as e:
         return f"Failed to download video: {str(e)}"
 

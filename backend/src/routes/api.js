@@ -4,6 +4,7 @@ import { getTools } from '../controllers/toolsController.js';
 import { getMetrics, clearMetrics } from '../controllers/metricsController.js';
 import { getSystemPrompt, saveSystemPrompt, activateSystemPrompt, deleteSystemPrompt } from '../controllers/systemPromptController.js';
 import { handleChat, getChats, getChatMessages, deleteChatSession } from '../controllers/chatController.js';
+import { updateMcpProgress, getMcpStatus } from '../controllers/mcpStatusController.js';
 
 const router = Router();
 
@@ -13,6 +14,10 @@ router.get("/", getStatus);
 // Configuration & Tools
 router.get("/api/config", getConfig);
 router.get("/api/tools", getTools);
+
+// MCP background tasks status
+router.post("/api/mcp/progress", updateMcpProgress);
+router.get("/api/mcp/status", getMcpStatus);
 
 // Metrics
 router.get("/api/metrics", getMetrics);

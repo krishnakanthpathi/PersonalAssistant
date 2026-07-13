@@ -18,9 +18,9 @@ import {
   Settings,
   Edit3,
   Save,
-  Copy
+  Copy,
+  Loader2
 } from 'lucide-react';
-import SiriOrb from './components/SiriOrb.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 
 // Helper to parse markdown tables into premium HTML tables
@@ -281,6 +281,9 @@ function MainApp() {
     port: 3000
   });
 
+  // MCP Background Tasks state
+  const [mcpTasks, setMcpTasks] = useState([]);
+
   // Chat Sessions States
   const [chats, setChats] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
@@ -326,6 +329,17 @@ function MainApp() {
       console.error('Failed to connect to backend:', error);
       setIsConnected(false);
       setConfig(c => ({ ...c, model: 'Offline' }));
+    }
+  };
+
+  // Fetch MCP background task status
+  const fetchMcpStatus = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/mcp/status');
+      const data = await res.json();
+      setMcpTasks(data.tasks || []);
+    } catch (error) {
+      console.error('Failed to fetch MCP task status:', error);
     }
   };
 
@@ -478,6 +492,10 @@ function MainApp() {
     fetchData();
     fetchSystemPrompt();
     fetchChats();
+    fetchMcpStatus();
+
+    const interval = setInterval(fetchMcpStatus, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   // Sync chats when activeTab changes back to chat
@@ -682,6 +700,56 @@ function MainApp() {
             </div>
           </div>
         </div>
+
+        {/* Background Tasks Card */}
+        {mcpTasks && mcpTasks.length > 0 && (
+          <div className="bg-bg-card border border-border-color rounded-2xl p-4 mb-6 shadow-sm backdrop-blur-md">
+            <div className="flex items-center gap-2 mb-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
+              {mcpTasks.some(t => t.status === 'running' || t.status === 'initiating') ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-purple" />
+              ) : mcpTasks.every(t => t.status === 'finished') ? (
+                <CheckCircle className="w-3.5 h-3.5 text-accent-emerald" />
+              ) : (
+                <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+              )}
+              MCP Tasks
+            </div>
+            <div className="flex flex-col gap-3">
+              {mcpTasks.map(task => {
+                const pct = task.total > 0 ? Math.round((task.progress / task.total) * 100) : null;
+                const isRunning = task.status === 'running' || task.status === 'initiating';
+                const isFinished = task.status === 'finished';
+                const isFailed = task.status === 'failed';
+
+                return (
+                  <div key={task.taskId} className="flex flex-col gap-1.5 text-xs">
+                    <div className="flex items-center justify-between font-medium">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-grow">
+                        {isRunning && <Loader2 className="w-3 h-3 animate-spin text-accent-purple shrink-0" />}
+                        {isFinished && <CheckCircle className="w-3 h-3 text-accent-emerald shrink-0" />}
+                        {isFailed && <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />}
+                        <span className="text-gray-300 truncate" title={task.message}>
+                          {task.message || task.taskId}
+                        </span>
+                      </div>
+                      <span className="text-gray-400 font-mono text-[10px] shrink-0 ml-2">
+                        {pct !== null && isRunning ? `${pct}%` : task.status}
+                      </span>
+                    </div>
+                    {pct !== null && isRunning && (
+                      <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-accent-purple h-full transition-all duration-300 rounded-full" 
+                          style={{ width: `${pct}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Chat History */}
         <div className="flex flex-col flex-grow overflow-hidden mt-2">
@@ -1133,12 +1201,6 @@ function MainApp() {
           </div>
         </div>
       )}
-      <SiriOrb
-        isProcessing={isProcessing}
-        currentStatusLog={currentStatusLog}
-        messages={messages}
-        onSendPrompt={handleSend}
-      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { env } from './config/env.js';
 import apiRoutes from './routes/api.js';
 
 import path from 'path';
+import fs from 'fs';
 
 const app = express();
 
@@ -18,6 +19,15 @@ app.use(express.json());
 
 // Serve screenshots statically
 app.use('/screenshots', express.static(path.resolve('data/screenshots')));
+
+// Ensure downloads directory exists
+const downloadsDir = path.resolve('data/downloads');
+if (!fs.existsSync(downloadsDir)) {
+	fs.mkdirSync(downloadsDir, { recursive: true });
+}
+
+// Serve downloads statically
+app.use('/downloads', express.static(downloadsDir));
 
 // Mount API routes
 app.use(apiRoutes);

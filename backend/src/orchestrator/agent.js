@@ -56,6 +56,10 @@ export class Agent {
 			const response = await callLLM(messages, true, tools, requestId);
 			let message = response.message;
 
+			if (message.content && onStatusUpdate) {
+				onStatusUpdate(message.content);
+			}
+
 			// Parse XML tool calls in the initial response
 			parseXmlToolCalls(message);
 
@@ -99,6 +103,10 @@ export class Agent {
 				}
 				const nextResponse = await callLLM(messages, false, tools, requestId);
 				message = nextResponse.message;
+
+				if (message.content && onStatusUpdate) {
+					onStatusUpdate(message.content);
+				}
 
 				// Parse XML tool calls in the subsequent response
 				parseXmlToolCalls(message);

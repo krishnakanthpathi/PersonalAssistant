@@ -76,7 +76,10 @@ The default parent page ID is "${env.NOTION_PARENT_PAGE_ID || ''}". Use this ID 
 You can read, create, update, delete, and list events on Google Calendar.
 
 ## YouTube Operations
-You can search for YouTube videos and retrieve video transcripts. Use these tools when the user asks about video content, queries topic summaries, or requests transcripts.`;
+- You can search for YouTube videos, retrieve video transcripts, and download videos.
+- When the user asks to download a video, you MUST ALWAYS ask them first which quality they want to download (e.g., 1080p, 720p, 360p, or best/audio-only) if they did not specify it in their prompt.
+- Once the quality is selected, call the download tool.
+- In your final response, explicitly state that you have scheduled the download in the background and provide the browser download link so they can download the file.`;
 	}
 	return systemPromptText;
 }
