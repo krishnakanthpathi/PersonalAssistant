@@ -102,15 +102,14 @@ I've updated your system volume to fifty percent.
 </action>
 
 ## UI Automation Workflow (IMPORTANT)
-When you need to interact with a desktop application's UI (click buttons, select contacts, fill inputs, press Send):
-1. After opening the app, ALWAYS call \`annotate_screen\` first to get a visual blueprint of the current screen with all element coordinates.
-2. Use the returned element map to identify the EXACT (x, y) coordinates of the target element (button, text field, contact, etc.).
-3. Call \`move_mouse\` with action="click" and the identified (x, y) to click that element.
-4. If you need to type in a field, click it first with \`move_mouse\`, then use \`keystroke_action\` with action="type".
-5. To press Enter/Escape/Space use \`keystroke_action\` with action="press" or "shortcut" and the key name.
-6. If the screen changes (new page loaded, dialog opened), call \`annotate_screen\` again before clicking anything.
-7. After searching for a contact, ALWAYS call \`annotate_screen\` to SEE the search results and find the contact's exact coordinates before clicking.
-8. NEVER guess at coordinates — always use \`annotate_screen\` or \`get_ui_elements\` to determine them first.
+When you need to interact with a desktop application or configure settings:
+1. Visual screenshots (\`take_screenshot\`) are available, but visual annotations (\`annotate_screen\` / \`get_ui_elements\`) are disabled.
+2. Instead, you must ALWAYS call \`get_accessibility_tree\` first to inspect the structured UI element tree of the active application window.
+3. The accessibility tree returns each element's role, name/title, dimensions, and screen center coordinates (x, y).
+4. Once you identify the target element in the tree:
+   - Click it by calling \`move_mouse\` or \`mouse_click\` with the element's (x, y) coordinates.
+   - Type text by clicking first, then using \`keystroke_action\` with action="type".
+   - Or write a custom AppleScript using \`run_applescript\` for complex actions.
 
 ## Chrome Browser Links (IMPORTANT)
 - Whenever you need to open any web link, you must open it in a new tab in Google Chrome.
@@ -196,6 +195,32 @@ You can search for YouTube videos and retrieve video transcripts. Use these tool
 				})();
 				logger.info("Successfully migrated active system prompt with Chrome browser rules and markdown table guidelines.");
 			}
+		}
+
+		// Migration to update UI Automation instructions to use get_accessibility_tree
+		const currentPromptRow = db.prepare("SELECT * FROM system_prompts WHERE is_active = 1 LIMIT 1").get();
+		if (currentPromptRow && !currentPromptRow.prompt.includes("get_accessibility_tree")) {
+			let updatedPrompt = currentPromptRow.prompt;
+			// Replace whatever workflow section is there with our get_accessibility_tree workflow
+			const oldWorkflowRegex = /## UI Automation Workflow[\s\S]*?(?=##|$)/i;
+			const newWorkflow = `## UI Automation Workflow (IMPORTANT)
+When you need to interact with a desktop application or configure settings:
+1. Visual screenshots (\`take_screenshot\`) are available, but visual annotations (\`annotate_screen\` / \`get_ui_elements\`) are disabled.
+2. Instead, you must ALWAYS call \`get_accessibility_tree\` first to inspect the structured UI element tree of the active application window.
+3. The accessibility tree returns each element's role, name/title, dimensions, and screen center coordinates (x, y).
+4. Once you identify the target element in the tree:
+   - Click it by calling \`move_mouse\` or \`mouse_click\` with the element's (x, y) coordinates.
+   - Type text by clicking first, then using \`keystroke_action\` with action="type".
+   - Or write a custom AppleScript using \`run_applescript\` for complex actions.
+\n\n`;
+			
+			updatedPrompt = updatedPrompt.replace(oldWorkflowRegex, newWorkflow);
+			
+			db.transaction(() => {
+				db.prepare("UPDATE system_prompts SET is_active = 0 WHERE is_active = 1").run();
+				db.prepare("INSERT INTO system_prompts (prompt, is_active) VALUES (?, 1)").run(updatedPrompt);
+			})();
+			logger.info("Successfully migrated active system prompt to use get_accessibility_tree.");
 		}
 	}
 } catch (err) {

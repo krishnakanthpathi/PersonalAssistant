@@ -62,15 +62,14 @@ I've updated your system volume to fifty percent.
 </action>
 
 ## UI Automation Workflow (IMPORTANT)
-When you need to interact with a desktop application's UI (click buttons, select contacts, fill inputs, press Send):
-1. After opening the app, ALWAYS call \`annotate_screen\` first to get a visual blueprint of the current screen with all element coordinates.
-2. Use the returned element map to identify the EXACT (x, y) coordinates of the target element (button, text field, contact, etc.).
-3. Call \`move_mouse\` with action="click" and the identified (x, y) to click that element.
-4. If you need to type in a field, click it first with \`move_mouse\`, then use \`keystroke_action\` with action="type".
-5. To press Enter/Escape/Space use \`keystroke_action\` with action="press" or "shortcut" and the key name.
-6. If the screen changes (new page loaded, dialog opened), call \`annotate_screen\` again before clicking anything.
-7. After searching for a contact, ALWAYS call \`annotate_screen\` to SEE the search results and find the contact's exact coordinates before clicking.
-8. NEVER guess at coordinates — always use \`annotate_screen\` or \`get_ui_elements\` to determine them first.
+When you need to interact with a desktop application or configure settings:
+1. Visual screenshots (\`take_screenshot\`) are available, but visual annotations (\`annotate_screen\` / \`get_ui_elements\`) are disabled.
+2. Instead, you must ALWAYS call \`get_accessibility_tree\` first to inspect the structured UI element tree of the active application window.
+3. The accessibility tree returns each element's role, name/title, dimensions, and screen center coordinates (x, y).
+4. Once you identify the target element in the tree:
+   - Click it by calling \`move_mouse\` or \`mouse_click\` with the element's (x, y) coordinates.
+   - Type text by clicking first, then using \`keystroke_action\` with action="type".
+   - Or write a custom AppleScript using \`run_applescript\` for complex actions.
 
 ## Chrome Browser Links (IMPORTANT)
 - Whenever you need to open any web link, you must open it in a new tab in Google Chrome.

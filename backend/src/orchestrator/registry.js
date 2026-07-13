@@ -21,11 +21,12 @@ import { keystrokeTool } from '../tools/mac/keystroke.js';
 import { activeWindowTool } from '../tools/mac/activeWindow.js';
 import { runAppleScriptTool } from '../tools/mac/runAppleScriptTool.js';
 import { moveMouseTool } from '../tools/mac/moveMouseTool.js';
-import { getUIElementsTool } from '../tools/mac/getUIElements.js';
+// import { getUIElementsTool } from '../tools/mac/getUIElements.js';
 import { mouseClickTool } from '../tools/mac/mouseClick.js';
-import { annotateScreenTool } from '../tools/mac/annotateScreen.js';
+// import { annotateScreenTool } from '../tools/mac/annotateScreen.js';
 import { timerTool } from '../tools/mac/timer.js';
 import { rdsQueryTool } from '../tools/rdsQuery.js';
+import { getAccessibilityTreeTool } from '../tools/mac/getAccessibilityTree.js';
 
 
 import { mcpManager } from '../mcp/mcpManager.js';
@@ -64,11 +65,12 @@ class ToolRegistry {
 		this.tools.set(activeWindowTool.definition.name, activeWindowTool);
 		this.tools.set(runAppleScriptTool.definition.name, runAppleScriptTool);
 		this.tools.set(moveMouseTool.definition.name, moveMouseTool);
-		this.tools.set(getUIElementsTool.definition.name, getUIElementsTool);
+		// this.tools.set(getUIElementsTool.definition.name, getUIElementsTool);
 		this.tools.set(mouseClickTool.definition.name, mouseClickTool);
-		this.tools.set(annotateScreenTool.definition.name, annotateScreenTool);
+		// this.tools.set(annotateScreenTool.definition.name, annotateScreenTool);
 		this.tools.set(timerTool.definition.name, timerTool);
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
+		this.tools.set(getAccessibilityTreeTool.definition.name, getAccessibilityTreeTool);
 	}
 
 	// Ensure database connection is loaded
@@ -176,8 +178,27 @@ class ToolRegistry {
 				env.MAX_RELEVANT_TOOLS
 			);
 
+			// Core UI tools that should always be present
+			const CORE_TOOLS = new Set([
+				'get_accessibility_tree',
+				'move_mouse',
+				'mouse_click',
+				'keystroke_action',
+				'run_applescript',
+				'take_screenshot'
+			]);
 
-			logger.info(`RAG selected ${selectedTools.length} / ${allTools.length} tools for the user query.`);
+			for (const tool of allTools) {
+				const toolName = tool.function?.name || tool.name;
+				if (CORE_TOOLS.has(toolName)) {
+					const alreadyIncluded = selectedTools.some(t => (t.function?.name || t.name) === toolName);
+					if (!alreadyIncluded) {
+						selectedTools.push(tool);
+					}
+				}
+			}
+
+			logger.info(`RAG selected ${selectedTools.length} / ${allTools.length} tools (including core UI tools) for the user query.`);
 			return selectedTools;
 		} catch (error) {
 			logger.error(`Error in getRelevantTools, returning all tools: ${error.message}`);
