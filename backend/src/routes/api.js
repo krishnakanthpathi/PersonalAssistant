@@ -3,7 +3,7 @@ import { getStatus, getConfig } from '../controllers/configController.js';
 import { getTools } from '../controllers/toolsController.js';
 import { getMetrics, clearMetrics } from '../controllers/metricsController.js';
 import { getSystemPrompt, saveSystemPrompt, activateSystemPrompt, deleteSystemPrompt } from '../controllers/systemPromptController.js';
-import { handleChat } from '../controllers/chatController.js';
+import { handleChat, getChats, getChatMessages, deleteChatSession } from '../controllers/chatController.js';
 
 const router = Router();
 
@@ -24,7 +24,10 @@ router.post("/api/system-prompt", saveSystemPrompt);
 router.post("/api/system-prompt/activate", activateSystemPrompt);
 router.delete("/api/system-prompt/:id", deleteSystemPrompt);
 
-// Chat stream
+// Chat stream and sessions
 router.post("/api/chat", handleChat);
+router.get("/api/chats", getChats);
+router.get("/api/chats/:sessionId", getChatMessages);
+router.delete("/api/chats/:sessionId", deleteChatSession);
 
 export default router;

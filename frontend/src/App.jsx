@@ -281,10 +281,9 @@ function MainApp() {
     port: 3000
   });
 
-  // Metrics Dashboard States (for Sidebar requests history list)
-  const [metrics, setMetrics] = useState({
-    requests: []
-  });
+  // Chat Sessions States
+  const [chats, setChats] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
 
   // System Prompt States
   const [systemPrompts, setSystemPrompts] = useState({ activePrompt: null, history: [] });
@@ -330,17 +329,59 @@ function MainApp() {
     }
   };
 
-  // Fetch Telemetry metrics
-  const fetchMetrics = async () => {
+  // Fetch Chat sessions list
+  const fetchChats = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/metrics');
+      const res = await fetch('http://localhost:3000/api/chats');
       const data = await res.json();
       if (data.success) {
-        setMetrics(data.metrics);
+        setChats(data.chats || []);
       }
     } catch (error) {
-      console.error('Failed to fetch metrics:', error);
+      console.error('Failed to fetch chats:', error);
     }
+  };
+
+  // Load a chat session and its message history
+  const loadChatSession = async (sessionId) => {
+    if (isProcessing) return;
+    try {
+      const res = await fetch(`http://localhost:3000/api/chats/${sessionId}`);
+      const data = await res.json();
+      if (data.success) {
+        setMessages(data.messages || []);
+        setCurrentSessionId(sessionId);
+      }
+    } catch (error) {
+      console.error('Failed to load chat messages:', error);
+    }
+  };
+
+  // Delete a chat session
+  const handleDeleteChat = async (e, sessionId) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this chat session?')) return;
+    try {
+      const res = await fetch(`http://localhost:3000/api/chats/${sessionId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchChats();
+        if (currentSessionId === sessionId) {
+          setMessages([]);
+          setCurrentSessionId(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete chat session:', error);
+    }
+  };
+
+  const startNewChat = () => {
+    if (isProcessing) return;
+    setMessages([]);
+    setCurrentSessionId(null);
   };
 
   // System Prompt Operations
@@ -436,22 +477,15 @@ function MainApp() {
   useEffect(() => {
     fetchData();
     fetchSystemPrompt();
-    fetchMetrics();
+    fetchChats();
   }, []);
 
-  // Poll metrics every 5 seconds when chat tab is active or processing a chat request
+  // Sync chats when activeTab changes back to chat
   useEffect(() => {
-    let interval = null;
-    if (activeTab === 'chat' || isProcessing) {
-      fetchMetrics(); // initial fetch
-      interval = setInterval(() => {
-        fetchMetrics();
-      }, 5000);
+    if (activeTab === 'chat') {
+      fetchChats();
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [activeTab, isProcessing]);
+  }, [activeTab]);
 
   const handleSend = async (textToSend) => {
     const inputMsg = textToSend || prompt;
@@ -473,7 +507,7 @@ function MainApp() {
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: inputMsg, history: messages })
+        body: JSON.stringify({ prompt: inputMsg, history: messages, sessionId: currentSessionId })
       });
 
       if (!response.body) {
@@ -520,6 +554,9 @@ function MainApp() {
                     if (content && typeof content === 'object') {
                       updated[assistantMsgIndex].content = content.content || '';
                       updated[assistantMsgIndex].speech = content.speech || '';
+                      if (content.sessionId) {
+                        setCurrentSessionId(content.sessionId);
+                      }
                     } else {
                       updated[assistantMsgIndex].content = content;
                     }
@@ -527,6 +564,7 @@ function MainApp() {
                   return updated;
                 });
                 setCurrentStatusLog('');
+                fetchChats();
               } else if (type === 'error') {
                 setMessages(prev => {
                   const updated = [...prev];
@@ -557,8 +595,8 @@ function MainApp() {
       setCurrentStatusLog('');
     } finally {
       setIsProcessing(false);
-      // Fetch latest metrics after run completes
-      fetchMetrics();
+      // Fetch latest chats after run completes
+      fetchChats();
     }
   };
 
@@ -570,7 +608,7 @@ function MainApp() {
   };
 
   const clearChat = () => {
-    setMessages([]);
+    startNewChat();
   };
 
   // Preset prompts
@@ -645,45 +683,54 @@ function MainApp() {
           </div>
         </div>
 
-        {/* Recent Requests / Chart History */}
+        {/* Chat History */}
         <div className="flex flex-col flex-grow overflow-hidden mt-2">
-          <div className="flex items-center gap-2 mb-3 text-gray-400">
-            <History size={16} className="text-accent-purple" />
-            <h2 className="text-xs font-bold uppercase tracking-wider">Recent Requests ({metrics.requests?.length || 0})</h2>
+          <div className="flex items-center justify-between mb-3 text-gray-400">
+            <div className="flex items-center gap-2">
+              <MessageSquare size={16} className="text-accent-purple" />
+              <h2 className="text-xs font-bold uppercase tracking-wider">Chat History ({chats.length})</h2>
+            </div>
+            <button
+              onClick={startNewChat}
+              disabled={isProcessing}
+              className="px-2 py-1 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all text-[11px] font-semibold flex items-center gap-1 border border-white/5 bg-white/[0.02]"
+            >
+              + New Chat
+            </button>
           </div>
           <div className="flex flex-col gap-2 overflow-y-auto pr-1 flex-grow">
-            {metrics.requests?.length === 0 ? (
+            {chats.length === 0 ? (
               <div className="text-gray-500 text-xs text-center py-4 border border-dashed border-white/5 rounded-xl">
-                No history recorded yet.
+                No chats recorded yet.
               </div>
             ) : (
-              metrics.requests?.map((req) => {
+              chats.map((chat) => {
+                const isActive = currentSessionId === chat.id;
                 return (
-                  <button
-                    key={req.id}
-                    onClick={() => {
-                      navigate('/admin', { state: { initialRequest: req } });
-                    }}
-                    className="p-3 text-left rounded-xl transition-all duration-200 border border-transparent bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
+                  <div
+                    key={chat.id}
+                    onClick={() => loadChatSession(chat.id)}
+                    className={`p-3 text-left rounded-xl transition-all duration-200 border cursor-pointer group flex items-start justify-between gap-2 ${
+                      isActive 
+                        ? 'bg-accent-purple/10 border-accent-purple/20 text-white' 
+                        : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
+                    }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full ${req.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
-                        {req.success ? 'SUCCESS' : 'FAILED'}
-                      </span>
-                      <span className="text-[9px] font-mono text-gray-500">
-                        {req.totalDuration ? `${(req.totalDuration / 1000).toFixed(1)}s` : 'N/A'}
+                    <div className="min-w-0 flex-grow">
+                      <p className="font-medium text-xs truncate text-gray-200" title={chat.title || 'Untitled Chat'}>{chat.title || 'Untitled Chat'}</p>
+                      <span className="text-[9px] text-gray-500 font-mono">
+                        {new Date(chat.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(chat.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <p className="font-medium truncate mb-1 text-gray-200">{req.prompt}</p>
-                    <div className="flex items-center justify-between text-[8px] text-gray-500">
-                      <span>{new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {req.toolCalls?.length > 0 && (
-                        <span className="font-semibold text-accent-purple">
-                          {req.toolCalls.length} tool{req.toolCalls.length > 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                    <button
+                      onClick={(e) => handleDeleteChat(e, chat.id)}
+                      disabled={isProcessing}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-all shrink-0 self-center"
+                      title="Delete chat session"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 );
               })
             )}
