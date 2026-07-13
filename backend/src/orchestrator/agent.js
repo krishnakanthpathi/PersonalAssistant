@@ -1,6 +1,7 @@
 import axios from 'axios';
 import OpenAI from 'openai';
 import { registry } from './registry.js';
+import { ToolContext } from './toolContext.js';
 import { env } from '../config/env.js';
 import { catchErrors } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
@@ -310,6 +311,34 @@ You can search for YouTube videos and retrieve video transcripts. Use these tool
 					}
 
 					logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
+					
+					// Create a ToolContext for progress updates
+					const toolContext = new ToolContext((progressInfo) => {
+						if (onStatusUpdate) {
+							let msg = `Running: ${toolName}`;
+							if (typeof progressInfo === 'string') {
+								msg += ` (${progressInfo})`;
+							} else if (progressInfo && typeof progressInfo === 'object') {
+								const { progress, total, message } = progressInfo;
+								if (progress !== undefined) {
+									if (total !== undefined && total > 0) {
+										const pct = Math.round((progress / total) * 100);
+										msg += ` (${pct}%`;
+										if (message) msg += ` - ${message}`;
+										msg += `)`;
+									} else {
+										msg += ` (${progress}`;
+										if (message) msg += ` - ${message}`;
+										msg += `)`;
+									}
+								} else if (message) {
+									msg += ` (${message})`;
+								}
+							}
+							onStatusUpdate(msg);
+						}
+					});
+
 					if (onStatusUpdate) {
 						onStatusUpdate(`Running: ${toolName}`);
 					}
@@ -320,7 +349,7 @@ You can search for YouTube videos and retrieve video transcripts. Use these tool
 
 					try {
 						// Execute the tool (local or MCP)
-						const toolResult = await registry.callTool(toolName, toolArgs);
+						const toolResult = await registry.callTool(toolName, toolArgs, toolContext);
 						const toolLatency = Date.now() - toolCallStart;
 						logger.info(`Tool "${toolName}" executed successfully. Result length: ${String(toolResult).length} characters.`);
 

@@ -206,18 +206,18 @@ class ToolRegistry {
 		}
 	}
 
-	async callTool(name, args) {
+	async callTool(name, args, toolContext = null) {
 		// 1. Check local tools first
 		const localTool = this.tools.get(name);
 		if (localTool) {
-			return await localTool.execute(args);
+			return await localTool.execute(args, toolContext);
 		}
 
 		// 2. Fallback to MCP tools next
 		const mcpTools = await mcpManager.getTools();
 		const mcpTool = mcpTools.find(t => t.name === name);
 		if (mcpTool) {
-			const result = await mcpManager.callTool(mcpTool.serverName, name, args);
+			const result = await mcpManager.callTool(mcpTool.serverName, name, args, toolContext);
 			// Extract and return text content from standard MCP payload format
 			if (result && result.content && result.content.length > 0) {
 				return result.content.map(c => c.text).join('\n');

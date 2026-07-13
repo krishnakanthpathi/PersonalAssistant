@@ -48,10 +48,17 @@ export class YoutubeClient {
 		return response.tools || [];
 	}
 
-	async callTool(name, args) {
+	async callTool(name, args, toolContext = null) {
+		const options = {};
+		if (toolContext) {
+			options.onprogress = (progress) => {
+				toolContext.reportProgress(progress);
+			};
+			options.resetTimeoutOnProgress = true;
+		}
 		return await this.client.callTool({
 			name,
 			arguments: args
-		});
+		}, undefined, options);
 	}
 }

@@ -88,12 +88,12 @@ export class MCPManager {
 	/**
 	 * Route execution calls to the appropriate client
 	 */
-	callTool = catchErrors(async (serverName, toolName, args) => {
+	callTool = catchErrors(async (serverName, toolName, args, toolContext = null) => {
 		const client = this.servers.get(serverName);
 		if (!client) {
 			throw new Error(`MCP client for server "${serverName}" is not connected.`);
 		}
-		return await client.callTool(toolName, args);
+		return await client.callTool(toolName, args, toolContext);
 	}, 'Failed to execute MCP tool');
 }
 

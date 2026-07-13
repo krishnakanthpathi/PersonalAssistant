@@ -38,7 +38,7 @@ export class NotionClient {
         return response.tools || [];
     }
 
-    async callTool(name, args) {
+    async callTool(name, args, toolContext = null) {
         let normalizedArgs = { ...args };
 
         // Helper to format 32-char ID into standard UUID format (8-4-4-4-12)
@@ -117,9 +117,17 @@ export class NotionClient {
             }
         }
 
+        const options = {};
+        if (toolContext) {
+            options.onprogress = (progress) => {
+                toolContext.reportProgress(progress);
+            };
+            options.resetTimeoutOnProgress = true;
+        }
+
         return await this.client.callTool({
             name,
             arguments: normalizedArgs
-        });
+        }, undefined, options);
     }
 }

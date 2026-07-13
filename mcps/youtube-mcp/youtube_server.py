@@ -1,11 +1,13 @@
 import os
 import json
 from typing import List, Dict, Any
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
 from urllib.parse import parse_qs, urlparse
+import asyncio
+from yt_dlp import YoutubeDL
 
 # Initialize FastMCP server
 mcp = FastMCP("youtube")
@@ -158,6 +160,72 @@ def get_youtube_transcript(video_url_or_title: str) -> Dict[str, Any]:
         
     except Exception as e:
         return {"error": f"Failed to get transcript: {str(e)}. Make sure the video has captions available and the video ID/URL is correct."}
+
+@mcp.tool()
+async def download_youtube_video(video_url_or_title: str, ctx: Context) -> str:
+    """
+    Download a YouTube video.
+
+    Args:
+        video_url_or_title: The YouTube video URL or ID.
+        
+    Returns:
+        A message indicating success and where the video was saved.
+    """
+    try:
+        # Resolve ID / URL format (ensure we extract it or keep as-is)
+        video_id = extract_video_id(video_url_or_title)
+        url = video_url_or_title
+        if video_id:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            
+        loop = asyncio.get_running_loop()
+        
+        def progress_hook(d):
+            if d['status'] == 'downloading':
+                downloaded = d.get('downloaded_bytes', 0)
+                total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                filename = os.path.basename(d.get('filename', 'video.mp4'))
+                
+                if total > 0:
+                    percent = (downloaded / total) * 100
+                    percent_str = f"{percent:.1f}%"
+                    asyncio.run_coroutine_threadsafe(
+                        ctx.report_progress(progress=downloaded, total=total, message=f"Downloading {filename}: {percent_str}"),
+                        loop
+                    )
+                else:
+                    asyncio.run_coroutine_threadsafe(
+                        ctx.report_progress(progress=downloaded, message=f"Downloading {filename}..."),
+                        loop
+                    )
+            elif d['status'] == 'finished':
+                filename = os.path.basename(d.get('filename', 'video.mp4'))
+                asyncio.run_coroutine_threadsafe(
+                    ctx.report_progress(progress=100, total=100, message=f"Finished downloading {filename}"),
+                    loop
+                )
+
+        download_dir = os.path.expanduser("~/Downloads")
+        os.makedirs(download_dir, exist_ok=True)
+        
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
+            'progress_hooks': [progress_hook],
+            'quiet': True,
+            'no_warnings': True,
+        }
+        
+        def run_download():
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                return ydl.prepare_filename(info)
+                
+        filepath = await asyncio.to_thread(run_download)
+        return f"Successfully downloaded video to {filepath}"
+    except Exception as e:
+        return f"Failed to download video: {str(e)}"
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
