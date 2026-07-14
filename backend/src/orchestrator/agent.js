@@ -4,32 +4,26 @@ import { logger } from '../utils/logger.js';
 import { saySpeechTool } from '../tools/mac/saySpeech.js';
 import { metricsService } from '../utils/metrics.js';
 
-// Imported controllers
-import { prepareMessages } from './agent/promptManager.js';
-import { callLLM } from './agent/llmClient.js';
-import { parseAgentResponse } from './agent/responseParser.js';
-import { parseXmlToolCalls } from './agent/xmlToolParser.js';
 import {
+	prepareMessages,
+	callLLM,
+	parseXmlToolCalls,
 	parseToolArguments,
 	createToolContext,
 	executeToolWithLogging,
 	appendToolSuccessMessage,
-	appendToolErrorMessage
-} from './agent/toolExecutor.js';
+	appendToolErrorMessage,
+	parseAgentResponse
+} from './commonFunctions.js';
 
 export class Agent {
-	run = catchErrors(async (prompt, historyOrStatusUpdate, maybeStatusUpdate) => {
-		let history = [];
-		let onStatusUpdate = null;
-
-		if (typeof historyOrStatusUpdate === 'function') {
-			onStatusUpdate = historyOrStatusUpdate;
-		} else {
-			history = historyOrStatusUpdate || [];
-			onStatusUpdate = maybeStatusUpdate;
-		}
-
-		// Start tracking metrics
+	/**
+	 * Run the agent reasoning loop for a given prompt
+	 * @param {string} prompt 
+	 * @param {Array} history 
+	 * @param {Function} onStatusUpdate 
+	 */
+	run = catchErrors(async (prompt, history = [], onStatusUpdate = null) => {
 		const requestId = metricsService.startRequest(prompt);
 
 		try {
@@ -73,14 +67,11 @@ export class Agent {
 					break;
 				}
 
-				// Add assistant message containing the tool calls to history
 				messages.push(message);
 
 				for (const call of message.tool_calls) {
 					const toolName = call.function.name;
 					const toolArgs = parseToolArguments(call.function.arguments);
-
-					// Create a ToolContext for progress updates
 					const toolContext = createToolContext(toolName, onStatusUpdate);
 
 					if (onStatusUpdate) {
@@ -97,7 +88,6 @@ export class Agent {
 					}
 				}
 
-				// Call LLM again with the tool results to get the next step
 				if (onStatusUpdate) {
 					onStatusUpdate(`Thinking... (step ${iteration})`);
 				}
@@ -108,7 +98,6 @@ export class Agent {
 					onStatusUpdate(message.content);
 				}
 
-				// Parse XML tool calls in the subsequent response
 				parseXmlToolCalls(message);
 			}
 
