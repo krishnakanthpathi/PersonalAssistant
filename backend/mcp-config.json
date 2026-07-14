@@ -22,7 +22,8 @@
 				"@cocal/google-calendar-mcp"
 			],
 			"env": {
-				"GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json"
+				"GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json",
+				"GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/google-calendar-token.json"
 			}
 		},
 		"youtube": {

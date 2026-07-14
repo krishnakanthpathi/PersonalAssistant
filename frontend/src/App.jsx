@@ -271,6 +271,8 @@ function MainApp() {
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStatusLog, setCurrentStatusLog] = useState('');
   const [tools, setTools] = useState([]);
@@ -324,6 +326,18 @@ function MainApp() {
       const toolsData = await toolsRes.json();
       if (toolsData.success) {
         setTools(toolsData.tools || []);
+      }
+
+      // Fetch Google connection status
+      try {
+        const googleRes = await fetch('http://localhost:3000/api/auth/google/status');
+        const googleData = await googleRes.json();
+        if (googleData.success) {
+          setGoogleConnected(googleData.connected);
+          setGoogleEmail(googleData.email || '');
+        }
+      } catch (err) {
+        console.error('Failed to fetch Google auth status:', err);
       }
     } catch (error) {
       console.error('Failed to connect to backend:', error);
@@ -396,6 +410,39 @@ function MainApp() {
     if (isProcessing) return;
     setMessages([]);
     setCurrentSessionId(null);
+  };
+
+  const handleConnectGoogle = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/google/url');
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Failed to get Google authorization URL: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error connecting Google account:', error);
+      alert('Connection error. Is the backend running?');
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    if (!window.confirm('Are you sure you want to disconnect your Google account?')) return;
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/google/disconnect', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setGoogleConnected(false);
+        setGoogleEmail('');
+        alert('Disconnected Google account successfully.');
+      } else {
+        alert('Failed to disconnect Google account: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error disconnecting Google account:', error);
+      alert('Connection error. Is the backend running?');
+    }
   };
 
   // System Prompt Operations
@@ -493,6 +540,13 @@ function MainApp() {
     fetchSystemPrompt();
     fetchChats();
     fetchMcpStatus();
+
+    // Check if redirect query parameters exist
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') === 'google') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      alert('Successfully connected Google Account!');
+    }
 
     const interval = setInterval(fetchMcpStatus, 2000);
     return () => clearInterval(interval);
@@ -699,6 +753,37 @@ function MainApp() {
               <span className="font-mono text-gray-200 font-semibold">{config.port}</span>
             </div>
           </div>
+        </div>
+
+        {/* Google OAuth Connection Card */}
+        <div className="bg-bg-card border border-border-color rounded-2xl p-4 mb-6 shadow-sm backdrop-blur-md">
+          <div className="flex items-center justify-between mb-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
+            Google Account
+            <span className="flex items-center gap-1.5 font-bold normal-case text-gray-200">
+              <span className={`w-2 h-2 rounded-full ${googleConnected ? 'bg-accent-emerald shadow-[0_0_10px_var(--color-accent-emerald)]' : 'bg-gray-500'}`}></span>
+              {googleConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
+          {googleConnected ? (
+            <div className="flex flex-col gap-2">
+              <div className="text-[10px] text-gray-400 truncate" title={googleEmail}>
+                {googleEmail}
+              </div>
+              <button
+                onClick={handleDisconnectGoogle}
+                className="w-full mt-1 py-1.5 px-2 border border-red-500/20 hover:border-red-500 text-[11px] font-semibold text-red-400 hover:text-red-300 rounded-lg hover:bg-red-500/5 transition-all text-center"
+              >
+                Disconnect Google
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleConnectGoogle}
+              className="w-full mt-1 py-1.5 px-3 bg-accent-gradient hover:opacity-90 text-[11px] font-semibold text-white rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
+            >
+              <Calendar size={12} /> Connect Google
+            </button>
+          )}
         </div>
 
         {/* Background Tasks Card */}
