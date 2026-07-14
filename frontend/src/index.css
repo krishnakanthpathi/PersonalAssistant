@@ -212,4 +212,21 @@ body {
   animation-delay: 1.6s;
 }
 
+/* Custom Speech/Audio Active Glow styles */
+@keyframes micGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4), 0 0 8px rgba(239, 68, 68, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0), 0 0 16px rgba(239, 68, 68, 0.6);
+    transform: scale(1.05);
+  }
+}
+
+.mic-active-glow {
+  animation: micGlowPulse 1.6s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
 

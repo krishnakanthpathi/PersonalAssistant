@@ -19,7 +19,9 @@ import {
   Edit3,
   Save,
   Copy,
-  Loader2
+  Loader2,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard.jsx';
 
@@ -302,6 +304,167 @@ function MainApp() {
 
   const chatEndRef = useRef(null);
 
+  // Speech Synthesis (Text-to-Speech) States
+  const [currentlySpeakingId, setCurrentlySpeakingId] = useState(null);
+  const [autoTtsEnabled, setAutoTtsEnabled] = useState(false);
+  const autoTtsEnabledRef = useRef(false);
+  const utteranceRef = useRef(null);
+
+  // Sync autoTtsEnabledRef
+  useEffect(() => {
+    autoTtsEnabledRef.current = autoTtsEnabled;
+  }, [autoTtsEnabled]);
+
+  // Speech Recognition (Speech-to-Text) States
+  const [isListening, setIsListening] = useState(false);
+  const [interimSpeech, setInterimSpeech] = useState('');
+  const recognitionRef = useRef(null);
+  const baseTextRef = useRef('');
+  const lastShiftTimeRef = useRef(0);
+
+  // Speech Synthesis Function
+  const speakText = (text, id) => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      if (currentlySpeakingId === id) {
+        setCurrentlySpeakingId(null);
+        return;
+      }
+    }
+
+    // Strip HTML/markdown/XML tags for cleaner TTS
+    const cleanText = text
+      .replace(/<[^>]*>/g, '')
+      .replace(/[*_`#]/g, '')
+      .trim();
+
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.onend = () => {
+      setCurrentlySpeakingId(null);
+    };
+    utterance.onerror = () => {
+      setCurrentlySpeakingId(null);
+    };
+
+    utteranceRef.current = utterance;
+    setCurrentlySpeakingId(id);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+    setCurrentlySpeakingId(null);
+  };
+
+  // Speech Recognition Functions
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Google Chrome.');
+      return;
+    }
+    
+    // Stop any active TTS before listening
+    stopSpeaking();
+    
+    if (!recognitionRef.current) {
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+
+      rec.onresult = (event) => {
+        let accumulatedFinal = '';
+        let interim = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            accumulatedFinal += transcript;
+          } else {
+            interim += transcript;
+          }
+        }
+        
+        const text = (baseTextRef.current + ' ' + accumulatedFinal).trim();
+        setPrompt(text);
+        setInterimSpeech(interim);
+      };
+
+      rec.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+        if (event.error === 'not-allowed') {
+          alert('Microphone permission denied. Please allow microphone access in your browser settings.');
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+        setInterimSpeech('');
+      };
+
+      recognitionRef.current = rec;
+    }
+
+    baseTextRef.current = prompt;
+    try {
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error('Failed to start recognition:', err);
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const toggleListeningRef = useRef(null);
+  toggleListeningRef.current = toggleListening;
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Check for Cmd+Shift+S (Mac) or Ctrl+Shift+S (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        toggleListeningRef.current?.();
+        return;
+      }
+
+      // Check for double Shift tap
+      if (e.key === 'Shift') {
+        const now = Date.now();
+        if (now - lastShiftTimeRef.current < 350) {
+          e.preventDefault();
+          toggleListeningRef.current?.();
+          lastShiftTimeRef.current = 0;
+        } else {
+          lastShiftTimeRef.current = now;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Auto-scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -563,6 +726,9 @@ function MainApp() {
     const inputMsg = textToSend || prompt;
     if (!inputMsg.trim() || isProcessing) return;
 
+    stopSpeaking();
+    stopListening();
+
     if (!textToSend) setPrompt('');
 
     // Append user message
@@ -620,21 +786,29 @@ function MainApp() {
                   return updated;
                 });
               } else if (type === 'result') {
+                let speechText = '';
                 setMessages(prev => {
                   const updated = [...prev];
                   if (updated[assistantMsgIndex]) {
                     if (content && typeof content === 'object') {
                       updated[assistantMsgIndex].content = content.content || '';
                       updated[assistantMsgIndex].speech = content.speech || '';
+                      speechText = content.speech || content.content || '';
                       if (content.sessionId) {
                         setCurrentSessionId(content.sessionId);
                       }
                     } else {
                       updated[assistantMsgIndex].content = content;
+                      speechText = content || '';
                     }
                   }
                   return updated;
                 });
+
+                if (autoTtsEnabledRef.current && speechText) {
+                  speakText(speechText, assistantMsgIndex);
+                }
+
                 setCurrentStatusLog('');
                 fetchChats();
               } else if (type === 'error') {
@@ -680,6 +854,8 @@ function MainApp() {
   };
 
   const clearChat = () => {
+    stopSpeaking();
+    stopListening();
     startNewChat();
   };
 
@@ -905,6 +1081,18 @@ function MainApp() {
                 </span>
               </div>
               <div className="flex gap-2">
+                <button 
+                  onClick={() => setAutoTtsEnabled(prev => !prev)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                    autoTtsEnabled 
+                      ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.15)] font-semibold' 
+                      : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-400 hover:text-white'
+                  }`}
+                  title="Toggle automatic text-to-speech for assistant responses"
+                >
+                  <Volume2 size={12} className={autoTtsEnabled ? 'animate-pulse' : ''} />
+                  Auto Speak
+                </button>
                 <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition-all" onClick={fetchData} title="Sync backend connection state">
                   <RefreshCw size={12} /> Sync
                 </button>
@@ -969,8 +1157,17 @@ function MainApp() {
               ) : (
                 messages.map((msg, idx) => (
                   <div key={idx} className={`flex flex-col gap-1 max-w-[85%] ${msg.role === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-                    <div className="text-[10px] text-gray-500 font-semibold tracking-wider px-1">
-                      {msg.role === 'user' ? 'YOU' : 'ASSISTANT'}
+                    <div className="text-[10px] text-gray-500 font-semibold tracking-wider px-1 flex items-center justify-between w-full gap-2">
+                      <span>{msg.role === 'user' ? 'YOU' : 'ASSISTANT'}</span>
+                      {msg.role === 'assistant' && (
+                        <button 
+                          onClick={() => speakText(msg.content, idx)}
+                          className={`p-1 rounded-md transition-all ${currentlySpeakingId === idx ? 'text-accent-blue bg-accent-blue/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
+                          title={currentlySpeakingId === idx ? "Stop speaking" : "Read response out loud"}
+                        >
+                          <Volume2 size={12} className={currentlySpeakingId === idx ? 'animate-pulse' : ''} />
+                        </button>
+                      )}
                     </div>
                     <div className={`p-4 rounded-2xl border text-sm leading-relaxed ${msg.role === 'user' ? 'bg-accent-mono/10 border-accent-mono/20 text-white rounded-tr-none' : 'bg-bg-secondary/40 border-white/5 rounded-tl-none'}`}>
                       {msg.role === 'user' ? (
@@ -986,10 +1183,21 @@ function MainApp() {
                     </div>
                     
                     {msg.role === 'assistant' && msg.speech && (
-                      <div className="speech-bubble-container">
-                        <Volume2 className="speech-icon" size={14} />
+                      <button 
+                        onClick={() => speakText(msg.speech, `bubble-${idx}`)}
+                        className={`speech-bubble-container text-left transition-all hover:bg-white/10 cursor-pointer outline-none ${
+                          currentlySpeakingId === `bubble-${idx}` 
+                            ? 'border-accent-blue/40 bg-accent-blue/[0.04] shadow-[0_0_12px_rgba(59,130,246,0.1)]' 
+                            : ''
+                        }`}
+                        title={currentlySpeakingId === `bubble-${idx}` ? "Click to stop reading" : "Click to read out loud"}
+                      >
+                        <Volume2 
+                          className={`speech-icon ${currentlySpeakingId === `bubble-${idx}` ? 'text-accent-blue animate-pulse' : 'text-gray-400'}`} 
+                          size={14} 
+                        />
                         <span className="speech-text">"{msg.speech}"</span>
-                      </div>
+                      </button>
                     )}
                     
                     {/* Active loop status display */}
@@ -1015,19 +1223,41 @@ function MainApp() {
 
             {/* Input box area */}
             <div className="p-6 bg-gradient-to-t from-bg-primary via-bg-primary to-transparent flex-shrink-0">
-              <div className="max-w-3xl m-auto">
+              <div className="max-w-3xl m-auto animate-fadeIn">
+                {isListening && (
+                  <div className="flex items-center gap-2 mb-2.5 px-3.5 py-2 bg-red-500/5 border border-red-500/20 rounded-xl text-xs text-red-300 animate-fadeIn">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <span className="font-semibold tracking-wide uppercase text-[9px] text-red-400">Listening:</span>
+                    <span className="italic opacity-85 truncate max-w-lg">{interimSpeech || "Speak now..."}</span>
+                  </div>
+                )}
                 <div className="flex items-end gap-2 p-2 bg-bg-secondary border border-border-color rounded-2xl shadow-md focus-within:border-accent-mono/50 transition-all">
                   <textarea
                     className="flex-grow bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm text-gray-200 placeholder-gray-500 resize-none max-h-36 py-2 px-3 leading-relaxed"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Ask anything (e.g. Set volume to 30%, draft a note...)"
+                    placeholder={isListening ? "Listening... Speak clearly" : "Ask anything (e.g. Set volume to 30%, draft a note...)"}
                     disabled={isProcessing}
                     rows={1}
                   />
                   <button 
-                    className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm"
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-sm shrink-0 ${
+                      isListening 
+                        ? 'bg-red-500 hover:bg-red-600 text-white mic-active-glow' 
+                        : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5'
+                    }`}
+                    onClick={toggleListening}
+                    disabled={isProcessing}
+                    title="Toggle speech recognition (Double Shift or Cmd+Shift+S)"
+                  >
+                    {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                  </button>
+                  <button 
+                    className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm shrink-0"
                     onClick={() => handleSend()}
                     disabled={!prompt.trim() || isProcessing}
                   >
