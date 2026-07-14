@@ -109,7 +109,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 
 			const responseMessage = res.choices[0].message;
 			logger.info(`OpenAI response: role=${responseMessage.role}, tool_calls=${responseMessage.tool_calls?.length || 0}`);
-			
+
 			generatedContent = responseMessage.content || '';
 			if (responseMessage.tool_calls) {
 				generatedContent += '\nTool Calls: ' + JSON.stringify(responseMessage.tool_calls.map(tc => tc.function.name));
@@ -142,7 +142,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 			messages: msgs,
 			stream: false,
 			options: {
-				num_ctx: 16384
+				num_ctx: 32768
 			}
 		};
 		if (includeTools && tools.length > 0) {
@@ -241,7 +241,7 @@ export function createToolContext(toolName, onStatusUpdate) {
 
 export async function executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart) {
 	logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
-	
+
 	const requestStartVal = metricsService.activeRequests.get(requestId)?.startTime || Date.now();
 	const latencyFromRequestStart = toolCallStart - requestStartVal;
 

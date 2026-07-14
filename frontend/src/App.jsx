@@ -39,7 +39,7 @@ const parseTables = (text) => {
     const line = lines[i].trim();
     
     // A table separator line matches pattern of dashes, colons, pipes, and whitespace
-    const isSeparator = line.includes('|') && line.match(/^[\s:-|]+$/);
+    const isSeparator = line.includes('|') && line.match(/^[\s:\-|]+$/);
     // A table content line has at least one pipe
     const isTableLine = line.includes('|');
 
@@ -51,7 +51,7 @@ const parseTables = (text) => {
       if (!inTable) {
         // Look ahead to see if the next line is a separator row
         const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
-        const nextIsSeparator = nextLine.includes('|') && nextLine.match(/^[\s:-|]+$/);
+        const nextIsSeparator = nextLine.includes('|') && nextLine.match(/^[\s:\-|]+$/);
         
         if (nextIsSeparator) {
           inTable = true;
@@ -72,15 +72,15 @@ const parseTables = (text) => {
             return 'left';
           });
 
-          tableHtml = '<div class="overflow-x-auto my-4"><table class="w-full text-left text-xs border-collapse border border-white/10 rounded-xl overflow-hidden shadow-sm">';
-          tableHtml += '<thead class="bg-white/[0.02] border-b border-white/10 text-gray-300 font-semibold">';
+          tableHtml = '<div class="overflow-x-auto my-4 shadow-md rounded-xl border border-white/10"><table class="w-full text-left border-collapse overflow-hidden">';
+          tableHtml += '<thead class="bg-white/[0.04] border-b border-white/10 text-white font-medium text-xs tracking-wider uppercase">';
           tableHtml += '<tr>';
           headers.forEach((header, idx) => {
             const alignClass = columnAlignments[idx] === 'center' ? 'text-center' : columnAlignments[idx] === 'right' ? 'text-right' : 'text-left';
-            tableHtml += `<th class="py-2.5 px-3 font-semibold ${alignClass}">${header}</th>`;
+            tableHtml += `<th class="py-3.5 px-4 font-semibold text-white/90 ${alignClass}">${header}</th>`;
           });
           tableHtml += '</tr></thead>';
-          tableHtml += '<tbody class="divide-y divide-white/5">';
+          tableHtml += '<tbody class="divide-y divide-white/5 bg-white/[0.01]">';
         } else {
           // Not a table start, treat as normal text line
           outputLines.push(lines[i]);
@@ -90,10 +90,10 @@ const parseTables = (text) => {
         if (isSeparator) {
           continue;
         }
-        tableHtml += '<tr class="hover:bg-white/[0.02] border-b border-white/5 transition-all">';
+        tableHtml += '<tr class="hover:bg-white/[0.03] border-b border-white/5 transition-all">';
         cells.forEach((cell, idx) => {
           const alignClass = columnAlignments[idx] === 'center' ? 'text-center' : columnAlignments[idx] === 'right' ? 'text-right' : 'text-left';
-          tableHtml += `<td class="py-2 px-3 font-mono text-[11px] text-gray-300 ${alignClass}">${cell}</td>`;
+          tableHtml += `<td class="py-3 px-4 text-sm text-gray-200 ${alignClass}">${cell}</td>`;
         });
         if (cells.length < headers.length) {
           for (let j = cells.length; j < headers.length; j++) {
@@ -130,8 +130,16 @@ const parseMarkdown = (text) => {
     .replace(/<\/?action>/gi, '')
     .replace(/<\/?speech>/gi, '');
 
+  // Extract and stash mermaid blocks (do this on cleanedText BEFORE escaping HTML to preserve characters like > and <)
+  const mermaidBlocks = [];
+  let html = cleanedText.replace(/```mermaid([\s\S]*?)```/g, (match, code) => {
+    const id = `__MERMAID_BLOCK_${mermaidBlocks.length}__`;
+    mermaidBlocks.push(`<div class="mermaid-chart my-4 flex justify-center bg-black/10 p-4 rounded-xl border border-white/5 overflow-x-auto" data-code="${encodeURIComponent(code.trim())}"></div>`);
+    return id;
+  });
+
   // Escape HTML entities to prevent XSS
-  let html = cleanedText
+  html = html
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -159,13 +167,13 @@ const parseMarkdown = (text) => {
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>');
     
-    unescaped = unescaped.replace(/<table([^>]*)>/gi, '<div class="overflow-x-auto my-4"><table class="w-full text-left text-xs border-collapse border border-white/10 rounded-xl overflow-hidden shadow-sm"$1>');
+    unescaped = unescaped.replace(/<table([^>]*)>/gi, '<div class="overflow-x-auto my-4 shadow-md rounded-xl border border-white/10"><table class="w-full text-left border-collapse overflow-hidden"$1>');
     unescaped = unescaped.replace(/<\/table>/gi, '</table></div>');
-    unescaped = unescaped.replace(/<thead([^>]*)>/gi, '<thead class="bg-white/[0.02] border-b border-white/10 text-gray-300 font-semibold"$1>');
-    unescaped = unescaped.replace(/<tbody([^>]*)>/gi, '<tbody class="divide-y divide-white/5"$1>');
-    unescaped = unescaped.replace(/<tr([^>]*)>/gi, '<tr class="hover:bg-white/[0.02] border-b border-white/5 transition-all"$1>');
-    unescaped = unescaped.replace(/<th([^>]*)>/gi, '<th class="py-2.5 px-3 font-semibold text-left text-gray-300"$1>');
-    unescaped = unescaped.replace(/<td([^>]*)>/gi, '<td class="py-2 px-3 font-mono text-[11px] text-gray-300 text-left"$1>');
+    unescaped = unescaped.replace(/<thead([^>]*)>/gi, '<thead class="bg-white/[0.04] border-b border-white/10 text-white font-medium text-xs tracking-wider uppercase"$1>');
+    unescaped = unescaped.replace(/<tbody([^>]*)>/gi, '<tbody class="divide-y divide-white/5 bg-white/[0.01]"$1>');
+    unescaped = unescaped.replace(/<tr([^>]*)>/gi, '<tr class="hover:bg-white/[0.03] border-b border-white/5 transition-all"$1>');
+    unescaped = unescaped.replace(/<th([^>]*)>/gi, '<th class="py-3.5 px-4 font-semibold text-left text-white/90"$1>');
+    unescaped = unescaped.replace(/<td([^>]*)>/gi, '<td class="py-3 px-4 text-sm text-gray-200 text-left"$1>');
     
     return '\n\n' + unescaped + '\n\n';
   });
@@ -235,6 +243,11 @@ const parseMarkdown = (text) => {
   // Restore code blocks
   codeBlocks.forEach((code, idx) => {
     html = html.replace(`__CODE_BLOCK_${idx}__`, code);
+  });
+
+  // Restore mermaid blocks
+  mermaidBlocks.forEach((code, idx) => {
+    html = html.replace(`__MERMAID_BLOCK_${idx}__`, code);
   });
   
   // Paragraphs and Line Breaks
@@ -314,6 +327,54 @@ function MainApp() {
   useEffect(() => {
     autoTtsEnabledRef.current = autoTtsEnabled;
   }, [autoTtsEnabled]);
+
+  // Render Mermaid diagrams whenever messages change or activeTab changes
+  useEffect(() => {
+    let active = true;
+    const renderMermaid = async () => {
+      const elements = document.querySelectorAll('.mermaid-chart');
+      if (elements.length === 0) return;
+
+      try {
+        const { default: mermaid } = await import('mermaid');
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'dark',
+          securityLevel: 'loose',
+        });
+
+        for (let i = 0; i < elements.length; i++) {
+          const el = elements[i];
+          if (!active) break;
+          // If already rendered, skip
+          if (el.getAttribute('data-processed')) continue;
+          
+          const code = decodeURIComponent(el.getAttribute('data-code'));
+          const id = `mermaid-svg-${Math.random().toString(36).substring(2, 9)}`;
+          try {
+            const { svg } = await mermaid.render(id, code);
+            if (active) {
+              el.innerHTML = svg;
+              el.setAttribute('data-processed', 'true');
+            }
+          } catch (err) {
+            console.error('Failed to render mermaid chart:', err);
+            if (active) {
+              el.innerHTML = `<div class="text-xs text-red-400 p-2 border border-red-500/20 bg-red-500/5 rounded">Error rendering chart: ${err.message}</div>`;
+              el.setAttribute('data-processed', 'true');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load mermaid:', err);
+      }
+    };
+
+    renderMermaid();
+    return () => {
+      active = false;
+    };
+  }, [messages, activeTab]);
 
   // Speech Recognition (Speech-to-Text) States
   const [isListening, setIsListening] = useState(false);
