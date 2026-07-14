@@ -1,4 +1,4 @@
-import { db } from './db.js';
+import { getDB } from './mongodb.js';
 import { logger } from './logger.js';
 
 class MetricsService {
@@ -78,7 +78,7 @@ class MetricsService {
 		}
 	}
 
-	endRequest(requestId, finalSuccess, errorMsg = '') {
+	async endRequest(requestId, finalSuccess, errorMsg = '') {
 		const req = this.activeRequests.get(requestId);
 		if (!req) return;
 
@@ -89,164 +89,127 @@ class MetricsService {
 		}
 
 		try {
-			// Start transaction for atomic writes
-			const insertLog = db.prepare(`
-				INSERT INTO telemetry_logs (
-					id, timestamp, prompt, success, total_duration, retrieval_time, 
-					generation_time, context_processing_time, given_context, generated_context, 
-					screenshot_count, apple_script_count, fetch_ui_count, annotate_count
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			`);
+			const db = getDB();
+			const collection = db.collection('telemetry_logs');
 
-			const insertTool = db.prepare(`
-				INSERT INTO tool_calls (
-					request_id, name, args, latency, latency_from_request_start, success, error, result_summary
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			`);
+			const telemetryDoc = {
+				_id: req.id,
+				timestamp: new Date(req.timestamp),
+				prompt: req.prompt,
+				success: req.success,
+				totalDuration: req.totalDuration,
+				retrievalTime: req.retrievalTime,
+				generationTime: req.generationTime,
+				contextProcessingTime: req.contextProcessingTime,
+				givenContext: req.givenContext,
+				generatedContext: req.generatedContext,
+				screenshotCount: req.screenshotCount,
+				appleScriptCount: req.appleScriptCount,
+				fetchUiCount: req.fetchUiCount,
+				annotateCount: req.annotateCount,
+				toolCalls: req.toolCalls,
+				error: req.error || null
+			};
 
-			const executeTransaction = db.transaction((request, toolsList) => {
-				insertLog.run(
-					request.id,
-					request.timestamp,
-					request.prompt,
-					request.success ? 1 : 0,
-					request.totalDuration,
-					request.retrievalTime,
-					request.generationTime,
-					request.contextProcessingTime,
-					request.givenContext,
-					request.generatedContext,
-					request.screenshotCount,
-					request.appleScriptCount,
-					request.fetchUiCount,
-					request.annotateCount
-				);
+			await collection.insertOne(telemetryDoc);
+			logger.info(`Telemetry metrics saved successfully to MongoDB for request: ${requestId}`);
 
-				for (const tool of toolsList) {
-					insertTool.run(
-						request.id,
-						tool.name,
-						JSON.stringify(tool.args || {}),
-						tool.latency,
-						tool.latencyFromRequestStart || 0,
-						tool.success ? 1 : 0,
-						tool.error || null,
-						tool.resultSummary || ''
-					);
+			// Enforce 100 requests limit by deleting older logs
+			const count = await collection.countDocuments();
+			if (count > 100) {
+				const oldestKeep = await collection.find()
+					.sort({ timestamp: -1 })
+					.skip(99)
+					.limit(1)
+					.next();
+				if (oldestKeep) {
+					await collection.deleteMany({ timestamp: { $lt: oldestKeep.timestamp } });
 				}
-
-				// Enforce 100 requests limit by deleting older logs
-				db.prepare(`
-					DELETE FROM telemetry_logs 
-					WHERE id NOT IN (
-						SELECT id FROM telemetry_logs 
-						ORDER BY timestamp DESC 
-						LIMIT 100
-					)
-				`).run();
-			});
-
-			executeTransaction(req, req.toolCalls);
-			logger.info(`Telemetry metrics saved successfully to SQLite for request: ${requestId}`);
+			}
 		} catch (error) {
-			logger.error(`Failed to save telemetry metrics to SQLite: ${error.message}`);
+			logger.error(`Failed to save telemetry metrics to MongoDB: ${error.message}`);
 		} finally {
 			this.activeRequests.delete(requestId);
 		}
 	}
 
-	getMetrics() {
+	async getMetrics() {
 		try {
-			// Query requests
-			const rawLogs = db.prepare(`
-				SELECT * FROM telemetry_logs 
-				ORDER BY timestamp DESC
-			`).all();
+			const db = getDB();
+			const collection = db.collection('telemetry_logs');
 
-			const rawTools = db.prepare(`
-				SELECT * FROM tool_calls
-			`).all();
-
-			// Group tool calls by request_id
-			const toolCallsMap = new Map();
-			for (const tool of rawTools) {
-				if (!toolCallsMap.has(tool.request_id)) {
-					toolCallsMap.set(tool.request_id, []);
-				}
-				toolCallsMap.get(tool.request_id).push({
-					name: tool.name,
-					args: JSON.parse(tool.args || '{}'),
-					latency: tool.latency,
-					latencyFromRequestStart: tool.latency_from_request_start || 0,
-					success: tool.success === 1,
-					error: tool.error,
-					resultSummary: tool.result_summary || ''
-				});
-			}
+			// Query requests sorted by timestamp descending
+			const rawLogs = await collection.find()
+				.sort({ timestamp: -1 })
+				.toArray();
 
 			// Format requests list matching original format
 			const requests = rawLogs.map(log => ({
-				id: log.id,
-				timestamp: log.timestamp,
+				id: log._id,
+				timestamp: log.timestamp.toISOString(),
 				prompt: log.prompt,
-				success: log.success === 1,
-				totalDuration: log.total_duration,
-				retrievalTime: log.retrieval_time,
-				generationTime: log.generation_time,
-				contextProcessingTime: log.context_processing_time,
-				givenContext: log.given_context,
-				generatedContext: log.generated_context,
-				screenshotCount: log.screenshot_count,
-				appleScriptCount: log.apple_script_count,
-				fetchUiCount: log.fetch_ui_count,
-				annotateCount: log.annotate_count,
-				toolCalls: toolCallsMap.get(log.id) || []
+				success: log.success,
+				totalDuration: log.totalDuration,
+				retrievalTime: log.retrievalTime,
+				generationTime: log.generationTime,
+				contextProcessingTime: log.contextProcessingTime,
+				givenContext: log.givenContext,
+				generatedContext: log.generatedContext,
+				screenshotCount: log.screenshotCount,
+				appleScriptCount: log.appleScriptCount,
+				fetchUiCount: log.fetchUiCount,
+				annotateCount: log.annotateCount,
+				toolCalls: log.toolCalls || []
 			}));
 
 			// Calculate aggregates dynamically
 			const count = rawLogs.length;
 			const aggregates = {
 				totalRequests: count,
-				successfulRequests: rawLogs.filter(log => log.success === 1).length,
-				failedRequests: rawLogs.filter(log => log.success === 0).length,
-				averageTotalDuration: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + log.total_duration, 0) / count) : 0,
-				averageRetrievalTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + log.retrieval_time, 0) / count) : 0,
-				averageGenerationTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + log.generation_time, 0) / count) : 0,
-				averageContextProcessingTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + log.context_processing_time, 0) / count) : 0,
-				totalScreenshots: rawLogs.reduce((sum, log) => sum + log.screenshot_count, 0),
-				totalAppleScripts: rawLogs.reduce((sum, log) => sum + log.apple_script_count, 0),
-				totalFetchUis: rawLogs.reduce((sum, log) => sum + log.fetch_ui_count, 0),
-				totalAnnotations: rawLogs.reduce((sum, log) => sum + log.annotate_count, 0),
+				successfulRequests: rawLogs.filter(log => log.success).length,
+				failedRequests: rawLogs.filter(log => !log.success).length,
+				averageTotalDuration: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.totalDuration || 0), 0) / count) : 0,
+				averageRetrievalTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.retrievalTime || 0), 0) / count) : 0,
+				averageGenerationTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.generationTime || 0), 0) / count) : 0,
+				averageContextProcessingTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.contextProcessingTime || 0), 0) / count) : 0,
+				totalScreenshots: rawLogs.reduce((sum, log) => sum + (log.screenshotCount || 0), 0),
+				totalAppleScripts: rawLogs.reduce((sum, log) => sum + (log.appleScriptCount || 0), 0),
+				totalFetchUis: rawLogs.reduce((sum, log) => sum + (log.fetchUiCount || 0), 0),
+				totalAnnotations: rawLogs.reduce((sum, log) => sum + (log.annotateCount || 0), 0),
 				tools: {}
 			};
 
-			// Build tool specific aggregates
-			for (const tool of rawTools) {
-				if (!aggregates.tools[tool.name]) {
-					aggregates.tools[tool.name] = {
-						calls: 0,
-						successes: 0,
-						failures: 0,
-						successRate: 0,
-						averageLatency: 0,
-						averageLatencyFromRequestStart: 0
-					};
-				}
-				const stats = aggregates.tools[tool.name];
-				stats.calls++;
-				if (tool.success === 1) {
-					stats.successes++;
-				} else {
-					stats.failures++;
-				}
-				stats.successRate = Number((stats.successes / stats.calls).toFixed(4));
-				
-				// Re-calculate running latency sum to compute average
-				stats.totalLatency = (stats.totalLatency || 0) + tool.latency;
-				stats.averageLatency = Math.round(stats.totalLatency / stats.calls);
+			// Build tool specific aggregates from nested toolCalls array
+			for (const log of rawLogs) {
+				const toolCalls = log.toolCalls || [];
+				for (const tool of toolCalls) {
+					if (!aggregates.tools[tool.name]) {
+						aggregates.tools[tool.name] = {
+							calls: 0,
+							successes: 0,
+							failures: 0,
+							successRate: 0,
+							averageLatency: 0,
+							averageLatencyFromRequestStart: 0,
+							totalLatency: 0,
+							totalLatencyFromRequestStart: 0
+						};
+					}
+					const stats = aggregates.tools[tool.name];
+					stats.calls++;
+					if (tool.success) {
+						stats.successes++;
+					} else {
+						stats.failures++;
+					}
+					stats.successRate = Number((stats.successes / stats.calls).toFixed(4));
+					
+					stats.totalLatency += (tool.latency || 0);
+					stats.averageLatency = Math.round(stats.totalLatency / stats.calls);
 
-				stats.totalLatencyFromRequestStart = (stats.totalLatencyFromRequestStart || 0) + (tool.latency_from_request_start || 0);
-				stats.averageLatencyFromRequestStart = Math.round(stats.totalLatencyFromRequestStart / stats.calls);
+					stats.totalLatencyFromRequestStart += (tool.latencyFromRequestStart || 0);
+					stats.averageLatencyFromRequestStart = Math.round(stats.totalLatencyFromRequestStart / stats.calls);
+				}
 			}
 
 			// Remove temp sum properties
@@ -257,7 +220,7 @@ class MetricsService {
 
 			return { requests, aggregates };
 		} catch (error) {
-			logger.error(`Failed to retrieve telemetry metrics from SQLite: ${error.message}`);
+			logger.error(`Failed to retrieve telemetry metrics from MongoDB: ${error.message}`);
 			// Return empty template to avoid frontend crashes
 			return {
 				requests: [],
@@ -279,13 +242,11 @@ class MetricsService {
 		}
 	}
 
-	clear() {
+	async clear() {
 		try {
-			db.transaction(() => {
-				db.prepare(`DELETE FROM tool_calls`).run();
-				db.prepare(`DELETE FROM telemetry_logs`).run();
-			})();
-			logger.info('Telemetry metrics database cleared successfully.');
+			const db = getDB();
+			await db.collection('telemetry_logs').deleteMany({});
+			logger.info('Telemetry metrics database cleared successfully in MongoDB.');
 		} catch (error) {
 			logger.error(`Failed to clear telemetry metrics database: ${error.message}`);
 		}
@@ -293,3 +254,4 @@ class MetricsService {
 }
 
 export const metricsService = new MetricsService();
+export default metricsService;

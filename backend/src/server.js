@@ -7,6 +7,7 @@ import cors from 'cors';
 import { mcpManager } from './mcp/mcpManager.js';
 import { logger } from './utils/logger.js';
 import { env } from './config/env.js';
+import { connectToMongoDB } from './utils/mongodb.js';
 import apiRoutes from './routes/api.js';
 
 import path from 'path';
@@ -33,6 +34,9 @@ app.use('/downloads', express.static(downloadsDir));
 app.use(apiRoutes);
 
 async function startServer() {
+	// Connect to MongoDB
+	await connectToMongoDB();
+
 	// Initialize MCP Manager & spawn the filesystem server
 	await mcpManager.initialize();
 

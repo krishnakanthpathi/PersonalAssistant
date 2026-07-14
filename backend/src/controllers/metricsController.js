@@ -1,14 +1,15 @@
 import { metricsService } from '../utils/metrics.js';
 
-export const getMetrics = (req, res) => {
+export const getMetrics = async (req, res) => {
+	const metrics = await metricsService.getMetrics();
 	res.json({
 		success: true,
-		metrics: metricsService.getMetrics()
+		metrics
 	});
 };
 
-export const clearMetrics = (req, res) => {
-	metricsService.clear();
+export const clearMetrics = async (req, res) => {
+	await metricsService.clear();
 	res.json({
 		success: true,
 		message: "Metrics cleared successfully."

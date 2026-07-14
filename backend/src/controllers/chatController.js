@@ -1,31 +1,9 @@
 import { Agent } from '../orchestrator/agent.js';
 import { logger } from '../utils/logger.js';
-import { db } from '../utils/db.js';
+import { getDB } from '../utils/mongodb.js';
 import crypto from 'crypto';
 
 const agent = new Agent();
-
-// Create tables for chats if they don't exist
-db.exec(`
-	CREATE TABLE IF NOT EXISTS chat_sessions (
-		id TEXT PRIMARY KEY,
-		title TEXT,
-		created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-		updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-	);
-
-	CREATE TABLE IF NOT EXISTS chat_messages (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		session_id TEXT,
-		role TEXT,
-		content TEXT,
-		speech TEXT,
-		logs TEXT,
-		is_error INTEGER DEFAULT 0,
-		created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
-	);
-`);
 
 export const handleChat = async (req, res) => {
 	let { prompt, history, sessionId } = req.body;
@@ -47,17 +25,33 @@ export const handleChat = async (req, res) => {
 	};
 
 	try {
+		const db = getDB();
+		const sessionsCollection = db.collection('chat_sessions');
+
 		// 1. Insert or update the chat session
-		const sessionCheck = db.prepare("SELECT 1 FROM chat_sessions WHERE id = ?").get(sessionId);
-		if (!sessionCheck) {
-			const title = prompt.length > 50 ? prompt.substring(0, 47) + "..." : prompt;
-			db.prepare("INSERT INTO chat_sessions (id, title) VALUES (?, ?)").run(sessionId, title);
-		} else {
-			db.prepare("UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(sessionId);
-		}
+		const title = prompt.length > 50 ? prompt.substring(0, 47) + "..." : prompt;
+		await sessionsCollection.updateOne(
+			{ _id: sessionId },
+			{
+				$set: { updatedAt: new Date() },
+				$setOnInsert: { title, createdAt: new Date(), messages: [] }
+			},
+			{ upsert: true }
+		);
 
 		// 2. Insert user message
-		db.prepare("INSERT INTO chat_messages (session_id, role, content) VALUES (?, 'user', ?)").run(sessionId, prompt);
+		const userMessage = {
+			role: 'user',
+			content: prompt,
+			speech: null,
+			logs: [],
+			isError: false,
+			createdAt: new Date()
+		};
+		await sessionsCollection.updateOne(
+			{ _id: sessionId },
+			{ $push: { messages: userMessage } }
+		);
 
 		// 3. Run agent with history
 		const response = await agent.run(prompt, history, (status) => {
@@ -65,16 +59,41 @@ export const handleChat = async (req, res) => {
 		});
 
 		// 4. Save assistant response
-		const logsJson = response.logs ? JSON.stringify(response.logs) : null;
-		db.prepare("INSERT INTO chat_messages (session_id, role, content, speech, logs, is_error) VALUES (?, 'assistant', ?, ?, ?, 0)")
-			.run(sessionId, response.content || response, response.speech || null, logsJson);
+		const assistantMessage = {
+			role: 'assistant',
+			content: response.content || response,
+			speech: response.speech || null,
+			logs: response.logs || [],
+			isError: false,
+			createdAt: new Date()
+		};
+		await sessionsCollection.updateOne(
+			{ _id: sessionId },
+			{ $push: { messages: assistantMessage } }
+		);
 
 		// Send result along with sessionId so frontend can set/update it
 		sendSSE('result', { ...response, sessionId });
 	} catch (error) {
 		logger.error(`Error in chat endpoint: ${error.message}`);
-		db.prepare("INSERT INTO chat_messages (session_id, role, content, is_error) VALUES (?, 'assistant', ?, 1)")
-			.run(sessionId, `Error: ${error.message}`);
+		try {
+			const db = getDB();
+			const sessionsCollection = db.collection('chat_sessions');
+			const errorMessage = {
+				role: 'assistant',
+				content: `Error: ${error.message}`,
+				speech: null,
+				logs: [],
+				isError: true,
+				createdAt: new Date()
+			};
+			await sessionsCollection.updateOne(
+				{ _id: sessionId },
+				{ $push: { messages: errorMessage } }
+			);
+		} catch (dbErr) {
+			logger.error(`Failed to log chat error response to MongoDB: ${dbErr.message}`);
+		}
 		sendSSE('error', error.message);
 	} finally {
 		res.end();
@@ -84,8 +103,22 @@ export const handleChat = async (req, res) => {
 // Get all chat sessions
 export const getChats = async (req, res) => {
 	try {
-		const rows = db.prepare("SELECT * FROM chat_sessions ORDER BY updated_at DESC").all();
-		res.json({ success: true, chats: rows });
+		const db = getDB();
+		const rows = await db.collection('chat_sessions')
+			.find()
+			.project({ _id: 1, title: 1, createdAt: 1, updatedAt: 1 })
+			.sort({ updatedAt: -1 })
+			.toArray();
+
+		// Map to format matching original response
+		const chats = rows.map(r => ({
+			id: r._id,
+			title: r.title,
+			created_at: r.createdAt ? r.createdAt.toISOString() : null,
+			updated_at: r.updatedAt ? r.updatedAt.toISOString() : null
+		}));
+
+		res.json({ success: true, chats });
 	} catch (error) {
 		logger.error(`Error fetching chat sessions: ${error.message}`);
 		res.status(500).json({ success: false, error: error.message });
@@ -96,15 +129,21 @@ export const getChats = async (req, res) => {
 export const getChatMessages = async (req, res) => {
 	const { sessionId } = req.params;
 	try {
-		const rows = db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY id ASC").all(sessionId);
-		// Map logs back to objects
-		const messages = rows.map(m => ({
+		const db = getDB();
+		const session = await db.collection('chat_sessions').findOne({ _id: sessionId });
+		if (!session) {
+			return res.json({ success: true, messages: [] });
+		}
+
+		// Map properties to match what the frontend expects
+		const messages = (session.messages || []).map(m => ({
 			role: m.role,
 			content: m.content,
 			speech: m.speech,
-			isError: m.is_error === 1,
-			logs: m.logs ? JSON.parse(m.logs) : []
+			isError: m.isError === true,
+			logs: m.logs || []
 		}));
+
 		res.json({ success: true, messages });
 	} catch (error) {
 		logger.error(`Error fetching messages for session ${sessionId}: ${error.message}`);
@@ -116,7 +155,8 @@ export const getChatMessages = async (req, res) => {
 export const deleteChatSession = async (req, res) => {
 	const { sessionId } = req.params;
 	try {
-		db.prepare("DELETE FROM chat_sessions WHERE id = ?").run(sessionId);
+		const db = getDB();
+		await db.collection('chat_sessions').deleteOne({ _id: sessionId });
 		res.json({ success: true });
 	} catch (error) {
 		logger.error(`Error deleting chat session ${sessionId}: ${error.message}`);
