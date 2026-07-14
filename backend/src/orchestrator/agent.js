@@ -34,7 +34,7 @@ export class Agent {
 
 		try {
 			// 1. Prepare message history and RAG search query
-			const { messages, cleanedHistory, combinedRAGQuery } = prepareMessages(prompt, history);
+			const { messages, cleanedHistory, combinedRAGQuery } = await prepareMessages(prompt, history);
 
 			// 2. Fetch tool definitions using RAG selection
 			const retrievalStart = Date.now();

@@ -1,9 +1,10 @@
 /**
- * Simple in-memory and JSON-file-backed vector database for caching tool embeddings
+ * MongoDB-backed and memory-cached vector database for caching tool embeddings
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getDB } from '../config/mongodb.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,47 +24,66 @@ export class VectorDB {
 
 	async connect() {
 		try {
-			const dir = path.dirname(DB_FILE_PATH);
-			if (!fs.existsSync(dir)) {
-				fs.mkdirSync(dir, { recursive: true });
-			}
-			if (fs.existsSync(DB_FILE_PATH)) {
+			const db = getDB();
+			const collection = db.collection('tool_embeddings');
+
+			// Count existing documents in MongoDB
+			const count = await collection.countDocuments();
+
+			// If MongoDB is empty, seed from local JSON file if it exists
+			if (count === 0 && fs.existsSync(DB_FILE_PATH)) {
+				logger.info(`Seeding MongoDB tool_embeddings from local JSON file: ${DB_FILE_PATH}`);
 				const rawData = fs.readFileSync(DB_FILE_PATH, 'utf8');
 				if (rawData.trim()) {
 					const data = JSON.parse(rawData);
-					for (const item of data) {
-						if (item.name && item.tool && Array.isArray(item.embedding)) {
-							this.toolsCache.set(item.name, {
-								tool: item.tool,
-								embedding: item.embedding,
-								embeddingModel: item.embeddingModel || 'default'
-							});
-						}
+					if (data.length > 0) {
+						const documents = data.map(item => ({
+							_id: item.name,
+							tool: item.tool,
+							embedding: item.embedding,
+							embeddingModel: item.embeddingModel || 'default'
+						}));
+						await collection.insertMany(documents);
+						logger.info(`Successfully seeded ${documents.length} tool embeddings to MongoDB.`);
 					}
-					logger.info(`Loaded ${this.toolsCache.size} cached tool embeddings from disk.`);
 				}
 			}
+
+			// Load all documents from MongoDB into in-memory cache
+			const docs = await collection.find().toArray();
+			for (const doc of docs) {
+				this.toolsCache.set(doc._id, {
+					tool: doc.tool,
+					embedding: doc.embedding,
+					embeddingModel: doc.embeddingModel
+				});
+			}
+			logger.info(`Loaded ${this.toolsCache.size} cached tool embeddings from MongoDB.`);
 		} catch (error) {
-			logger.error(`Failed to load vector database from disk: ${error.message}`);
+			logger.error(`Failed to load vector database from MongoDB: ${error.message}`);
 		}
 	}
 
 	async save() {
 		try {
-			const dir = path.dirname(DB_FILE_PATH);
-			if (!fs.existsSync(dir)) {
-				fs.mkdirSync(dir, { recursive: true });
+			const db = getDB();
+			const collection = db.collection('tool_embeddings');
+
+			// Upsert all cached items to MongoDB
+			for (const [name, val] of this.toolsCache.entries()) {
+				await collection.replaceOne(
+					{ _id: name },
+					{
+						tool: val.tool,
+						embedding: val.embedding,
+						embeddingModel: val.embeddingModel
+					},
+					{ upsert: true }
+				);
 			}
-			const data = Array.from(this.toolsCache.entries()).map(([name, val]) => ({
-				name,
-				tool: val.tool,
-				embedding: val.embedding,
-				embeddingModel: val.embeddingModel
-			}));
-			fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), 'utf8');
-			logger.info(`Saved ${data.length} tool embeddings to disk.`);
+			logger.info(`Saved ${this.toolsCache.size} tool embeddings to MongoDB.`);
 		} catch (error) {
-			logger.error(`Failed to save vector database to disk: ${error.message}`);
+			logger.error(`Failed to save vector database to MongoDB: ${error.message}`);
 		}
 	}
 
@@ -99,8 +119,14 @@ export class VectorDB {
 		return Array.from(this.toolsCache.values());
 	}
 
-	clear() {
-		this.toolsCache.clear();
+	async clear() {
+		try {
+			this.toolsCache.clear();
+			const db = getDB();
+			await db.collection('tool_embeddings').deleteMany({});
+			logger.info('Cleared all tool embeddings from MongoDB.');
+		} catch (error) {
+			logger.error(`Failed to clear tool embeddings in MongoDB: ${error.message}`);
+		}
 	}
 }
-

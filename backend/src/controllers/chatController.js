@@ -1,6 +1,6 @@
 import { Agent } from '../orchestrator/agent.js';
 import { logger } from '../utils/logger.js';
-import { getDB } from '../utils/mongodb.js';
+import { getDB } from '../config/mongodb.js';
 import crypto from 'crypto';
 
 const agent = new Agent();

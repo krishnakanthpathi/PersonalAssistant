@@ -7,7 +7,7 @@ import cors from 'cors';
 import { mcpManager } from './mcp/mcpManager.js';
 import { logger } from './utils/logger.js';
 import { env } from './config/env.js';
-import { connectToMongoDB } from './utils/mongodb.js';
+import { connectToMongoDB } from './config/mongodb.js';
 import apiRoutes from './routes/api.js';
 
 import path from 'path';

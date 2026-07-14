@@ -1,4 +1,4 @@
-import { getDB } from './mongodb.js';
+import { getDB } from '../config/mongodb.js';
 import { logger } from './logger.js';
 
 class MetricsService {

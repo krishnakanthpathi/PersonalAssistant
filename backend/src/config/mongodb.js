@@ -1,20 +1,30 @@
-import { getDB } from '../../config/mongodb.js';
-import { logger } from '../../utils/logger.js';
-import { env } from '../../config/env.js';
+import { MongoClient } from 'mongodb';
+import { env } from './env.js';
+import { logger } from '../utils/logger.js';
 
-export async function loadSystemPrompt() {
-	let systemPromptText;
+let client = null;
+let db = null;
+
+export async function connectToMongoDB() {
+	if (db) return db;
+
 	try {
-		const db = getDB();
-		const row = await db.collection('system_prompts').findOne({ isActive: true });
-		systemPromptText = row?.prompt;
-	} catch (error) {
-		logger.error(`Failed to load system prompt from MongoDB: ${error.message}`);
-	}
+		logger.info(`Connecting to MongoDB at: ${env.MONGO_URI}`);
+		client = new MongoClient(env.MONGO_URI, {
+			connectTimeoutMS: 5000,
+			socketTimeoutMS: 30000,
+		});
 
-	if (!systemPromptText) {
-		// Fallback default
-		systemPromptText = `You are a local computer personal assistant running on macOS. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
+		await client.connect();
+		db = client.db(env.MONGO_DB_NAME);
+		logger.info(`MongoDB connected successfully to database: ${env.MONGO_DB_NAME}`);
+
+		// Seed the original comprehensive system prompt if empty
+		try {
+			const collection = db.collection('system_prompts');
+			const count = await collection.countDocuments();
+			if (count === 0) {
+				const defaultPrompt = `You are a local computer personal assistant running on macOS. You have access to tools. If you need to call a tool, you MUST use the native tool-calling feature.
 
 ## Response Formatting & Voice Output (IMPORTANT)
 Every response you generate MUST be split into two sections:
@@ -81,39 +91,43 @@ You can read, create, update, delete, and list events on Google Calendar.
 - When the user asks to download a video, you MUST ALWAYS ask them first which quality they want to download (e.g., 1080p, 720p, 360p, or best/audio-only) if they did not specify it in their prompt.
 - Once the quality is selected, call the download tool.
 - In your final response, explicitly state that you have scheduled the download in the background and provide the browser download link so they can download the file.`;
+
+				await collection.insertOne({
+					prompt: defaultPrompt,
+					isActive: true,
+					createdAt: new Date()
+				});
+				logger.info("Successfully seeded original default system prompt in MongoDB.");
+			}
+		} catch (err) {
+			logger.error(`Error checking/seeding system prompt in MongoDB: ${err.message}`);
+		}
+
+		// Gracefully handle application termination to close client connection
+		process.on('SIGINT', cleanup);
+		process.on('SIGTERM', cleanup);
+
+		return db;
+	} catch (error) {
+		logger.error(`Failed to connect to MongoDB: ${error.message}`);
+		throw error;
 	}
-	return systemPromptText;
 }
 
-export async function prepareMessages(prompt, history) {
-	// Sanitize and map standard message fields from history
-	const cleanedHistory = history
-		.map(m => ({
-			role: m.role,
-			content: m.content
-		}))
-		.filter(m => m.role && m.content);
+async function cleanup() {
+	if (client) {
+		await client.close();
+		logger.info('MongoDB client connection closed.');
+	}
+}
 
-	const systemPromptText = await loadSystemPrompt();
-
-	// Prepare message history
-	const messages = [
-		{
-			role: 'system',
-			content: systemPromptText
-		},
-		...cleanedHistory,
-		{ role: 'user', content: prompt }
-	];
-
-	// Generate a search query for tool selection that combines previous user inputs
-	// to maintain context
-	const userMessages = cleanedHistory.filter(m => m.role === 'user').slice(-2);
-	const combinedRAGQuery = [...userMessages.map(m => m.content), prompt].join(' ');
-
-	return {
-		messages,
-		cleanedHistory,
-		combinedRAGQuery
-	};
+/**
+ * Helper to get the DB instance directly if already connected,
+ * or trigger connection asynchronously.
+ */
+export function getDB() {
+	if (!db) {
+		throw new Error('Database not initialized. Call connectToMongoDB() first.');
+	}
+	return db;
 }
