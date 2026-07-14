@@ -259,7 +259,7 @@ const parseMarkdown = (text) => {
 const getToolIcon = (name) => {
   const lowercase = name.toLowerCase();
   if (lowercase.includes('volume')) return <Volume2 className="w-4 h-4 text-accent-blue" />;
-  if (lowercase.includes('notion') || lowercase.includes('file')) return <FileText className="w-4 h-4 text-accent-purple" />;
+  if (lowercase.includes('notion') || lowercase.includes('file')) return <FileText className="w-4 h-4 text-accent-mono" />;
   if (lowercase.includes('calendar') || lowercase.includes('event')) return <Calendar className="w-4 h-4 text-accent-emerald" />;
   if (lowercase.includes('puppeteer') || lowercase.includes('browser') || lowercase.includes('web')) return <Globe className="w-4 h-4 text-blue-400" />;
   return <Wrench className="w-4 h-4 text-gray-400" />;
@@ -706,7 +706,7 @@ function MainApp() {
         <div className="flex flex-col gap-1 mb-6">
           <button 
             onClick={() => setActiveTab('chat')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'chat' ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'chat' ? 'bg-accent-mono/10 text-accent-mono border border-accent-mono/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
           >
             <MessageSquare className="w-4 h-4" />
             Chat Assistant
@@ -791,7 +791,7 @@ function MainApp() {
           <div className="bg-bg-card border border-border-color rounded-2xl p-4 mb-6 shadow-sm backdrop-blur-md">
             <div className="flex items-center gap-2 mb-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
               {mcpTasks.some(t => t.status === 'running' || t.status === 'initiating') ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-purple" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-mono" />
               ) : mcpTasks.every(t => t.status === 'finished') ? (
                 <CheckCircle className="w-3.5 h-3.5 text-accent-emerald" />
               ) : (
@@ -810,7 +810,7 @@ function MainApp() {
                   <div key={task.taskId} className="flex flex-col gap-1.5 text-xs">
                     <div className="flex items-center justify-between font-medium">
                       <div className="flex items-center gap-1.5 min-w-0 flex-grow">
-                        {isRunning && <Loader2 className="w-3 h-3 animate-spin text-accent-purple shrink-0" />}
+                        {isRunning && <Loader2 className="w-3 h-3 animate-spin text-accent-mono shrink-0" />}
                         {isFinished && <CheckCircle className="w-3 h-3 text-accent-emerald shrink-0" />}
                         {isFailed && <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />}
                         <span className="text-gray-300 truncate" title={task.message}>
@@ -824,7 +824,7 @@ function MainApp() {
                     {pct !== null && isRunning && (
                       <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
                         <div 
-                          className="bg-accent-purple h-full transition-all duration-300 rounded-full" 
+                          className="bg-accent-mono h-full transition-all duration-300 rounded-full" 
                           style={{ width: `${pct}%` }}
                         ></div>
                       </div>
@@ -840,7 +840,7 @@ function MainApp() {
         <div className="flex flex-col flex-grow overflow-hidden mt-2">
           <div className="flex items-center justify-between mb-3 text-gray-400">
             <div className="flex items-center gap-2">
-              <MessageSquare size={16} className="text-accent-purple" />
+              <MessageSquare size={16} className="text-accent-mono" />
               <h2 className="text-xs font-bold uppercase tracking-wider">Chat History ({chats.length})</h2>
             </div>
             <button
@@ -865,7 +865,7 @@ function MainApp() {
                     onClick={() => loadChatSession(chat.id)}
                     className={`p-3 text-left rounded-xl transition-all duration-200 border cursor-pointer group flex items-start justify-between gap-2 ${
                       isActive 
-                        ? 'bg-accent-purple/10 border-accent-purple/20 text-white' 
+                        ? 'bg-accent-mono/10 border-accent-mono/20 text-white' 
                         : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
                     }`}
                   >
@@ -900,7 +900,7 @@ function MainApp() {
             <div className="h-16 px-6 border-b border-border-color flex items-center justify-between backdrop-blur-md bg-bg-secondary/40 z-10 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <h2 className="text-md font-semibold text-white">Personal Assistant Agent</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-purple font-mono uppercase tracking-wider border border-accent- purple/10">
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-mono font-mono uppercase tracking-wider border border-accent-mono/10">
                   {config.provider === 'openai' ? 'OpenAI SDK' : 'Ollama API'}
                 </span>
               </div>
@@ -937,7 +937,7 @@ function MainApp() {
                     </div>
                     <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
                       <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
-                        <FileText size={14} className="text-accent-purple" />
+                        <FileText size={14} className="text-accent-mono" />
                         Notion Notes
                       </div>
                       <span className="text-xs text-gray-500 leading-relaxed">Read notes, search pages, and append content to your workspace.</span>
@@ -972,7 +972,7 @@ function MainApp() {
                     <div className="text-[10px] text-gray-500 font-semibold tracking-wider px-1">
                       {msg.role === 'user' ? 'YOU' : 'ASSISTANT'}
                     </div>
-                    <div className={`p-4 rounded-2xl border text-sm leading-relaxed ${msg.role === 'user' ? 'bg-accent-purple/10 border-accent-purple/20 text-white rounded-tr-none' : 'bg-bg-secondary/40 border-white/5 rounded-tl-none'}`}>
+                    <div className={`p-4 rounded-2xl border text-sm leading-relaxed ${msg.role === 'user' ? 'bg-accent-mono/10 border-accent-mono/20 text-white rounded-tr-none' : 'bg-bg-secondary/40 border-white/5 rounded-tl-none'}`}>
                       {msg.role === 'user' ? (
                         <p>{msg.content}</p>
                       ) : !msg.content && !msg.isError && isProcessing && idx === messages.length - 1 ? (
@@ -995,7 +995,7 @@ function MainApp() {
                     {/* Active loop status display */}
                     {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (
                       <div className="flex items-center gap-2 mt-2 px-1 text-[11px] text-gray-500 font-mono">
-                        {isProcessing && idx === messages.length - 1 && <span className="w-1.5 h-1.5 rounded-full bg-accent-purple animate-ping"></span>}
+                        {isProcessing && idx === messages.length - 1 && <span className="w-1.5 h-1.5 rounded-full bg-accent-mono animate-ping"></span>}
                         <div>
                           <strong className="text-gray-400 font-medium">Reasoning path:</strong>{' '}
                           {msg.logs.map((log, lIdx) => (
@@ -1016,7 +1016,7 @@ function MainApp() {
             {/* Input box area */}
             <div className="p-6 bg-gradient-to-t from-bg-primary via-bg-primary to-transparent flex-shrink-0">
               <div className="max-w-3xl m-auto">
-                <div className="flex items-end gap-2 p-2 bg-bg-secondary border border-border-color rounded-2xl shadow-md focus-within:border-accent-purple/50 transition-all">
+                <div className="flex items-end gap-2 p-2 bg-bg-secondary border border-border-color rounded-2xl shadow-md focus-within:border-accent-mono/50 transition-all">
                   <textarea
                     className="flex-grow bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm text-gray-200 placeholder-gray-500 resize-none max-h-36 py-2 px-3 leading-relaxed"
                     value={prompt}
@@ -1027,7 +1027,7 @@ function MainApp() {
                     rows={1}
                   />
                   <button 
-                    className="w-9 h-9 flex items-center justify-center bg-accent-purple hover:bg-accent-purple/80 text-white rounded-xl disabled:opacity-50 transition-all shadow-sm"
+                    className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm"
                     onClick={() => handleSend()}
                     disabled={!prompt.trim() || isProcessing}
                   >
@@ -1088,7 +1088,7 @@ function MainApp() {
               {/* Left Side: Revision History */}
               <div className="flex flex-col bg-white/5 border border-white/5 rounded-2xl p-5 overflow-hidden h-full">
                 <div className="flex items-center gap-2 mb-4 flex-shrink-0">
-                  <History className="w-4 h-4 text-accent-purple" />
+                  <History className="w-4 h-4 text-accent-mono" />
                   <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">Revision History</span>
                   <span className="ml-auto px-2 py-0.5 bg-white/5 rounded-full font-mono text-[10px] text-gray-400">
                     {systemPrompts.history?.length || 0}
@@ -1098,7 +1098,7 @@ function MainApp() {
                 <div className="flex-grow overflow-y-auto overflow-x-auto pr-1">
                   {isFetchingPrompt && systemPrompts.history?.length === 0 ? (
                     <div className="text-center text-xs text-gray-500 py-12 flex flex-col items-center gap-2">
-                      <RefreshCw size={16} className="animate-spin text-accent-purple" />
+                      <RefreshCw size={16} className="animate-spin text-accent-mono" />
                       Loading revisions...
                     </div>
                   ) : systemPrompts.history?.length === 0 ? (

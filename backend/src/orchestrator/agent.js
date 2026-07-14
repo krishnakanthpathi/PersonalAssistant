@@ -25,6 +25,15 @@ export class Agent {
 	 */
 	run = catchErrors(async (prompt, history = [], onStatusUpdate = null) => {
 		const requestId = metricsService.startRequest(prompt);
+		const logs = [];
+		const triggerStatusUpdate = (status) => {
+			if (status && !logs.includes(status)) {
+				logs.push(status);
+			}
+			if (onStatusUpdate) {
+				onStatusUpdate(status);
+			}
+		};
 
 		try {
 			// 1. Prepare message history and RAG search query
@@ -44,15 +53,9 @@ export class Agent {
 			let iteration = 0;
 
 			// 3. First call to LLM including the tools list
-			if (onStatusUpdate) {
-				onStatusUpdate('Thinking...');
-			}
+			triggerStatusUpdate('Thinking...');
 			const response = await callLLM(messages, true, tools, requestId);
 			let message = response.message;
-
-			if (message.content && onStatusUpdate) {
-				onStatusUpdate(message.content);
-			}
 
 			// Parse XML tool calls in the initial response
 			parseXmlToolCalls(message);
@@ -72,11 +75,9 @@ export class Agent {
 				for (const call of message.tool_calls) {
 					const toolName = call.function.name;
 					const toolArgs = parseToolArguments(call.function.arguments);
-					const toolContext = createToolContext(toolName, onStatusUpdate);
+					const toolContext = createToolContext(toolName, triggerStatusUpdate);
 
-					if (onStatusUpdate) {
-						onStatusUpdate(`Running: ${toolName}`);
-					}
+					triggerStatusUpdate(`Running: ${toolName}`);
 
 					const toolCallStart = Date.now();
 					const { success, result, error } = await executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart);
@@ -88,15 +89,9 @@ export class Agent {
 					}
 				}
 
-				if (onStatusUpdate) {
-					onStatusUpdate(`Thinking... (step ${iteration})`);
-				}
+				triggerStatusUpdate(`Thinking... (step ${iteration})`);
 				const nextResponse = await callLLM(messages, false, tools, requestId);
 				message = nextResponse.message;
-
-				if (message.content && onStatusUpdate) {
-					onStatusUpdate(message.content);
-				}
 
 				parseXmlToolCalls(message);
 			}
@@ -110,7 +105,7 @@ export class Agent {
 				});
 			}
 
-			return parsed;
+			return { ...parsed, logs };
 		} catch (error) {
 			metricsService.endRequest(requestId, false, error.message);
 			throw error;

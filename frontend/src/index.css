@@ -5,26 +5,26 @@
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   
-  --color-bg-primary: #090a0f;
-  --color-bg-secondary: #121420;
-  --color-bg-card: rgba(22, 26, 41, 0.65);
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #0a0a0a;
+  --color-bg-card: rgba(18, 18, 18, 0.65);
   --color-border-color: rgba(255, 255, 255, 0.08);
-  --color-border-glow: rgba(147, 51, 234, 0.3);
+  --color-border-glow: rgba(255, 255, 255, 0.15);
   
-  --color-accent-purple: #a855f7;
+  --color-accent-mono: #ffffff;
   --color-accent-blue: #3b82f6;
   --color-accent-emerald: #10b981;
-  --color-accent-gradient: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+  --color-accent-gradient: linear-gradient(135deg, #ffffff 0%, #737373 100%);
   
-  --shadow-glow: 0 0 16px rgba(168, 85, 247, 0.25);
+  --shadow-glow: 0 0 16px rgba(255, 255, 255, 0.12);
 }
 
 body {
   font-family: var(--font-sans);
   background-color: var(--color-bg-primary);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(255, 255, 255, 0.03) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(255, 255, 255, 0.01) 0px, transparent 50%);
   background-attachment: fixed;
   color: #f3f4f6;
 }
@@ -62,18 +62,18 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(168, 85, 247, 0.08);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   padding: 12px 16px;
   margin-top: 8px;
   max-width: 100%;
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.05);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.02);
   animation: fadeIn 0.3s ease-out;
 }
 
 .speech-icon {
-  color: var(--color-accent-purple);
+  color: var(--color-accent-mono);
   margin-top: 2px;
   flex-shrink: 0;
   animation: talkPulse 1.5s infinite ease-in-out;
@@ -81,7 +81,7 @@ body {
 
 .speech-text {
   font-size: 0.9rem;
-  color: #e9d5ff; /* light purple-grey */
+  color: #e5e5e5;
   font-style: italic;
   line-height: 1.4;
 }
@@ -142,19 +142,19 @@ body {
 @keyframes siri-breathing {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2), 0 0 40px rgba(255, 255, 255, 0.1);
   }
   50% {
     transform: scale(1.08);
-    box-shadow: 0 0 35px rgba(168, 85, 247, 0.7), 0 0 60px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 35px rgba(255, 255, 255, 0.4), 0 0 60px rgba(255, 255, 255, 0.2);
   }
 }
 
 .siri-orb-base {
-  background: linear-gradient(-45deg, #a855f7, #3b82f6, #06b6d4, #ec4899);
+  background: linear-gradient(-45deg, #ffffff, #e5e5e5, #404040, #0a0a0a);
   background-size: 400% 400%;
   animation: siri-gradient-rotate 6s ease infinite, siri-morph 4s ease-in-out infinite;
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 40px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.15), 0 0 40px rgba(255, 255, 255, 0.08);
   transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -166,13 +166,13 @@ body {
 .siri-orb-idle:hover {
   transform: scale(1.15);
   opacity: 1;
-  box-shadow: 0 0 30px rgba(168, 85, 247, 0.6), 0 0 50px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3), 0 0 50px rgba(255, 255, 255, 0.15);
 }
 
 .siri-orb-listening {
   transform: scale(1.2);
   animation: siri-gradient-rotate 3s ease infinite, siri-morph 2s ease-in-out infinite;
-  box-shadow: 0 0 40px rgba(6, 182, 212, 0.8), 0 0 60px rgba(236, 72, 153, 0.6);
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.5), 0 0 60px rgba(255, 255, 255, 0.25);
 }
 
 .siri-orb-thinking {
@@ -180,10 +180,10 @@ body {
 }
 
 .siri-orb-completed {
-  background: linear-gradient(-45deg, #10b981, #3b82f6, #10b981);
+  background: linear-gradient(-45deg, #ffffff, #a3a3a3, #ffffff);
   background-size: 200% 200%;
   animation: siri-gradient-rotate 4s ease infinite, siri-morph 5s ease-in-out infinite;
-  box-shadow: 0 0 30px rgba(16, 185, 129, 0.6), 0 0 50px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.4), 0 0 50px rgba(255, 255, 255, 0.2);
 }
 
 .siri-ripple-ring {
@@ -193,7 +193,7 @@ body {
   right: 0;
   bottom: 0;
   border-radius: 50%;
-  border: 2px solid rgba(168, 85, 247, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   pointer-events: none;
   opacity: 0;
 }

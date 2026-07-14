@@ -25,7 +25,7 @@ import {
 const getToolIcon = (name) => {
   const lowercase = name.toLowerCase();
   if (lowercase.includes('volume')) return <Volume2 className="w-4 h-4 text-accent-blue" />;
-  if (lowercase.includes('notion') || lowercase.includes('file')) return <FileText className="w-4 h-4 text-accent-purple" />;
+  if (lowercase.includes('notion') || lowercase.includes('file')) return <FileText className="w-4 h-4 text-accent-mono" />;
   if (lowercase.includes('calendar') || lowercase.includes('event')) return <Calendar className="w-4 h-4 text-accent-emerald" />;
   if (lowercase.includes('puppeteer') || lowercase.includes('browser') || lowercase.includes('web')) return <Globe className="w-4 h-4 text-blue-400" />;
   return <Wrench className="w-4 h-4 text-gray-400" />;
@@ -169,7 +169,7 @@ export default function AdminDashboard() {
         {/* Server & Config indicators */}
         <div className="hidden md:flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 border border-white/5 rounded-full text-gray-400">
-            <Cpu size={12} className="text-accent-purple" />
+            <Cpu size={12} className="text-accent-mono" />
             <span className="font-semibold">{config.provider.toUpperCase()} : {config.model}</span>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 border border-white/5 rounded-full text-gray-400">
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
         {/* Left Sidebar: Recent Request History List */}
         <aside className="w-80 flex-shrink-0 border-r border-border-color bg-bg-secondary/20 flex flex-col h-full overflow-hidden">
           <div className="p-4 border-b border-border-color bg-bg-secondary/10 flex items-center gap-2">
-            <History size={15} className="text-accent-purple" />
+            <History size={15} className="text-accent-mono" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Recent Requests ({metrics.requests?.length || 0})</h2>
           </div>
 
@@ -219,7 +219,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between text-[8px] text-gray-500">
                       <span>{new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                       {req.toolCalls?.length > 0 && (
-                        <span className="font-semibold text-accent-purple bg-accent-purple/5 px-1.5 py-0.5 rounded">
+                        <span className="font-semibold text-accent-mono bg-accent-mono/5 px-1.5 py-0.5 rounded">
                           {req.toolCalls.length} tool{req.toolCalls.length > 1 ? 's' : ''}
                         </span>
                       )}
@@ -274,7 +274,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
                   <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">RAG Retrieval</span>
-                  <span className="font-mono text-sm font-bold text-accent-purple">{selectedRequest.retrievalTime || 0} ms</span>
+                  <span className="font-mono text-sm font-bold text-accent-mono">{selectedRequest.retrievalTime || 0} ms</span>
                 </div>
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
                   <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">Tools Executed</span>
@@ -415,13 +415,13 @@ export default function AdminDashboard() {
                   <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Average Latency</span>
                     <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-3xl font-extrabold text-accent-purple">
+                      <span className="text-3xl font-extrabold text-accent-mono">
                         {metrics.aggregates?.averageTotalDuration ? `${(metrics.aggregates.averageTotalDuration / 1000).toFixed(1)}s` : '0.0s'}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
                       <span className="text-gray-400">Avg RAG Duration:</span>
-                      <span className="font-semibold text-accent-purple">{metrics.aggregates?.averageRetrievalTime || 0} ms</span>
+                      <span className="font-semibold text-accent-mono">{metrics.aggregates?.averageRetrievalTime || 0} ms</span>
                     </div>
                   </div>
 
@@ -536,7 +536,7 @@ export default function AdminDashboard() {
               <div className="flex flex-col gap-6 lg:sticky lg:top-6">
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col max-h-[calc(100vh-80px)] overflow-hidden">
                   <div className="flex items-center gap-2 mb-4 text-gray-200">
-                    <Wrench className="w-4 h-4 text-accent-purple" />
+                    <Wrench className="w-4 h-4 text-accent-mono" />
                     <span className="text-xs font-bold uppercase tracking-wider">Active Tools ({tools.length})</span>
                   </div>
                   <div className="flex flex-col gap-2 overflow-y-auto pr-1">
