@@ -82,6 +82,14 @@ export class MCPManager {
 			await youtubeClient.connect();
 			this.servers.set('youtube', youtubeClient);
 		}
+
+		// 6. Initialize Firecrawl Client if configured
+		if (config.mcpServers.firecrawl) {
+			const { FirecrawlClient } = await import('./clients/firecrawl.js');
+			const firecrawlClient = new FirecrawlClient(config.mcpServers.firecrawl);
+			await firecrawlClient.connect();
+			this.servers.set('firecrawl', firecrawlClient);
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**
