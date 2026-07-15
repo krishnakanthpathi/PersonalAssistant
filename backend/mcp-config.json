@@ -52,7 +52,7 @@
 				"@shinzolabs/gmail-mcp"
 			],
 			"env": {
-				"PORT": "3010"
+				"PORT": "0"
 			}
 		}
 	}

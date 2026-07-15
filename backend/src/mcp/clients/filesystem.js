@@ -1,5 +1,7 @@
+import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { ListRootsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../../utils/logger.js';
 
 export class FilesystemClient {
@@ -18,12 +20,30 @@ export class FilesystemClient {
 			env: { ...process.env, ...(this.config.env || {}) }
 		});
 
-		// 2. Initialize the JSON-RPC client
+		// 2. Initialize the JSON-RPC client with roots capability
 		this.client = new Client({
 			name: 'filesystem-client',
 			version: '1.0.0'
 		}, {
-			capabilities: {}
+			capabilities: {
+				roots: {
+					listChanged: true
+				}
+			}
+		});
+
+		// Register roots list request handler
+		this.client.setRequestHandler(ListRootsRequestSchema, async () => {
+			const paths = this.config.args.filter(arg => !arg.startsWith('-') && !arg.includes('server-filesystem'));
+			return {
+				roots: paths.map(p => {
+					const absolutePath = path.resolve(p);
+					return {
+						uri: `file://${absolutePath}`,
+						name: path.basename(absolutePath)
+					};
+				})
+			};
 		});
 
 		// 3. Connect to the child process via standard streams (stdio)
