@@ -77,10 +77,8 @@ export class Agent {
 					const toolArgs = parseToolArguments(call.function.arguments);
 					const toolContext = createToolContext(toolName, triggerStatusUpdate);
 
-					triggerStatusUpdate(`Running: ${toolName}`);
-
 					const toolCallStart = Date.now();
-					const { success, result, error } = await executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart);
+					const { success, result, error } = await executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart, triggerStatusUpdate);
 
 					if (success) {
 						appendToolSuccessMessage(messages, call, result, toolName);

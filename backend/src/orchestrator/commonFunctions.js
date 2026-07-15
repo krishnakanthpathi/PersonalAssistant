@@ -295,8 +295,11 @@ export function createToolContext(toolName, onStatusUpdate) {
 	});
 }
 
-export async function executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart) {
+export async function executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart, onStatusUpdate = null) {
 	logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
+	if (onStatusUpdate) {
+		onStatusUpdate(`Calling tool: ${toolName} (Args: ${JSON.stringify(toolArgs)})`);
+	}
 
 	const requestStartVal = metricsService.activeRequests.get(requestId)?.startTime || Date.now();
 	const latencyFromRequestStart = toolCallStart - requestStartVal;
@@ -305,6 +308,9 @@ export async function executeToolWithLogging(toolName, toolArgs, toolContext, re
 		const toolResult = await registry.callTool(toolName, toolArgs, toolContext);
 		const toolLatency = Date.now() - toolCallStart;
 		logger.info(`Tool "${toolName}" executed successfully. Result length: ${String(toolResult).length} characters.`);
+		if (onStatusUpdate) {
+			onStatusUpdate(`Tool ${toolName} succeeded (${toolLatency}ms)`);
+		}
 
 		metricsService.recordToolCall(requestId, {
 			name: toolName,
@@ -319,6 +325,9 @@ export async function executeToolWithLogging(toolName, toolArgs, toolContext, re
 	} catch (error) {
 		const toolLatency = Date.now() - toolCallStart;
 		logger.error(`Tool "${toolName}" failed to execute: ${error.message}`);
+		if (onStatusUpdate) {
+			onStatusUpdate(`Tool ${toolName} failed: ${error.message} (${toolLatency}ms)`);
+		}
 
 		metricsService.recordToolCall(requestId, {
 			name: toolName,
