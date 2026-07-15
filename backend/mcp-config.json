@@ -54,6 +54,13 @@
 			"env": {
 				"PORT": "0"
 			}
+		},
+		"github": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-github"
+			]
 		}
 	}
 }

@@ -102,6 +102,18 @@ export class MCPManager {
 				logger.warn(`Failed to initialize Gmail MCP client on boot: ${err.message}`);
 			}
 		}
+
+		// 8. Initialize GitHub Client if configured
+		if (config.mcpServers.github) {
+			try {
+				const { GithubClient } = await import('./clients/github.js');
+				const githubClient = new GithubClient(config.mcpServers.github);
+				await githubClient.connect();
+				this.servers.set('github', githubClient);
+			} catch (err) {
+				logger.warn(`Failed to initialize GitHub MCP client on boot: ${err.message}`);
+			}
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**
@@ -177,6 +189,12 @@ export class MCPManager {
 			const gmailClient = new GmailClient(serverConfig);
 			await gmailClient.connect();
 			this.servers.set(serverName, gmailClient);
+			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
+		} else if (serverName === 'github') {
+			const { GithubClient } = await import('./clients/github.js');
+			const githubClient = new GithubClient(serverConfig);
+			await githubClient.connect();
+			this.servers.set(serverName, githubClient);
 			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
 		}
 	}
