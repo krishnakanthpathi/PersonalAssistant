@@ -1092,6 +1092,7 @@ function MainApp() {
             <SystemPromptPanel
               systemPrompts={systemPrompts}
               isFetchingPrompt={isFetchingPrompt}
+              isSavingPrompt={isSavingPrompt}
               promptError={promptError}
               promptSuccessMessage={promptSuccessMessage}
               selectedHistoryPrompt={selectedHistoryPrompt}

@@ -13,6 +13,7 @@ import {
 export default function SystemPromptPanel({
   systemPrompts,
   isFetchingPrompt,
+  isSavingPrompt,
   promptError,
   promptSuccessMessage,
   selectedHistoryPrompt,
