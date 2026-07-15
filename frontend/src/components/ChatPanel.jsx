@@ -1,14 +1,14 @@
 import React, { useRef, useEffect } from 'react';
-import { 
-  Volume2, 
-  Sparkles, 
-  MessageSquare, 
-  FileText, 
-  Calendar, 
-  Globe, 
-  Mic, 
-  MicOff, 
-  Send 
+import {
+  Volume2,
+  Sparkles,
+  MessageSquare,
+  FileText,
+  Calendar,
+  Globe,
+  Mic,
+  MicOff,
+  Send
 } from 'lucide-react';
 
 export default function ChatPanel({
@@ -42,7 +42,7 @@ export default function ChatPanel({
   };
 
   const starterPrompts = [
-    { label: "🌐 Scrape Website", text: "Search the web for local weather and give me a summary" }
+    // { label: "🌐 Scrape Website", text: "Search the web for local weather and give me a summary" }
   ];
 
   return (
@@ -59,7 +59,7 @@ export default function ChatPanel({
               Interact with your system volume, Notion pages, local file system, Google calendar, and Gmail.
               The assistant reasoning loop will call local and remote tools dynamically to satisfy your prompt.
             </p>
-            
+
             <div className="grid grid-cols-2 gap-4 mb-8">
               <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
                 <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
@@ -93,9 +93,9 @@ export default function ChatPanel({
 
             <div className="flex flex-wrap gap-2 justify-center">
               {starterPrompts.map((p, i) => (
-                <button 
-                  key={i} 
-                  className="px-3.5 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs font-medium transition-all border border-white/5 hover:border-white/10 text-gray-300" 
+                <button
+                  key={i}
+                  className="px-3.5 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs font-medium transition-all border border-white/5 hover:border-white/10 text-gray-300"
                   onClick={() => handleSend(p.text)}
                 >
                   {p.label}
@@ -109,7 +109,7 @@ export default function ChatPanel({
               <div className="text-[10px] text-gray-500 font-semibold tracking-wider px-1 flex items-center justify-between w-full gap-2">
                 <span>{msg.role === 'user' ? 'YOU' : 'ASSISTANT'}</span>
                 {msg.role === 'assistant' && (
-                  <button 
+                  <button
                     onClick={() => speakText(msg.content, idx)}
                     className={`p-1 rounded-md transition-all ${currentlySpeakingId === idx ? 'text-accent-blue bg-accent-blue/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
                     title={currentlySpeakingId === idx ? "Stop speaking" : "Read response out loud"}
@@ -130,25 +130,24 @@ export default function ChatPanel({
                   <div className="markdown-body" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) || (msg.isError ? 'An error occurred' : 'Thinking...') }} />
                 )}
               </div>
-              
+
               {msg.role === 'assistant' && msg.speech && (
-                <button 
+                <button
                   onClick={() => speakText(msg.speech, `bubble-${idx}`)}
-                  className={`speech-bubble-container text-left transition-all hover:bg-white/10 cursor-pointer outline-none ${
-                    currentlySpeakingId === `bubble-${idx}` 
-                      ? 'border-accent-blue/40 bg-accent-blue/[0.04] shadow-[0_0_12px_rgba(59,130,246,0.15)]' 
+                  className={`speech-bubble-container text-left transition-all hover:bg-white/10 cursor-pointer outline-none ${currentlySpeakingId === `bubble-${idx}`
+                      ? 'border-accent-blue/40 bg-accent-blue/[0.04] shadow-[0_0_12px_rgba(59,130,246,0.15)]'
                       : ''
-                  }`}
+                    }`}
                   title={currentlySpeakingId === `bubble-${idx}` ? "Click to stop reading" : "Click to read out loud"}
                 >
-                  <Volume2 
-                    className={`speech-icon ${currentlySpeakingId === `bubble-${idx}` ? 'text-accent-blue animate-pulse' : 'text-gray-400'}`} 
-                    size={14} 
+                  <Volume2
+                    className={`speech-icon ${currentlySpeakingId === `bubble-${idx}` ? 'text-accent-blue animate-pulse' : 'text-gray-400'}`}
+                    size={14}
                   />
                   <span className="speech-text">"{msg.speech}"</span>
                 </button>
               )}
-              
+
               {/* Active loop status display */}
               {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (
                 <div className="flex items-center gap-2 mt-2 px-1 text-[11px] text-gray-500 font-mono">
@@ -193,19 +192,18 @@ export default function ChatPanel({
               disabled={isProcessing}
               rows={1}
             />
-            <button 
-              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-sm shrink-0 ${
-                isListening 
-                  ? 'bg-red-500 hover:bg-red-600 text-white mic-active-glow' 
+            <button
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-sm shrink-0 ${isListening
+                  ? 'bg-red-500 hover:bg-red-600 text-white mic-active-glow'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5'
-              }`}
+                }`}
               onClick={toggleListening}
               disabled={isProcessing}
               title="Toggle speech recognition (Double Shift or Cmd+Shift+S)"
             >
               {isListening ? <MicOff size={16} /> : <Mic size={16} />}
             </button>
-            <button 
+            <button
               className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm shrink-0"
               onClick={() => handleSend()}
               disabled={!prompt.trim() || isProcessing}
@@ -216,10 +214,10 @@ export default function ChatPanel({
           {messages.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">
               {starterPrompts.map((p, i) => (
-                <button 
-                  key={i} 
-                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-full text-xs transition-all text-gray-400 hover:text-white" 
-                  onClick={() => handleSend(p.text)} 
+                <button
+                  key={i}
+                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-full text-xs transition-all text-gray-400 hover:text-white"
+                  onClick={() => handleSend(p.text)}
                   disabled={isProcessing}
                 >
                   {p.label}
