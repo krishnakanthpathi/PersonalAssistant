@@ -8,9 +8,22 @@ import {
   Globe,
   Mic,
   MicOff,
-  Send,
-  Terminal
+  Send
 } from 'lucide-react';
+
+const getToolNameFromLog = (log) => {
+  if (!log) return null;
+  // Match "Calling tool: tool_name"
+  const callMatch = log.match(/Calling tool:\s*([a-zA-Z0-9_-]+)/i);
+  if (callMatch) return callMatch[1];
+  // Match "Tool tool_name succeeded/failed"
+  const resultMatch = log.match(/Tool\s*([a-zA-Z0-9_-]+)\s*(succeeded|failed)/i);
+  if (resultMatch) return resultMatch[1];
+  // Match "Running: tool_name"
+  const runningMatch = log.match(/Running:\s*([a-zA-Z0-9_-]+)/i);
+  if (runningMatch) return runningMatch[1];
+  return null;
+};
 
 export default function ChatPanel({
   messages,
@@ -154,7 +167,9 @@ export default function ChatPanel({
                 ) : !msg.content && !msg.isError && isProcessing && idx === messages.length - 1 ? (
                   <div className="flex items-center gap-3">
                     <span className="w-2.5 h-2.5 rounded-full bg-accent-blue animate-pulse shadow-[0_0_8px_var(--color-accent-blue)]"></span>
-                    <span className="text-xs text-gray-400 font-mono">{currentStatusLog || 'Thinking...'}</span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      {getToolNameFromLog(currentStatusLog) ? `Running: ${getToolNameFromLog(currentStatusLog)}` : (currentStatusLog || 'Thinking...')}
+                    </span>
                   </div>
                 ) : (
                   <div className="markdown-body min-w-0" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) || (msg.isError ? 'An error occurred' : 'Thinking...') }} />
@@ -179,43 +194,28 @@ export default function ChatPanel({
               )}
 
               {/* Active loop status display */}
-              {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (
-                <div className="mt-2.5 max-w-full">
-                  <details className="text-[11px] font-mono text-gray-400 border border-white/10 rounded-xl bg-white/[0.02] overflow-hidden group">
-                    <summary className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-white/[0.04] select-none transition-colors">
-                      <div className="flex items-center gap-2">
-                        <Terminal className="w-3.5 h-3.5 text-accent-blue" />
-                        <span className="font-semibold text-gray-300">Tool Execution Logs ({msg.logs.length} events)</span>
-                      </div>
-                      <span className="text-[10px] text-gray-500 group-open:rotate-180 transition-transform">▼</span>
-                    </summary>
-                    <div className="px-3 pb-3 pt-2 border-t border-white/5 flex flex-col gap-2 max-h-60 overflow-y-auto bg-black/20">
-                      {msg.logs.map((log, lIdx) => {
-                        let badgeColor = 'bg-white/5 text-gray-400';
-                        let textColor = 'text-gray-300';
-                        
-                        if (log.includes('succeeded')) {
-                          badgeColor = 'bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20';
-                        } else if (log.includes('failed')) {
-                          badgeColor = 'bg-red-500/10 text-red-400 border border-red-500/20';
-                          textColor = 'text-red-300';
-                        } else if (log.startsWith('Calling tool:')) {
-                          badgeColor = 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20';
-                        }
-                        
-                        return (
-                          <div key={lIdx} className="flex gap-2 items-start leading-relaxed border-b border-white/[0.02] pb-1.5 last:border-b-0 last:pb-0">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0 mt-0.5 border ${badgeColor}`}>
-                              {log.startsWith('Calling tool:') ? 'Call' : log.includes('succeeded') ? 'Success' : log.includes('failed') ? 'Failure' : 'Info'}
-                            </span>
-                            <span className={`break-all ${textColor}`}>{log}</span>
-                          </div>
-                        );
-                      })}
+              {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (() => {
+                const toolNames = msg.logs
+                  .map(getToolNameFromLog)
+                  .filter(Boolean)
+                  .filter((val, idx, arr) => arr.indexOf(val) === idx);
+                
+                if (toolNames.length === 0) return null;
+
+                return (
+                  <div className="flex items-start gap-2 mt-2 px-1 text-[11px] text-gray-500 font-mono max-w-full">
+                    {isProcessing && idx === messages.length - 1 && <span className="w-1.5 h-1.5 rounded-full bg-accent-mono animate-ping mt-1 shrink-0"></span>}
+                    <div className="min-w-0 flex-wrap">
+                      <strong className="text-gray-400 font-medium">Reasoning path:</strong>{' '}
+                      {toolNames.map((name, nIdx) => (
+                        <span key={nIdx}>
+                          {nIdx > 0 && ' → '}<span className="text-accent-blue font-bold break-words">{name}</span>
+                        </span>
+                      ))}
                     </div>
-                  </details>
-                </div>
-              )}
+                  </div>
+                );
+              })()}
             </div>
           ))
         )}

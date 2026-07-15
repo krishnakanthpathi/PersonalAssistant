@@ -8,7 +8,7 @@ import { logger } from '../utils/logger.js';
 
 export class Embedder {
 	constructor() {
-		this.provider = (env.LLM_PROVIDER === 'openai' || (env.LLM_PROVIDER === 'grok' && env.OPENAI_API_KEY)) ? 'openai' : 'ollama';
+		this.provider = env.EMBEDDING_PROVIDER || ((env.LLM_PROVIDER === 'openai' || (env.LLM_PROVIDER === 'grok' && env.OPENAI_API_KEY)) ? 'openai' : 'ollama');
 		if (this.provider === 'openai') {
 			this.openai = new OpenAI({
 				apiKey: env.OPENAI_API_KEY,
@@ -23,23 +23,31 @@ export class Embedder {
 		}
 		try {
 			if (this.provider === 'openai') {
-				const response = await this.openai.embeddings.create({
-					model: env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
-					input: text
-				});
-				return response.data[0].embedding;
+				try {
+					const response = await this.openai.embeddings.create({
+						model: env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+						input: text
+					});
+					return response.data[0].embedding;
+				} catch (openaiError) {
+					logger.warn(`OpenAI embedding failed, falling back to Ollama: ${openaiError.message}`);
+					return await this.embedOllama(text);
+				}
 			} else {
-				// Ollama embeddings API
-				const response = await axios.post(`${env.OLLAMA_URL}/api/embeddings`, {
-					model: env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text',
-					prompt: text
-				});
-				return response.data.embedding;
+				return await this.embedOllama(text);
 			}
 		} catch (error) {
 			logger.error(`Embedding generation failed: ${error.message}`);
 			throw error;
 		}
+	}
+
+	async embedOllama(text) {
+		const response = await axios.post(`${env.OLLAMA_URL}/api/embeddings`, {
+			model: env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text',
+			prompt: text
+		});
+		return response.data.embedding;
 	}
 
 	async embedBatch(texts) {
@@ -48,25 +56,33 @@ export class Embedder {
 		}
 		try {
 			if (this.provider === 'openai') {
-				const response = await this.openai.embeddings.create({
-					model: env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
-					input: texts
-				});
-				return response.data.map(d => d.embedding);
+				try {
+					const response = await this.openai.embeddings.create({
+						model: env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+						input: texts
+					});
+					return response.data.map(d => d.embedding);
+				} catch (openaiError) {
+					logger.warn(`OpenAI batch embedding failed, falling back to Ollama: ${openaiError.message}`);
+					return await this.embedBatchOllama(texts);
+				}
 			} else {
-				// Ollama parallel requests for batch embedding
-				const promises = texts.map(text =>
-					axios.post(`${env.OLLAMA_URL}/api/embeddings`, {
-						model: env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text',
-						prompt: text
-					}).then(res => res.data.embedding)
-				);
-				return await Promise.all(promises);
+				return await this.embedBatchOllama(texts);
 			}
 
 		} catch (error) {
 			logger.error(`Batch embedding generation failed: ${error.message}`);
 			throw error;
 		}
+	}
+
+	async embedBatchOllama(texts) {
+		const promises = texts.map(text =>
+			axios.post(`${env.OLLAMA_URL}/api/embeddings`, {
+				model: env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text',
+				prompt: text
+			}).then(res => res.data.embedding)
+		);
+		return await Promise.all(promises);
 	}
 }

@@ -12,6 +12,7 @@ export const env = {
 
 	// llm provider
 	LLM_PROVIDER: process.env.LLM_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'ollama'),
+	EMBEDDING_PROVIDER: process.env.EMBEDDING_PROVIDER,
 
 	// ollama
 	OLLAMA_URL: process.env.OLLAMA_URL || 'http://localhost:11434',
