@@ -1,13 +1,31 @@
 /**
  * Native app controls via osascript
  */
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 
 export function runAppleScript(script) {
 	return new Promise((resolve, reject) => {
-		exec(`osascript -e "${script.replace(/"/g, '\\"')}"`, (err, stdout, stderr) => {
-			if (err) reject(err);
-			else resolve(stdout.trim());
+		const child = spawn('osascript', []);
+		let stdout = '';
+		let stderr = '';
+
+		child.stdout.on('data', (data) => {
+			stdout += data.toString();
 		});
+
+		child.stderr.on('data', (data) => {
+			stderr += data.toString();
+		});
+
+		child.on('close', (code) => {
+			if (code !== 0) {
+				reject(new Error(stderr.trim() || `osascript exited with code ${code}`));
+			} else {
+				resolve(stdout.trim());
+			}
+		});
+
+		child.stdin.write(script);
+		child.stdin.end();
 	});
 }

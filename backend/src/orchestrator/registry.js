@@ -25,6 +25,7 @@ import { moveMouseTool } from '../tools/mac/moveMouseTool.js';
 import { mouseClickTool } from '../tools/mac/mouseClick.js';
 // import { annotateScreenTool } from '../tools/mac/annotateScreen.js';
 import { timerTool } from '../tools/mac/timer.js';
+import { remindersTool } from '../tools/mac/reminders.js';
 import { rdsQueryTool } from '../tools/rdsQuery.js';
 import { getAccessibilityTreeTool } from '../tools/mac/getAccessibilityTree.js';
 
@@ -69,6 +70,7 @@ class ToolRegistry {
 		this.tools.set(mouseClickTool.definition.name, mouseClickTool);
 		// this.tools.set(annotateScreenTool.definition.name, annotateScreenTool);
 		this.tools.set(timerTool.definition.name, timerTool);
+		this.tools.set(remindersTool.definition.name, remindersTool);
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
 		this.tools.set(getAccessibilityTreeTool.definition.name, getAccessibilityTreeTool);
 	}
