@@ -39,7 +39,9 @@ export const getGoogleAuthUrl = async (req, res) => {
 			prompt: 'consent',
 			scope: [
 				'https://www.googleapis.com/auth/calendar',
-				'https://www.googleapis.com/auth/userinfo.email'
+				'https://www.googleapis.com/auth/userinfo.email',
+				'https://www.googleapis.com/auth/gmail.readonly',
+				'https://www.googleapis.com/auth/gmail.compose'
 			]
 		});
 		res.json({ success: true, url });
@@ -87,6 +89,13 @@ export const handleGoogleCallback = async (req, res) => {
 			await mcpManager.reconnectServer('google-calendar');
 		} catch (err) {
 			logger.error(`Failed to automatically reconnect Google Calendar client: ${err.message}`);
+		}
+
+		// 3b. Restart the Gmail MCP server to pick up new tokens
+		try {
+			await mcpManager.reconnectServer('gmail');
+		} catch (err) {
+			logger.error(`Failed to automatically reconnect Gmail client: ${err.message}`);
 		}
 
 		// 4. Redirect user back to React frontend dashboard
@@ -149,6 +158,13 @@ export const disconnectGoogle = async (req, res) => {
 			await mcpManager.disconnectServer('google-calendar');
 		} catch (err) {
 			logger.error(`Failed to gracefully disconnect Google Calendar: ${err.message}`);
+		}
+
+		// Shutdown/Disconnect the Gmail MCP client
+		try {
+			await mcpManager.disconnectServer('gmail');
+		} catch (err) {
+			logger.error(`Failed to gracefully disconnect Gmail: ${err.message}`);
 		}
 
 		res.json({ success: true });

@@ -54,9 +54,15 @@ export async function connectToMongoDB() {
 }
 
 async function cleanup() {
-	if (client) {
-		await client.close();
-		logger.info('MongoDB client connection closed.');
+	try {
+		if (client) {
+			await client.close();
+			logger.info('MongoDB client connection closed.');
+		}
+	} catch (err) {
+		logger.error(`Error during MongoDB cleanup: ${err.message}`);
+	} finally {
+		process.exit(0);
 	}
 }
 

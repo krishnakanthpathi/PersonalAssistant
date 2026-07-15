@@ -54,6 +54,7 @@ body {
 .markdown-body li { @apply my-1; }
 .markdown-body code { @apply bg-white/5 border border-white/10 rounded px-1.5 py-0.5 font-mono text-sm text-accent-blue; }
 .markdown-body pre { @apply bg-black/40 border border-white/5 rounded-lg p-3 my-3 font-mono text-sm overflow-x-auto text-gray-200; }
+.markdown-body blockquote { @apply border border-white/10 bg-white/[0.02] p-4 my-4 rounded-xl text-gray-200 font-sans; }
 .markdown-body strong { @apply font-semibold text-white; }
 .markdown-body br { @apply mb-1; }
 

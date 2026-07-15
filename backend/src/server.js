@@ -45,6 +45,7 @@ async function startServer() {
 	});
 }
 
+// Start the personal assistant express backend server
 startServer().catch(err => {
 	logger.error(`Failed to start server: ${err.message}`);
 });

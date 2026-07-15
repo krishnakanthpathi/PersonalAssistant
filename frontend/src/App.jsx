@@ -189,6 +189,11 @@ const parseMarkdown = (text) => {
   
   // Also parse standard markdown tables globally (fallback)
   html = parseTables(html);
+
+  // Blockquotes (quote blocks starting with >)
+  html = html.replace(/^\s*&gt;\s+(.+)$/gm, '<blockquote>$1</blockquote>');
+  html = html.replace(/<\/blockquote>\s*<blockquote>/g, '<br/>');
+  html = html.replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, '<blockquote class="border border-white/10 bg-white/[0.02] p-4 my-4 rounded-xl text-gray-200 font-sans">$1</blockquote>');
     
   // Headers
   html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
@@ -262,7 +267,8 @@ const parseMarkdown = (text) => {
       trimmed.startsWith('<h2>') || 
       trimmed.startsWith('<h1>') ||
       trimmed.startsWith('<div') ||
-      trimmed.startsWith('<table')
+      trimmed.startsWith('<table') ||
+      trimmed.startsWith('<blockquote')
     ) {
       return trimmed;
     }
@@ -1018,7 +1024,7 @@ function MainApp() {
               onClick={handleConnectGoogle}
               className="w-full mt-1 py-1.5 px-3 bg-accent-gradient hover:opacity-90 text-[11px] font-semibold text-white rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
             >
-              <Calendar size={12} /> Connect Google
+              <Sparkles size={12} /> Connect Google Account
             </button>
           )}
         </div>
@@ -1172,8 +1178,8 @@ function MainApp() {
                   </div>
                   <h2 className="text-2xl font-bold text-white tracking-tight mb-2">Personal AI Assistant</h2>
                   <p className="text-sm text-gray-400 leading-relaxed mb-8">
-                    Interact with your system volume, Notion pages, local file system, and Google calendar.
-                    The assistant reasoning loop will call local tools dynamically to satisfy your prompt.
+                    Interact with your system volume, Notion pages, local file system, Google calendar, and Gmail.
+                    The assistant reasoning loop will call local and remote tools dynamically to satisfy your prompt.
                   </p>
                   
                   <div className="grid grid-cols-2 gap-4 mb-8">
@@ -1194,9 +1200,9 @@ function MainApp() {
                     <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
                       <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
                         <Calendar size={14} className="text-accent-emerald" />
-                        Google Calendar
+                        Google Apps
                       </div>
-                      <span className="text-xs text-gray-500 leading-relaxed">View meetings, create events, and manage calendars.</span>
+                      <span className="text-xs text-gray-500 leading-relaxed">Manage Google Calendar events and read/compose Gmail messages.</span>
                     </div>
                     <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
                       <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">

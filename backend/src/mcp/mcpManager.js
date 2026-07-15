@@ -90,6 +90,18 @@ export class MCPManager {
 			await firecrawlClient.connect();
 			this.servers.set('firecrawl', firecrawlClient);
 		}
+
+		// 7. Initialize Gmail Client if configured
+		if (config.mcpServers.gmail) {
+			try {
+				const { GmailClient } = await import('./clients/gmail.js');
+				const gmailClient = new GmailClient(config.mcpServers.gmail);
+				await gmailClient.connect();
+				this.servers.set('gmail', gmailClient);
+			} catch (err) {
+				logger.warn(`Failed to initialize Gmail MCP client on boot: ${err.message}`);
+			}
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**
@@ -159,6 +171,12 @@ export class MCPManager {
 			const calendarClient = new GoogleCalendarClient(serverConfig);
 			await calendarClient.connect();
 			this.servers.set(serverName, calendarClient);
+			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
+		} else if (serverName === 'gmail') {
+			const { GmailClient } = await import('./clients/gmail.js');
+			const gmailClient = new GmailClient(serverConfig);
+			await gmailClient.connect();
+			this.servers.set(serverName, gmailClient);
 			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
 		}
 	}
