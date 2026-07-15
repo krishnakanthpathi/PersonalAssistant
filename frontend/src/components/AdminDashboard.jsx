@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   History, 
@@ -33,6 +33,13 @@ const getToolIcon = (name) => {
 
 export default function AdminDashboard() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    const previousTab = location.state?.fromTab || 'chat';
+    navigate('/', { state: { activeTab: previousTab } });
+  };
+
   const [metrics, setMetrics] = useState({
     requests: [],
     aggregates: {
@@ -153,12 +160,12 @@ export default function AdminDashboard() {
       {/* Header */}
       <header className="flex-shrink-0 h-16 border-b border-border-color bg-bg-secondary/40 backdrop-blur-md px-6 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
-          <Link 
-            to="/" 
+          <button 
+            onClick={handleBack}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition"
           >
             <ArrowLeft size={14} /> Back to Chat
-          </Link>
+          </button>
           <div className="h-4 w-px bg-white/10" />
           <div className="flex items-center gap-2">
             <LayoutDashboard className="w-5 h-5 text-accent-blue" />

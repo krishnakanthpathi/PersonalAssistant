@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Sparkles, 
   Wrench, 
@@ -24,6 +24,10 @@ import {
   MicOff
 } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard.jsx';
+import Sidebar from './components/Sidebar.jsx';
+import ChatPanel from './components/ChatPanel.jsx';
+import SystemPromptPanel from './components/SystemPromptPanel.jsx';
+import SettingsPanel from './components/SettingsPanel.jsx';
 
 // Helper to parse markdown tables into premium HTML tables
 const parseTables = (text) => {
@@ -288,7 +292,16 @@ const getToolIcon = (name) => {
 
 function MainApp() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'system-prompt'
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'system-prompt' | 'settings'
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+      // Clear navigation state to prevent restoring it on future navigations
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -987,236 +1000,40 @@ function MainApp() {
     startNewChat();
   };
 
-  // Preset prompts
-  const starterPrompts = [
-    { label: "🔊 Set volume to 50%", text: "Set volume to 50%" },
-    { label: "📝 Create a Notion Note", text: "Create a note in Notion with the title 'Quick Ideas' and contents '1. Build React Web App\n2. Add OpenAI integration'" },
-    { label: "📅 List Calendar Events", text: "What do I have on my calendar for today?" },
-    { label: "🌐 Scrape Website", text: "Search the web for local weather and give me a summary" }
-  ];
-
   return (
     <div className="flex w-screen h-screen bg-bg-primary overflow-hidden text-gray-200">
-      {/* Sidebar Panel */}
-      <aside className="w-80 bg-bg-secondary border-r border-border-color flex flex-col p-6 h-full flex-shrink-0">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-accent-gradient flex items-center justify-center shadow-glow">
-            <Sparkles className="text-white w-[22px] h-[22px]" />
-          </div>
-          <h1 className="text-xl font-bold bg-accent-gradient bg-clip-text text-transparent tracking-tight">Antigravity Hub</h1>
-        </div>
-
-        {/* Sidebar Navigation Tabs */}
-        <div className="flex flex-col gap-1 mb-6">
-          <button 
-            onClick={() => setActiveTab('chat')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'chat' ? 'bg-accent-mono/10 text-accent-mono border border-accent-mono/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            Chat Assistant
-          </button>
-          <Link 
-            to="/admin"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            Admin Dashboard
-          </Link>
-          <button 
-            onClick={() => {
-              setActiveTab('system-prompt');
-              fetchSystemPrompt();
-            }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'system-prompt' ? 'bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
-          >
-            <Settings className="w-4 h-4" />
-            System Prompt
-          </button>
-          <button 
-            onClick={() => {
-              setActiveTab('llm-settings');
-            }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'llm-settings' ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
-          >
-            <Wrench className="w-4 h-4" />
-            LLM Settings
-          </button>
-        </div>
-
-        {/* Status indicator Card */}
-        <div className="bg-bg-card border border-border-color rounded-2xl p-4 mb-6 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between mb-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
-            System status
-            <span className="flex items-center gap-1.5 font-bold normal-case text-gray-200">
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-accent-emerald shadow-[0_0_10px_var(--color-accent-emerald)] animate-pulse' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`}></span>
-              {isConnected ? 'Online' : 'Offline'}
-            </span>
-          </div>
-          <div className="flex flex-col gap-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">LLM Provider:</span>
-              <span className="font-mono text-gray-200 font-semibold uppercase">{config.provider}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Active Model:</span>
-              <span className="font-mono text-gray-200 font-semibold text-[10px] max-w-[150px] truncate" title={config.model}>{config.model}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Port:</span>
-              <span className="font-mono text-gray-200 font-semibold">{config.port}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Google OAuth Connection Card */}
-        <div className="bg-bg-card border border-border-color rounded-2xl p-4 mb-6 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between mb-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
-            Google Account
-            <span className="flex items-center gap-1.5 font-bold normal-case text-gray-200">
-              <span className={`w-2 h-2 rounded-full ${googleConnected ? 'bg-accent-emerald shadow-[0_0_10px_var(--color-accent-emerald)]' : 'bg-gray-500'}`}></span>
-              {googleConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
-          {googleConnected ? (
-            <div className="flex flex-col gap-2">
-              <div className="text-[10px] text-gray-400 truncate" title={googleEmail}>
-                {googleEmail}
-              </div>
-              <button
-                onClick={handleDisconnectGoogle}
-                className="w-full mt-1 py-1.5 px-2 border border-red-500/20 hover:border-red-500 text-[11px] font-semibold text-red-400 hover:text-red-300 rounded-lg hover:bg-red-500/5 transition-all text-center"
-              >
-                Disconnect Google
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleConnectGoogle}
-              className="w-full mt-1 py-1.5 px-3 bg-accent-gradient hover:opacity-90 text-[11px] font-semibold text-white rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
-            >
-              <Sparkles size={12} /> Connect Google Account
-            </button>
-          )}
-        </div>
-
-        {/* Background Tasks Card */}
-        {mcpTasks && mcpTasks.length > 0 && (
-          <div className="bg-bg-card border border-border-color rounded-2xl p-4 mb-6 shadow-sm backdrop-blur-md">
-            <div className="flex items-center gap-2 mb-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
-              {mcpTasks.some(t => t.status === 'running' || t.status === 'initiating') ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-mono" />
-              ) : mcpTasks.every(t => t.status === 'finished') ? (
-                <CheckCircle className="w-3.5 h-3.5 text-accent-emerald" />
-              ) : (
-                <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-              )}
-              MCP Tasks
-            </div>
-            <div className="flex flex-col gap-3">
-              {mcpTasks.map(task => {
-                const pct = task.total > 0 ? Math.round((task.progress / task.total) * 100) : null;
-                const isRunning = task.status === 'running' || task.status === 'initiating';
-                const isFinished = task.status === 'finished';
-                const isFailed = task.status === 'failed';
-
-                return (
-                  <div key={task.taskId} className="flex flex-col gap-1.5 text-xs">
-                    <div className="flex items-center justify-between font-medium">
-                      <div className="flex items-center gap-1.5 min-w-0 flex-grow">
-                        {isRunning && <Loader2 className="w-3 h-3 animate-spin text-accent-mono shrink-0" />}
-                        {isFinished && <CheckCircle className="w-3 h-3 text-accent-emerald shrink-0" />}
-                        {isFailed && <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />}
-                        <span className="text-gray-300 truncate" title={task.message}>
-                          {task.message || task.taskId}
-                        </span>
-                      </div>
-                      <span className="text-gray-400 font-mono text-[10px] shrink-0 ml-2">
-                        {pct !== null && isRunning ? `${pct}%` : task.status}
-                      </span>
-                    </div>
-                    {pct !== null && isRunning && (
-                      <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
-                        <div 
-                          className="bg-accent-mono h-full transition-all duration-300 rounded-full" 
-                          style={{ width: `${pct}%` }}
-                        ></div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Chat History */}
-        <div className="flex flex-col flex-grow overflow-hidden mt-2">
-          <div className="flex items-center justify-between mb-3 text-gray-400">
-            <div className="flex items-center gap-2">
-              <MessageSquare size={16} className="text-accent-mono" />
-              <h2 className="text-xs font-bold uppercase tracking-wider">Chat History ({chats.length})</h2>
-            </div>
-            <button
-              onClick={startNewChat}
-              disabled={isProcessing}
-              className="px-2 py-1 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all text-[11px] font-semibold flex items-center gap-1 border border-white/5 bg-white/[0.02]"
-            >
-              + New Chat
-            </button>
-          </div>
-          <div className="flex flex-col gap-2 overflow-y-auto pr-1 flex-grow">
-            {chats.length === 0 ? (
-              <div className="text-gray-500 text-xs text-center py-4 border border-dashed border-white/5 rounded-xl">
-                No chats recorded yet.
-              </div>
-            ) : (
-              chats.map((chat) => {
-                const isActive = currentSessionId === chat.id;
-                return (
-                  <div
-                    key={chat.id}
-                    onClick={() => loadChatSession(chat.id)}
-                    className={`p-3 text-left rounded-xl transition-all duration-200 border cursor-pointer group flex items-start justify-between gap-2 ${
-                      isActive 
-                        ? 'bg-accent-mono/10 border-accent-mono/20 text-white' 
-                        : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-grow">
-                      <p className="font-medium text-xs truncate text-gray-200" title={chat.title || 'Untitled Chat'}>{chat.title || 'Untitled Chat'}</p>
-                      <span className="text-[9px] text-gray-500 font-mono">
-                        {new Date(chat.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(chat.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <button
-                      onClick={(e) => handleDeleteChat(e, chat.id)}
-                      disabled={isProcessing}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-all shrink-0 self-center"
-                      title="Delete chat session"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </aside>
+      {/* Sidebar Component */}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isConnected={isConnected}
+        config={config}
+        mcpTasks={mcpTasks}
+        chats={chats}
+        currentSessionId={currentSessionId}
+        isProcessing={isProcessing}
+        startNewChat={startNewChat}
+        loadChatSession={loadChatSession}
+        handleDeleteChat={handleDeleteChat}
+        fetchSystemPrompt={fetchSystemPrompt}
+      />
 
       {/* Main Panel Content */}
       <main className="flex-grow flex flex-col h-full bg-transparent overflow-hidden">
-        {activeTab === 'chat' ? (
-          /* CHAT INTERFACE */
-          <div className="flex flex-col h-full overflow-hidden">
-            {/* Chat header area */}
-            <div className="h-16 px-6 border-b border-border-color flex items-center justify-between backdrop-blur-md bg-bg-secondary/40 z-10 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <h2 className="text-md font-semibold text-white">Personal Assistant Agent</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-mono font-mono uppercase tracking-wider border border-accent-mono/10">
-                  {config.provider === 'openai' ? 'OpenAI SDK' : config.provider === 'grok' ? 'Grok API' : 'Ollama API'}
-                </span>
-              </div>
+        {/* Global Top Bar Header */}
+        <div className="h-16 px-6 border-b border-border-color flex items-center justify-between backdrop-blur-md bg-bg-secondary/40 z-10 flex-shrink-0">
+          <div className="flex items-center gap-3 select-none">
+            <h2 className="text-md font-semibold text-white">
+              {activeTab === 'chat' ? 'Chat Assistant' : activeTab === 'system-prompt' ? 'System Prompt Manager' : 'Settings'}
+            </h2>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-mono font-mono uppercase tracking-wider border border-accent-mono/10">
+              {config.provider === 'openai' ? 'OpenAI SDK' : config.provider === 'grok' ? 'Grok API' : 'Ollama API'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Context-specific Top Bar buttons */}
+            {activeTab === 'chat' && (
               <div className="flex gap-2">
                 <button 
                   onClick={() => setAutoTtsEnabled(prev => !prev)}
@@ -1237,603 +1054,73 @@ function MainApp() {
                   <Trash2 size={12} /> Clear Chat
                 </button>
               </div>
-            </div>
-
-            {/* Messages list */}
-            <div className="flex-grow overflow-y-auto px-6 py-6 flex flex-col gap-6">
-              {messages.length === 0 ? (
-                <div className="m-auto max-w-xl text-center py-12">
-                  <div className="w-16 h-16 rounded-2xl bg-accent-gradient flex items-center justify-center m-auto mb-6 shadow-glow">
-                    <Sparkles className="text-white w-8 h-8" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-white tracking-tight mb-2">Personal AI Assistant</h2>
-                  <p className="text-sm text-gray-400 leading-relaxed mb-8">
-                    Interact with your system volume, Notion pages, local file system, Google calendar, and Gmail.
-                    The assistant reasoning loop will call local and remote tools dynamically to satisfy your prompt.
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
-                      <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
-                        <Volume2 size={14} className="text-accent-blue" />
-                        System Audio
-                      </div>
-                      <span className="text-xs text-gray-500 leading-relaxed">Controls system volume levels directly on your Mac.</span>
-                    </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
-                      <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
-                        <FileText size={14} className="text-accent-mono" />
-                        Notion Notes
-                      </div>
-                      <span className="text-xs text-gray-500 leading-relaxed">Read notes, search pages, and append content to your workspace.</span>
-                    </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
-                      <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
-                        <Calendar size={14} className="text-accent-emerald" />
-                        Google Apps
-                      </div>
-                      <span className="text-xs text-gray-500 leading-relaxed">Manage Google Calendar events and read/compose Gmail messages.</span>
-                    </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left hover:bg-white/10 transition-all">
-                      <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
-                        <Globe size={14} className="text-blue-400" />
-                        Web Scraper
-                      </div>
-                      <span className="text-xs text-gray-500 leading-relaxed">Automate browser queries, search the web, and scrape details.</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {starterPrompts.map((p, i) => (
-                      <button key={i} className="px-3.5 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs font-medium transition-all border border-white/5 hover:border-white/10 text-gray-300" onClick={() => handleSend(p.text)}>
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                messages.map((msg, idx) => (
-                  <div key={idx} className={`flex flex-col gap-1 max-w-[85%] ${msg.role === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-                    <div className="text-[10px] text-gray-500 font-semibold tracking-wider px-1 flex items-center justify-between w-full gap-2">
-                      <span>{msg.role === 'user' ? 'YOU' : 'ASSISTANT'}</span>
-                      {msg.role === 'assistant' && (
-                        <button 
-                          onClick={() => speakText(msg.content, idx)}
-                          className={`p-1 rounded-md transition-all ${currentlySpeakingId === idx ? 'text-accent-blue bg-accent-blue/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-                          title={currentlySpeakingId === idx ? "Stop speaking" : "Read response out loud"}
-                        >
-                          <Volume2 size={12} className={currentlySpeakingId === idx ? 'animate-pulse' : ''} />
-                        </button>
-                      )}
-                    </div>
-                    <div className={`p-4 rounded-2xl border text-sm leading-relaxed ${msg.role === 'user' ? 'bg-accent-mono/10 border-accent-mono/20 text-white rounded-tr-none' : 'bg-bg-secondary/40 border-white/5 rounded-tl-none'}`}>
-                      {msg.role === 'user' ? (
-                        <p>{msg.content}</p>
-                      ) : !msg.content && !msg.isError && isProcessing && idx === messages.length - 1 ? (
-                        <div className="flex items-center gap-3">
-                          <span className="w-2.5 h-2.5 rounded-full bg-accent-blue animate-pulse shadow-[0_0_8px_var(--color-accent-blue)]"></span>
-                          <span className="text-xs text-gray-400 font-mono">{currentStatusLog || 'Thinking...'}</span>
-                        </div>
-                      ) : (
-                        <div className="markdown-body" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) || (msg.isError ? 'An error occurred' : 'Thinking...') }} />
-                      )}
-                    </div>
-                    
-                    {msg.role === 'assistant' && msg.speech && (
-                      <button 
-                        onClick={() => speakText(msg.speech, `bubble-${idx}`)}
-                        className={`speech-bubble-container text-left transition-all hover:bg-white/10 cursor-pointer outline-none ${
-                          currentlySpeakingId === `bubble-${idx}` 
-                            ? 'border-accent-blue/40 bg-accent-blue/[0.04] shadow-[0_0_12px_rgba(59,130,246,0.1)]' 
-                            : ''
-                        }`}
-                        title={currentlySpeakingId === `bubble-${idx}` ? "Click to stop reading" : "Click to read out loud"}
-                      >
-                        <Volume2 
-                          className={`speech-icon ${currentlySpeakingId === `bubble-${idx}` ? 'text-accent-blue animate-pulse' : 'text-gray-400'}`} 
-                          size={14} 
-                        />
-                        <span className="speech-text">"{msg.speech}"</span>
-                      </button>
-                    )}
-                    
-                    {/* Active loop status display */}
-                    {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (
-                      <div className="flex items-center gap-2 mt-2 px-1 text-[11px] text-gray-500 font-mono">
-                        {isProcessing && idx === messages.length - 1 && <span className="w-1.5 h-1.5 rounded-full bg-accent-mono animate-ping"></span>}
-                        <div>
-                          <strong className="text-gray-400 font-medium">Reasoning path:</strong>{' '}
-                          {msg.logs.map((log, lIdx) => (
-                            <span key={lIdx}>
-                              {lIdx > 0 && ' → '}<span className="text-accent-blue font-bold">{log}</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Input box area */}
-            <div className="p-6 bg-gradient-to-t from-bg-primary via-bg-primary to-transparent flex-shrink-0">
-              <div className="max-w-3xl m-auto animate-fadeIn">
-                {isListening && (
-                  <div className="flex items-center gap-2 mb-2.5 px-3.5 py-2 bg-red-500/5 border border-red-500/20 rounded-xl text-xs text-red-300 animate-fadeIn">
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                    </span>
-                    <span className="font-semibold tracking-wide uppercase text-[9px] text-red-400">Listening:</span>
-                    <span className="italic opacity-85 truncate max-w-lg">{interimSpeech || "Speak now..."}</span>
-                  </div>
-                )}
-                <div className="flex items-end gap-2 p-2 bg-bg-secondary border border-border-color rounded-2xl shadow-md focus-within:border-accent-mono/50 transition-all">
-                  <textarea
-                    className="flex-grow bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm text-gray-200 placeholder-gray-500 resize-none max-h-36 py-2 px-3 leading-relaxed"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={isListening ? "Listening... Speak clearly" : "Ask anything (e.g. Set volume to 30%, draft a note...)"}
-                    disabled={isProcessing}
-                    rows={1}
-                  />
-                  <button 
-                    className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-sm shrink-0 ${
-                      isListening 
-                        ? 'bg-red-500 hover:bg-red-600 text-white mic-active-glow' 
-                        : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5'
-                    }`}
-                    onClick={toggleListening}
-                    disabled={isProcessing}
-                    title="Toggle speech recognition (Double Shift or Cmd+Shift+S)"
-                  >
-                    {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                  </button>
-                  <button 
-                    className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm shrink-0"
-                    onClick={() => handleSend()}
-                    disabled={!prompt.trim() || isProcessing}
-                  >
-                    <Send size={16} />
-                  </button>
-                </div>
-                {messages.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {starterPrompts.slice(0, 3).map((p, i) => (
-                      <button key={i} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-full text-xs transition-all text-gray-400 hover:text-white" onClick={() => handleSend(p.text)} disabled={isProcessing}>
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : activeTab === 'system-prompt' ? (
-          /* SYSTEM PROMPT MANAGER VIEW */
-          <div className="flex flex-grow h-full overflow-hidden p-6 flex-col">
-            {/* System Prompt Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-border-color mb-6 flex-shrink-0">
-              <div className="flex items-center gap-2.5">
-                <Settings className="w-5 h-5 text-accent-emerald" />
-                <div>
-                  <h2 className="text-md font-semibold text-white font-sans">System Prompt Manager</h2>
-                  <p className="text-xs text-gray-400">Configure instructions and rules that control the AI assistant's personality and tools.</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={fetchSystemPrompt}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition"
-                  title="Reload prompts from database"
-                >
-                  <RefreshCw size={12} className={isFetchingPrompt ? 'animate-spin' : ''} /> Reload
-                </button>
-              </div>
-            </div>
-
-            {/* Alert Logs */}
-            {promptError && (
-              <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center flex-shrink-0 animate-fadeIn">
-                <AlertCircle size={14} className="flex-shrink-0" />
-                <span>{promptError}</span>
-              </div>
-            )}
-            {promptSuccessMessage && (
-              <div className="mb-4 p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center flex-shrink-0 animate-fadeIn">
-                <CheckCircle size={14} className="flex-shrink-0" />
-                <span>{promptSuccessMessage}</span>
-              </div>
             )}
 
-            {/* Side-by-Side Prompt layout */}
-            <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden h-full">
-              {/* Left Side: Revision History */}
-              <div className="flex flex-col bg-white/5 border border-white/5 rounded-2xl p-5 overflow-hidden h-full">
-                <div className="flex items-center gap-2 mb-4 flex-shrink-0">
-                  <History className="w-4 h-4 text-accent-mono" />
-                  <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">Revision History</span>
-                  <span className="ml-auto px-2 py-0.5 bg-white/5 rounded-full font-mono text-[10px] text-gray-400">
-                    {systemPrompts.history?.length || 0}
-                  </span>
-                </div>
+            <div className="h-4 w-px bg-white/10" />
 
-                <div className="flex-grow overflow-y-auto overflow-x-auto pr-1">
-                  {isFetchingPrompt && systemPrompts.history?.length === 0 ? (
-                    <div className="text-center text-xs text-gray-500 py-12 flex flex-col items-center gap-2">
-                      <RefreshCw size={16} className="animate-spin text-accent-mono" />
-                      Loading revisions...
-                    </div>
-                  ) : systemPrompts.history?.length === 0 ? (
-                    <div className="text-center text-xs text-gray-500 py-12">No history recorded yet.</div>
-                  ) : (
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-white/[0.02] text-gray-400 border-b border-white/10">
-                          <th className="font-semibold py-3 px-3 rounded-l-xl text-left">Revision</th>
-                          <th className="font-semibold py-3 px-3 text-left">Preview</th>
-                          <th className="font-semibold py-3 px-3 text-left">Status</th>
-                          <th className="font-semibold py-3 px-3 text-left">Date</th>
-                          <th className="font-semibold py-3 px-3 rounded-r-xl text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {systemPrompts.history.map((item) => {
-                          const isActive = item.is_active === 1;
-                          const dateStr = new Date(item.created_at).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          });
-                          return (
-                            <tr key={item.id} className={`hover:bg-white/[0.02] border-b border-white/5 transition-all ${isActive ? 'bg-accent-emerald/[0.02]' : ''}`}>
-                              <td className="py-3 px-3 font-mono font-bold text-white">#{item.id}</td>
-                              <td className="py-3 px-3 text-gray-400 max-w-[150px] truncate" title={item.prompt}>{item.prompt}</td>
-                              <td className="py-3 px-3">
-                                <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full ${isActive ? 'bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20' : 'bg-white/5 text-gray-400 border border-white/5'}`}>
-                                  {isActive ? 'ACTIVE' : 'INACTIVE'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-gray-500 text-[10px] whitespace-nowrap">{dateStr}</td>
-                              <td className="py-3 px-3 text-right">
-                                <div className="flex gap-2.5 justify-end">
-                                  <button
-                                    onClick={() => setSelectedHistoryPrompt(item)}
-                                    className="text-accent-blue hover:underline font-semibold bg-transparent border-0 cursor-pointer p-0 text-[11px]"
-                                  >
-                                    Details
-                                  </button>
-                                  {!isActive && (
-                                    <>
-                                      <button
-                                        onClick={() => handleActivatePrompt(item.id)}
-                                        className="text-accent-emerald hover:underline font-semibold bg-transparent border-0 cursor-pointer p-0 text-[11px]"
-                                      >
-                                        Activate
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeletePrompt(item.id)}
-                                        className="text-red-400 hover:text-red-300 font-semibold bg-transparent border-0 cursor-pointer p-0 text-[11px]"
-                                      >
-                                        Delete
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Side: Active Prompt Editor */}
-              <div className="lg:col-span-2 flex flex-col bg-white/5 border border-white/5 rounded-2xl p-5 overflow-hidden h-full">
-                <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-accent-emerald shadow-[0_0_8px_var(--color-accent-emerald)] animate-pulse"></span>
-                    <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">Active System Prompt</span>
-                  </div>
-                  {!isEditingPrompt ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(systemPrompts.activePrompt?.prompt || '');
-                          alert('System prompt copied to clipboard!');
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition text-gray-300 hover:text-white"
-                      >
-                        <Copy size={12} /> Copy Prompt
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditPromptText(systemPrompts.activePrompt?.prompt || '');
-                          setIsEditingPrompt(true);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 hover:bg-accent-emerald/20 rounded-lg text-xs font-semibold transition"
-                      >
-                        <Edit3 size={12} /> Edit Prompt
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setIsEditingPrompt(false)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition text-gray-400 hover:text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSavePrompt}
-                        disabled={isSavingPrompt || !editPromptText.trim()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald text-white rounded-lg text-xs font-semibold transition hover:bg-accent-emerald/80 disabled:opacity-50"
-                      >
-                        <Save size={12} /> {isSavingPrompt ? 'Saving...' : 'Save as New Revision'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-grow overflow-hidden flex flex-col">
-                  {isEditingPrompt ? (
-                    <textarea
-                      value={editPromptText}
-                      onChange={(e) => setEditPromptText(e.target.value)}
-                      className="w-full flex-grow p-4 bg-black/40 border border-white/10 rounded-xl font-mono text-xs text-gray-200 outline-none focus:border-accent-emerald/50 resize-none overflow-y-auto leading-relaxed"
-                      placeholder="Enter system prompt guidelines here..."
-                    />
-                  ) : (
-                    <div className="w-full flex-grow p-4 bg-black/30 border border-white/5 rounded-xl font-mono text-xs text-gray-300 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
-                      {systemPrompts.activePrompt?.prompt || 'No active system prompt found.'}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* LLM SETTINGS VIEW */
-          <div className="flex flex-col h-full overflow-y-auto p-6">
-            <div className="flex items-center justify-between pb-4 border-b border-border-color mb-6 flex-shrink-0">
-              <div className="flex items-center gap-2.5">
-                <Wrench className="w-5 h-5 text-accent-blue" />
-                <div>
-                  <h2 className="text-md font-semibold text-white font-sans">LLM Provider Configuration</h2>
-                  <p className="text-xs text-gray-400">Configure your active model and keys for OpenAI, Ollama, and Grok.</p>
-                </div>
-              </div>
-            </div>
-
-            {settingsError && (
-              <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
-                <AlertCircle size={14} className="flex-shrink-0" />
-                <span>{settingsError}</span>
-              </div>
-            )}
-            {settingsSuccess && (
-              <div className="mb-4 p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
-                <CheckCircle size={14} className="flex-shrink-0" />
-                <span>{settingsSuccess}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveSettings} className="space-y-6 max-w-4xl animate-fadeIn">
-              {/* Provider Selector Card */}
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Active LLM Provider</label>
-                <select
-                  value={settingsForm.provider}
-                  onChange={(e) => setSettingsForm(prev => ({ ...prev, provider: e.target.value }))}
-                  className="w-full md:w-1/3 p-3 bg-black/40 border border-white/10 rounded-xl text-xs text-gray-200 outline-none focus:border-accent-blue/50"
-                >
-                  <option value="ollama">Ollama (Local API)</option>
-                  <option value="openai">OpenAI SDK (Cloud / compatible API)</option>
-                  <option value="grok">Grok API (x.ai)</option>
-                </select>
-                <p className="text-[10px] text-gray-500 mt-2">
-                  Choosing Grok or OpenAI requires internet connectivity and API keys. Ollama runs fully offline.
-                </p>
-              </div>
-
-              {/* Provider Details Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* OpenAI settings card */}
-                <div className={`bg-white/5 border rounded-2xl p-5 transition-all duration-200 ${settingsForm.provider === 'openai' ? 'border-accent-blue/40 bg-accent-blue/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-white/5 opacity-60'}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold uppercase tracking-wider text-white">OpenAI Settings</span>
-                    {settingsForm.provider === 'openai' && <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>}
-                  </div>
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">API Key</label>
-                      <input
-                        type="password"
-                        placeholder="sk-..."
-                        value={settingsForm.openaiApiKey}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiApiKey: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                      <input
-                        type="text"
-                        placeholder="https://api.openai.com/v1"
-                        value={settingsForm.openaiBaseUrl}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiBaseUrl: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                      <input
-                        type="text"
-                        placeholder="gpt-4o"
-                        value={settingsForm.openaiModel}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Ollama settings card */}
-                <div className={`bg-white/5 border rounded-2xl p-5 transition-all duration-200 ${settingsForm.provider === 'ollama' ? 'border-accent-blue/40 bg-accent-blue/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-white/5 opacity-60'}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold uppercase tracking-wider text-white">Ollama Settings</span>
-                    {settingsForm.provider === 'ollama' && <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>}
-                  </div>
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">Ollama URL</label>
-                      <input
-                        type="text"
-                        placeholder="http://localhost:11434"
-                        value={settingsForm.ollamaUrl}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaUrl: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                      <input
-                        type="text"
-                        placeholder="llama3.1"
-                        value={settingsForm.ollamaModel}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Grok settings card */}
-                <div className={`bg-white/5 border rounded-2xl p-5 transition-all duration-200 ${settingsForm.provider === 'grok' ? 'border-accent-blue/40 bg-accent-blue/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-white/5 opacity-60'}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold uppercase tracking-wider text-white">Grok Settings</span>
-                    {settingsForm.provider === 'grok' && <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>}
-                  </div>
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">Grok API Key</label>
-                      <input
-                        type="password"
-                        placeholder="xai-..."
-                        value={settingsForm.grokApiKey}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, grokApiKey: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                      <input
-                        type="text"
-                        placeholder="https://api.x.ai/v1"
-                        value={settingsForm.grokBaseUrl}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, grokBaseUrl: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                      <input
-                        type="text"
-                        placeholder="grok-2-1218"
-                        value={settingsForm.grokModel}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* RAG Embeddings Warning */}
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-[11px] text-gray-400">
-                <strong className="text-yellow-400/90 block mb-1">RAG Embeddings Note:</strong>
-                Since the Grok API does not natively support embeddings, when using Grok or OpenAI as the LLM provider:
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>The system will automatically use the OpenAI embeddings API if a valid <strong>OpenAI API Key</strong> is provided.</li>
-                  <li>If no OpenAI API key is present, it will fallback to Ollama to generate embeddings locally.</li>
-                </ul>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
-                <button
-                  type="submit"
-                  disabled={isSavingSettings}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all disabled:opacity-50 shadow-glow"
-                >
-                  <Save size={13} />
-                  {isSavingSettings ? 'Saving...' : 'Save Configuration'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-      </main>
-
-      {/* Historical Prompt Details Modal */}
-      {selectedHistoryPrompt && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-bg-secondary border border-border-color rounded-2xl w-full max-w-3xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-border-color flex items-center justify-between flex-shrink-0">
-              <div>
-                <h3 className="text-md font-semibold text-white">Revision #{selectedHistoryPrompt.id} Details</h3>
-                <span className="text-[10px] text-gray-400 font-mono">Created on {new Date(selectedHistoryPrompt.created_at).toLocaleString()}</span>
-              </div>
-              <span className={`text-[9px] font-bold font-mono px-2 py-0.5 rounded-full ${selectedHistoryPrompt.is_active === 1 ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-white/5 text-gray-400'}`}>
-                {selectedHistoryPrompt.is_active === 1 ? 'ACTIVE' : 'INACTIVE'}
-              </span>
-            </div>
-            
-            <div className="flex-grow overflow-y-auto p-6 font-mono text-xs text-gray-300 whitespace-pre-wrap select-text leading-relaxed bg-black/20">
-              {selectedHistoryPrompt.prompt}
-            </div>
-            
-            <div className="p-4 border-t border-border-color flex justify-between items-center bg-bg-secondary/80 flex-shrink-0">
-              <div className="flex gap-2">
-                {selectedHistoryPrompt.is_active !== 1 && (
-                  <button
-                    onClick={() => {
-                      handleActivatePrompt(selectedHistoryPrompt.id);
-                      setSelectedHistoryPrompt(null);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald text-white rounded-lg text-xs font-semibold transition hover:bg-accent-emerald/80"
-                  >
-                    Activate Revision
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedHistoryPrompt.prompt);
-                    alert('Revision copied to clipboard!');
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium text-gray-300 hover:text-white transition"
-                >
-                  <Copy size={12} /> Copy
-                </button>
-              </div>
-              <button
-                onClick={() => setSelectedHistoryPrompt(null)}
-                className="px-4 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium text-gray-300 hover:text-white transition"
-              >
-                Close
-              </button>
-            </div>
+            {/* Global Prominent Telemetry Chart Button */}
+            <Link 
+              to="/admin"
+              state={{ fromTab: activeTab }}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-accent-blue text-white rounded-lg text-xs font-semibold shadow-glow transition-all hover:bg-accent-blue/80"
+              title="Open Telemetry Dashboard and Charts"
+            >
+              <LayoutDashboard size={12} />
+              Telemetry Charts
+            </Link>
           </div>
         </div>
-      )}
+
+        {/* Tab Switching Panel Content */}
+        <div className="flex-grow overflow-hidden">
+          {activeTab === 'chat' ? (
+            <ChatPanel
+              messages={messages}
+              isProcessing={isProcessing}
+              interimSpeech={interimSpeech}
+              currentStatusLog={currentStatusLog}
+              currentlySpeakingId={currentlySpeakingId}
+              speakText={speakText}
+              prompt={prompt}
+              setPrompt={setPrompt}
+              handleSend={handleSend}
+              isListening={isListening}
+              toggleListening={toggleListening}
+              parseMarkdown={parseMarkdown}
+            />
+          ) : activeTab === 'system-prompt' ? (
+            <SystemPromptPanel
+              systemPrompts={systemPrompts}
+              isFetchingPrompt={isFetchingPrompt}
+              promptError={promptError}
+              promptSuccessMessage={promptSuccessMessage}
+              selectedHistoryPrompt={selectedHistoryPrompt}
+              setSelectedHistoryPrompt={setSelectedHistoryPrompt}
+              isEditingPrompt={isEditingPrompt}
+              setIsEditingPrompt={setIsEditingPrompt}
+              editPromptText={editPromptText}
+              setEditPromptText={setEditPromptText}
+              handleSavePrompt={handleSavePrompt}
+              handleActivatePrompt={handleActivatePrompt}
+              handleDeletePrompt={handleDeletePrompt}
+              fetchSystemPrompt={fetchSystemPrompt}
+            />
+          ) : (
+            <SettingsPanel
+              settingsForm={settingsForm}
+              setSettingsForm={setSettingsForm}
+              isSavingSettings={isSavingSettings}
+              settingsSuccess={settingsSuccess}
+              settingsError={settingsError}
+              handleSaveSettings={handleSaveSettings}
+              googleConnected={googleConnected}
+              googleEmail={googleEmail}
+              handleConnectGoogle={handleConnectGoogle}
+              handleDisconnectGoogle={handleDisconnectGoogle}
+            />
+          )}
+        </div>
+      </main>
     </div>
   );
 }
