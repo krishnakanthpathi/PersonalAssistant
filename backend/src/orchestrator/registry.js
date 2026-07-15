@@ -181,14 +181,7 @@ class ToolRegistry {
 			);
 
 			// Core UI tools that should always be present
-			const CORE_TOOLS = new Set([
-				'get_accessibility_tree',
-				'move_mouse',
-				'mouse_click',
-				'keystroke_action',
-				'run_applescript',
-				'take_screenshot'
-			]);
+			const CORE_TOOLS = new Set();
 
 			for (const tool of allTools) {
 				const toolName = tool.function?.name || tool.name;
