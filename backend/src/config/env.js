@@ -23,12 +23,16 @@ export const env = {
 	OPENAI_MODEL: process.env.OPENAI_MODEL || 'glm-4',
 	OPENAI_EMBEDDING_MODEL: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
 
+	// grok
+	GROK_API_KEY: process.env.GROK_API_KEY,
+	GROK_BASE_URL: process.env.GROK_BASE_URL || 'https://api.x.ai/v1',
+	GROK_MODEL: process.env.GROK_MODEL || 'grok-2-1218',
+
 	// mcps
 	NOTION_TOKEN: process.env.NOTION_TOKEN,
 	NOTION_PARENT_PAGE_ID: process.env.NOTION_PARENT_PAGE_ID,
 
 	// embeddings
-	OPENAI_EMBEDDING_MODEL: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
 	OLLAMA_EMBEDDING_MODEL: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
 
 	// youtube

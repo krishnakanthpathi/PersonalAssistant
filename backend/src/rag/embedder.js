@@ -8,7 +8,7 @@ import { logger } from '../utils/logger.js';
 
 export class Embedder {
 	constructor() {
-		this.provider = env.LLM_PROVIDER;
+		this.provider = (env.LLM_PROVIDER === 'openai' || (env.LLM_PROVIDER === 'grok' && env.OPENAI_API_KEY)) ? 'openai' : 'ollama';
 		if (this.provider === 'openai') {
 			this.openai = new OpenAI({
 				apiKey: env.OPENAI_API_KEY,

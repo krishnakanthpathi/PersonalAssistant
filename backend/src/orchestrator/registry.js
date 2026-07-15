@@ -118,7 +118,7 @@ class ToolRegistry {
 			return allTools;
 		}
 
-		const currentModel = env.LLM_PROVIDER === 'openai'
+		const currentModel = (env.LLM_PROVIDER === 'openai' || (env.LLM_PROVIDER === 'grok' && env.OPENAI_API_KEY))
 			? (env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small')
 			: (env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text');
 

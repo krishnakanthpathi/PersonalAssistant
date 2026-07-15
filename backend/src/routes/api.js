@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getStatus, getConfig } from '../controllers/configController.js';
+import { getStatus, getConfig, updateConfig } from '../controllers/configController.js';
 import { getTools } from '../controllers/toolsController.js';
 import { getMetrics, clearMetrics } from '../controllers/metricsController.js';
 import { getSystemPrompt, saveSystemPrompt, activateSystemPrompt, deleteSystemPrompt } from '../controllers/systemPromptController.js';
@@ -14,6 +14,7 @@ router.get("/", getStatus);
 
 // Configuration & Tools
 router.get("/api/config", getConfig);
+router.post("/api/config", updateConfig);
 router.get("/api/tools", getTools);
 
 // Google OAuth Flow

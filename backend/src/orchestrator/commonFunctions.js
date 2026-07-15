@@ -136,6 +136,62 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 			logger.error(`OpenAI request failed: ${error.message}`);
 			throw error;
 		}
+	} else if (provider === 'grok') {
+		if (!env.GROK_API_KEY) {
+			throw new Error('GROK_API_KEY is not defined in the environment variables.');
+		}
+		const grokInstance = new OpenAI({
+			apiKey: env.GROK_API_KEY,
+			baseURL: env.GROK_BASE_URL || 'https://api.x.ai/v1'
+		});
+
+		const payload = {
+			model: env.GROK_MODEL || 'grok-2-1218',
+			messages: msgs,
+			stream: false
+		};
+
+		if (includeTools && tools.length > 0) {
+			payload.tools = tools;
+		}
+
+		const payloadSize = JSON.stringify(payload).length;
+		logger.info(`Grok request: model=${payload.model}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
+
+		try {
+			const start = Date.now();
+			const res = await grokInstance.chat.completions.create(payload);
+			duration = Date.now() - start;
+
+			const responseMessage = res.choices[0].message;
+			logger.info(`Grok response: role=${responseMessage.role}, tool_calls=${responseMessage.tool_calls?.length || 0}`);
+
+			generatedContent = responseMessage.content || '';
+			if (responseMessage.tool_calls) {
+				generatedContent += '\nTool Calls: ' + JSON.stringify(responseMessage.tool_calls.map(tc => tc.function.name));
+			}
+			if (requestId) {
+				metricsService.recordLLMCall(requestId, duration, promptEvalDuration, generatedContent);
+			}
+
+			return {
+				message: {
+					role: 'assistant',
+					content: responseMessage.content || '',
+					tool_calls: responseMessage.tool_calls ? responseMessage.tool_calls.map(tc => ({
+						id: tc.id,
+						type: tc.type,
+						function: {
+							name: tc.function.name,
+							arguments: tc.function.arguments
+						}
+					})) : undefined
+				}
+			};
+		} catch (error) {
+			logger.error(`Grok request failed: ${error.message}`);
+			throw error;
+		}
 	} else {
 		const payload = {
 			model: env.OLLAMA_MODEL,
