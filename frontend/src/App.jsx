@@ -21,13 +21,30 @@ import {
   Copy,
   Loader2,
   Mic,
-  MicOff
+  MicOff,
+  Menu
 } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
 import SystemPromptPanel from './components/SystemPromptPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
+import hljs from 'highlight.js';
+
+// --- Code Syntax Highlight Themes (loaded as raw CSS strings via Vite) ---
+import monokaiCss from 'highlight.js/styles/monokai.css?inline';
+import githubDarkCss from 'highlight.js/styles/github-dark.css?inline';
+import draculaCss from 'highlight.js/styles/base16/dracula.css?inline';
+import atomOneDarkCss from 'highlight.js/styles/atom-one-dark.css?inline';
+import tokyoNightCss from 'highlight.js/styles/tokyo-night-dark.css?inline';
+
+export const CODE_THEMES = [
+  { id: 'monokai',       label: 'Monokai',       bg: '#272822', accent: '#f92672', css: monokaiCss },
+  { id: 'github-dark',   label: 'GitHub Dark',   bg: '#0d1117', accent: '#79c0ff', css: githubDarkCss },
+  { id: 'dracula',       label: 'Dracula',       bg: '#282a36', accent: '#bd93f9', css: draculaCss },
+  { id: 'atom-one-dark', label: 'Atom One Dark', bg: '#282c34', accent: '#e06c75', css: atomOneDarkCss },
+  { id: 'tokyo-night',   label: 'Tokyo Night',   bg: '#1a1b26', accent: '#7aa2f7', css: tokyoNightCss },
+];
 
 // Helper to parse markdown tables into premium HTML tables
 const parseTables = (text) => {
@@ -128,6 +145,8 @@ const parseTables = (text) => {
 // Markdown parser with simple regex
 const parseMarkdown = (text) => {
   if (!text) return '';
+  // Ensure text is always a string — msg.content can sometimes be an object
+  if (typeof text !== 'string') text = JSON.stringify(text);
   
   // Strip XML tags like <action>, </action>, <speech>, </speech>
   const cleanedText = text
@@ -148,11 +167,41 @@ const parseMarkdown = (text) => {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Extract and stash code blocks to prevent parsing links/markdown inside code elements
+  // Extract and stash code blocks — apply highlight.js Monokai coloring
   const codeBlocks = [];
-  html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
     const id = `__CODE_BLOCK_${codeBlocks.length}__`;
-    codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
+    const rawCode = code.trimEnd();
+    const langLabel = lang ? lang.toLowerCase() : '';
+    const displayLang = langLabel
+      ? langLabel.charAt(0).toUpperCase() + langLabel.slice(1)
+      : 'Text';
+
+    // Run highlight.js — fall back to plaintext if lang unknown
+    let highlighted;
+    try {
+      highlighted = langLabel && hljs.getLanguage(langLabel)
+        ? hljs.highlight(rawCode, { language: langLabel, ignoreIllegals: true }).value
+        : hljs.highlightAuto(rawCode).value;
+    } catch {
+      highlighted = rawCode
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    codeBlocks.push(
+      `<div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="code-lang-label">${displayLang}</span>
+          <button class="code-copy-btn" data-copy-btn title="Copy code">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Copy code
+          </button>
+        </div>
+        <pre class="code-block-pre"><code class="code-block-code hljs">${highlighted}</code></pre>
+      </div>`
+    );
     return id;
   });
   
@@ -160,7 +209,7 @@ const parseMarkdown = (text) => {
   const inlineCodes = [];
   html = html.replace(/`([^`]+)`/g, (match, code) => {
     const id = `__INLINE_CODE_${inlineCodes.length}__`;
-    inlineCodes.push(`<code>${code}</code>`);
+    inlineCodes.push(`<code class="inline-code">${code}</code>`);
     return id;
   });
 
@@ -294,6 +343,7 @@ function MainApp() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'system-prompt' | 'settings'
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (location.state?.activeTab) {
@@ -349,6 +399,27 @@ function MainApp() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
+
+  // Code syntax highlight theme
+  const [codeTheme, setCodeTheme] = useState(
+    () => localStorage.getItem('codeTheme') || 'monokai'
+  );
+
+  // Swap the injected highlight.js theme CSS whenever codeTheme changes
+  useEffect(() => {
+    const theme = CODE_THEMES.find(t => t.id === codeTheme) || CODE_THEMES[0];
+    const styleId = 'hljs-theme-style';
+    let el = document.getElementById(styleId);
+    if (!el) {
+      el = document.createElement('style');
+      el.id = styleId;
+      document.head.appendChild(el);
+    }
+    el.textContent = theme.css;
+    localStorage.setItem('codeTheme', codeTheme);
+    // Update code block wrapper bg to match the theme
+    document.documentElement.style.setProperty('--hljs-bg', theme.bg);
+  }, [codeTheme]);
 
   const chatEndRef = useRef(null);
 
@@ -1016,28 +1087,38 @@ function MainApp() {
         loadChatSession={loadChatSession}
         handleDeleteChat={handleDeleteChat}
         fetchSystemPrompt={fetchSystemPrompt}
+        mobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
       />
 
       {/* Main Panel Content */}
-      <main className="flex-grow flex flex-col h-full bg-transparent overflow-hidden">
+      <main className="flex-grow flex flex-col h-full bg-transparent overflow-hidden min-w-0">
         {/* Global Top Bar Header */}
-        <div className="h-16 px-6 border-b border-border-color flex items-center justify-between backdrop-blur-md bg-bg-secondary/40 z-10 flex-shrink-0">
-          <div className="flex items-center gap-3 select-none">
-            <h2 className="text-md font-semibold text-white">
-              {activeTab === 'chat' ? 'Chat Assistant' : activeTab === 'system-prompt' ? 'System Prompt Manager' : 'Settings'}
+        <div className="h-14 sm:h-16 px-3 sm:px-6 border-b border-border-color flex items-center justify-between backdrop-blur-md bg-bg-secondary/40 z-10 flex-shrink-0 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Mobile hamburger */}
+            <button
+              className="lg:hidden p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all flex-shrink-0"
+              onClick={() => setMobileSidebarOpen(true)}
+              title="Open sidebar"
+            >
+              <Menu size={16} />
+            </button>
+            <h2 className="text-sm sm:text-md font-semibold text-white truncate">
+              {activeTab === 'chat' ? 'Chat Assistant' : activeTab === 'system-prompt' ? 'System Prompt' : 'Settings'}
             </h2>
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-mono font-mono uppercase tracking-wider border border-accent-mono/10">
+            <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-mono font-mono uppercase tracking-wider border border-accent-mono/10 flex-shrink-0">
               {config.provider === 'openai' ? 'OpenAI SDK' : config.provider === 'grok' ? 'Grok API' : 'Ollama API'}
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             {/* Context-specific Top Bar buttons */}
             {activeTab === 'chat' && (
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2">
                 <button 
                   onClick={() => setAutoTtsEnabled(prev => !prev)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                     autoTtsEnabled 
                       ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.15)] font-semibold' 
                       : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-400 hover:text-white'
@@ -1045,28 +1126,30 @@ function MainApp() {
                   title="Toggle automatic text-to-speech for assistant responses"
                 >
                   <Volume2 size={12} className={autoTtsEnabled ? 'animate-pulse' : ''} />
-                  Auto Speak
+                  <span className="hidden sm:inline">Auto Speak</span>
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition-all" onClick={fetchData} title="Sync backend connection state">
-                  <RefreshCw size={12} /> Sync
+                <button className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition-all" onClick={fetchData} title="Sync backend connection state">
+                  <RefreshCw size={12} />
+                  <span className="hidden sm:inline">Sync</span>
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition-all text-red-400 hover:text-red-300 disabled:opacity-50" onClick={clearChat} disabled={messages.length === 0} title="Clear chat history">
-                  <Trash2 size={12} /> Clear Chat
+                <button className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition-all text-red-400 hover:text-red-300 disabled:opacity-50" onClick={clearChat} disabled={messages.length === 0} title="Clear chat history">
+                  <Trash2 size={12} />
+                  <span className="hidden sm:inline">Clear</span>
                 </button>
               </div>
             )}
 
-            <div className="h-4 w-px bg-white/10" />
+            <div className="h-4 w-px bg-white/10 hidden sm:block" />
 
             {/* Global Prominent Telemetry Chart Button */}
             <Link 
               to="/admin"
               state={{ fromTab: activeTab }}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-accent-blue text-white rounded-lg text-xs font-semibold shadow-glow transition-all hover:bg-accent-blue/80"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1.5 bg-accent-blue text-white rounded-lg text-xs font-semibold shadow-glow transition-all hover:bg-accent-blue/80"
               title="Open Telemetry Dashboard and Charts"
             >
               <LayoutDashboard size={12} />
-              Telemetry Charts
+              <span className="hidden sm:inline">Telemetry</span>
             </Link>
           </div>
         </div>
@@ -1118,6 +1201,9 @@ function MainApp() {
               googleEmail={googleEmail}
               handleConnectGoogle={handleConnectGoogle}
               handleDisconnectGoogle={handleDisconnectGoogle}
+              codeTheme={codeTheme}
+              setCodeTheme={setCodeTheme}
+              codeThemes={CODE_THEMES}
             />
           )}
         </div>

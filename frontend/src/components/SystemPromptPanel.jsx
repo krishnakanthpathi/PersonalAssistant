@@ -28,14 +28,14 @@ export default function SystemPromptPanel({
   fetchSystemPrompt
 }) {
   return (
-    <div className="flex flex-grow h-full overflow-hidden p-6 flex-col">
+    <div className="flex flex-grow h-full overflow-y-auto lg:overflow-hidden p-4 sm:p-6 flex-col">
       {/* System Prompt Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-border-color mb-6 flex-shrink-0">
+      <div className="flex items-center justify-between pb-4 border-b border-border-color mb-4 sm:mb-6 flex-shrink-0">
         <div className="flex items-center gap-2.5">
           <Settings className="w-5 h-5 text-accent-emerald" />
           <div>
             <h2 className="text-md font-semibold text-white font-sans">System Prompt Manager</h2>
-            <p className="text-xs text-gray-400">Configure instructions and rules that control the AI assistant's personality and tools.</p>
+            <p className="text-xs text-gray-400 hidden sm:block">Configure instructions and rules that control the AI assistant's personality and tools.</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -64,9 +64,9 @@ export default function SystemPromptPanel({
       )}
 
       {/* Side-by-Side Prompt layout */}
-      <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden h-full">
+      <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 overflow-hidden h-full min-h-0">
         {/* Left Side: Revision History */}
-        <div className="flex flex-col bg-white/5 border border-white/5 rounded-2xl p-5 overflow-hidden h-full">
+        <div className="flex flex-col bg-white/5 border border-white/5 rounded-2xl p-4 sm:p-5 overflow-hidden max-h-64 lg:max-h-none lg:h-full">
           <div className="flex items-center gap-2 mb-4 flex-shrink-0">
             <History className="w-4 h-4 text-accent-mono" />
             <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">Revision History</span>
@@ -149,7 +149,7 @@ export default function SystemPromptPanel({
         </div>
 
         {/* Right Side: Active Prompt Editor */}
-        <div className="lg:col-span-2 flex flex-col bg-white/5 border border-white/5 rounded-2xl p-5 overflow-hidden h-full">
+        <div className="lg:col-span-2 flex flex-col bg-white/5 border border-white/5 rounded-2xl p-4 sm:p-5 overflow-hidden min-h-64 lg:h-full">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-accent-emerald shadow-[0_0_8px_var(--color-accent-emerald)] animate-pulse"></span>

@@ -46,17 +46,112 @@ body {
 }
 
 /* Markdown rendering helper classes */
-.markdown-body h1 { @apply text-2xl font-bold my-4 text-white; }
-.markdown-body h2 { @apply text-xl font-semibold my-3 text-white; }
-.markdown-body h3 { @apply text-lg font-medium my-2 text-white; }
+.markdown-body { min-width: 0; overflow-wrap: break-word; word-break: break-word; }
+.markdown-body h1 { @apply text-xl sm:text-2xl font-bold my-3 sm:my-4 text-white; }
+.markdown-body h2 { @apply text-lg sm:text-xl font-semibold my-2 sm:my-3 text-white; }
+.markdown-body h3 { @apply text-base sm:text-lg font-medium my-2 text-white; }
 .markdown-body p { @apply my-2 text-gray-300 leading-relaxed; }
 .markdown-body ul { @apply list-disc pl-5 my-2 text-gray-300; }
 .markdown-body li { @apply my-1; }
-.markdown-body code { @apply bg-white/5 border border-white/10 rounded px-1.5 py-0.5 font-mono text-sm text-accent-blue; }
-.markdown-body pre { @apply bg-black/40 border border-white/5 rounded-lg p-3 my-3 font-mono text-sm overflow-x-auto text-gray-200; }
 .markdown-body blockquote { @apply border border-white/10 bg-white/[0.02] p-4 my-4 rounded-xl text-gray-200 font-sans; }
 .markdown-body strong { @apply font-semibold text-white; }
 .markdown-body br { @apply mb-1; }
+.markdown-body a { @apply text-accent-blue hover:underline; }
+
+/* Inline code */
+.inline-code {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  background: rgba(110, 118, 129, 0.18);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 0.1em 0.45em;
+  color: #e6edf3;
+  line-height: 1.6;
+  vertical-align: baseline;
+  word-break: break-all;
+}
+
+/* ChatGPT-style code block — Monokai theme */
+.code-block-wrapper {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  margin: 0.5rem 0;
+  background: var(--hljs-bg, #272822);
+  font-family: var(--font-mono);
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(0,0,0,0.25);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.code-lang-label {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: #8b949e;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #8b949e;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+.code-copy-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: #e6edf3;
+}
+.code-copy-btn.copied {
+  color: #3fb950;
+}
+
+.code-block-pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  background: transparent;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-block-code {
+  display: block;
+  color: #e6edf3;
+  font-family: var(--font-mono);
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* Mobile: ensure code blocks don't overflow chat bubbles */
+.markdown-body .code-block-wrapper {
+  max-width: 100%;
+  overflow: hidden;
+}
+.markdown-body pre,
+.markdown-body .code-block-pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 /* Speech bubble styling */
 .speech-bubble-container {

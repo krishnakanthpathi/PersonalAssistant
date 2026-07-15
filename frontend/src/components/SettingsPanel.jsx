@@ -1,12 +1,12 @@
 import React from 'react';
 import { 
-  Wrench, 
   Save, 
   AlertCircle, 
   CheckCircle, 
   Sparkles,
   Link2,
-  Settings
+  Settings,
+  Palette
 } from 'lucide-react';
 
 export default function SettingsPanel({
@@ -19,7 +19,10 @@ export default function SettingsPanel({
   googleConnected,
   googleEmail,
   handleConnectGoogle,
-  handleDisconnectGoogle
+  handleDisconnectGoogle,
+  codeTheme,
+  setCodeTheme,
+  codeThemes = []
 }) {
   return (
     <div className="flex flex-col h-full overflow-y-auto p-6">
@@ -28,7 +31,7 @@ export default function SettingsPanel({
         <div className="flex items-center gap-2.5">
           <Settings className="w-5 h-5 text-accent-blue" />
           <div>
-            <h2 className="text-md font-semibold text-white font-sans">Settings & Configurations</h2>
+            <h2 className="text-md font-semibold text-white font-sans">Settings &amp; Configurations</h2>
             <p className="text-xs text-gray-400">Configure LLM active models, API endpoints, and third-party account integrations.</p>
           </div>
         </div>
@@ -83,33 +86,21 @@ export default function SettingsPanel({
                 <div className="space-y-3 text-xs">
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">API Key</label>
-                    <input
-                      type="password"
-                      placeholder="sk-..."
-                      value={settingsForm.openaiApiKey}
+                    <input type="password" placeholder="sk-..." value={settingsForm.openaiApiKey}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiApiKey: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://api.openai.com/v1"
-                      value={settingsForm.openaiBaseUrl}
+                    <input type="text" placeholder="https://api.openai.com/v1" value={settingsForm.openaiBaseUrl}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiBaseUrl: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                    <input
-                      type="text"
-                      placeholder="gpt-4o"
-                      value={settingsForm.openaiModel}
+                    <input type="text" placeholder="gpt-4o" value={settingsForm.openaiModel}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                 </div>
               </div>
@@ -123,23 +114,15 @@ export default function SettingsPanel({
                 <div className="space-y-3 text-xs">
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">Ollama URL</label>
-                    <input
-                      type="text"
-                      placeholder="http://localhost:11434"
-                      value={settingsForm.ollamaUrl}
+                    <input type="text" placeholder="http://localhost:11434" value={settingsForm.ollamaUrl}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaUrl: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                    <input
-                      type="text"
-                      placeholder="llama3.1"
-                      value={settingsForm.ollamaModel}
+                    <input type="text" placeholder="llama3.1" value={settingsForm.ollamaModel}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                 </div>
               </div>
@@ -153,33 +136,21 @@ export default function SettingsPanel({
                 <div className="space-y-3 text-xs">
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">Grok API Key</label>
-                    <input
-                      type="password"
-                      placeholder="xai-..."
-                      value={settingsForm.grokApiKey}
+                    <input type="password" placeholder="xai-..." value={settingsForm.grokApiKey}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, grokApiKey: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://api.x.ai/v1"
-                      value={settingsForm.grokBaseUrl}
+                    <input type="text" placeholder="https://api.x.ai/v1" value={settingsForm.grokBaseUrl}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, grokBaseUrl: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
                     <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                    <input
-                      type="text"
-                      placeholder="grok-2-1218"
-                      value={settingsForm.grokModel}
+                    <input type="text" placeholder="grok-2-1218" value={settingsForm.grokModel}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                    />
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                 </div>
               </div>
@@ -209,15 +180,64 @@ export default function SettingsPanel({
           </form>
         </div>
 
-        {/* Right Column: Account Integrations (Span 1) */}
+        {/* Right Column: Code Theme + Integrations */}
         <div className="space-y-6">
+
+          {/* ── Code Highlight Theme Picker ── */}
+          {codeThemes.length > 0 && (
+            <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-4 text-xs font-bold text-white uppercase tracking-wider">
+                <Palette size={14} className="text-accent-blue" />
+                <span>Code Theme</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {codeThemes.map(theme => {
+                  const isActive = codeTheme === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      onClick={() => setCodeTheme(theme.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-200 ${
+                        isActive
+                          ? 'border-accent-blue/50 bg-accent-blue/5 shadow-[0_0_12px_rgba(59,130,246,0.12)]'
+                          : 'border-white/5 bg-black/20 hover:bg-white/5 hover:border-white/10'
+                      }`}
+                    >
+                      {/* Colour swatch: bg on top, accent stripe on bottom */}
+                      <div
+                        className="flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden border border-white/10 flex flex-col"
+                        aria-hidden
+                      >
+                        <div className="flex-1" style={{ background: theme.bg }} />
+                        <div className="h-2.5" style={{ background: theme.accent }} />
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <p className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-gray-300'}`}>
+                          {theme.label}
+                        </p>
+                        <p className="text-[10px] font-mono text-gray-500">{theme.bg}</p>
+                      </div>
+                      {isActive && (
+                        <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold border border-accent-blue/20">
+                          ACTIVE
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">
+                Applied instantly to all code blocks. Saved locally in your browser.
+              </p>
+            </div>
+          )}
+
+          {/* Google OAuth Card */}
           <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4 text-xs font-bold text-white uppercase tracking-wider">
               <Link2 size={14} className="text-accent-mono" />
               <span>Integrations</span>
             </div>
-            
-            {/* Google OAuth Card */}
             <div className="bg-black/20 border border-white/5 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3 text-xs font-semibold text-gray-300">
                 <span>Google Account</span>
@@ -226,7 +246,6 @@ export default function SettingsPanel({
                   {googleConnected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
-              
               {googleConnected ? (
                 <div className="flex flex-col gap-2">
                   <div className="text-[10px] text-gray-400 truncate font-mono bg-white/5 p-2 rounded" title={googleEmail}>
@@ -253,8 +272,8 @@ export default function SettingsPanel({
                 </div>
               )}
             </div>
-
           </div>
+
         </div>
 
       </div>
