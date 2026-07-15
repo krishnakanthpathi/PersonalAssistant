@@ -114,6 +114,18 @@ export class MCPManager {
 				logger.warn(`Failed to initialize GitHub MCP client on boot: ${err.message}`);
 			}
 		}
+
+		// 9. Initialize Memory Client if configured
+		if (config.mcpServers.memory) {
+			try {
+				const { MemoryClient } = await import('./clients/memory.js');
+				const memoryClient = new MemoryClient(config.mcpServers.memory);
+				await memoryClient.connect();
+				this.servers.set('memory', memoryClient);
+			} catch (err) {
+				logger.warn(`Failed to initialize Memory MCP client on boot: ${err.message}`);
+			}
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**
@@ -195,6 +207,12 @@ export class MCPManager {
 			const githubClient = new GithubClient(serverConfig);
 			await githubClient.connect();
 			this.servers.set(serverName, githubClient);
+			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
+		} else if (serverName === 'memory') {
+			const { MemoryClient } = await import('./clients/memory.js');
+			const memoryClient = new MemoryClient(serverConfig);
+			await memoryClient.connect();
+			this.servers.set(serverName, memoryClient);
 			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
 		}
 	}

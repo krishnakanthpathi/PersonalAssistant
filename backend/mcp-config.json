@@ -61,6 +61,16 @@
 				"-y",
 				"@modelcontextprotocol/server-github"
 			]
+		},
+		"memory": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-memory"
+			],
+			"env": {
+				"MEMORY_FILE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/memory.json"
+			}
 		}
 	}
 }

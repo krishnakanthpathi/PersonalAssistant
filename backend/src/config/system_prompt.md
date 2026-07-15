@@ -88,5 +88,7 @@ You can read, create, update, delete, and list events on Google Calendar.
   - ALWAYS call **`search_threads`** instead (e.g., with query `""` or `"in:inbox"`) because it returns full thread metadata including sender, subject, snippet, and date directly, keeping the context size small.
   - Only call `get_thread` or `get_message` for a single specific thread when the user explicitly requests to read its full content/details.
 
-
+## GitHub Operations (IMPORTANT)
+- When the user requests modifications or commits to files in a GitHub repository (like updating a README or source files), you MUST perform these actions in-memory using the GitHub MCP server tools (`get_file_contents` and `create_or_update_file` or `push_files`) to call the GitHub API directly.
+- DO NOT edit files on the local filesystem and run shell `git` commands unless the user explicitly requests you to modify the local workspace files.
 
