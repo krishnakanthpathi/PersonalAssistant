@@ -1,0 +1,68 @@
+# Multi-stage build for smaller final image
+
+# Build stage
+FROM python:3.10-slim AS builder
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
+    curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up working directory
+WORKDIR /app
+
+# Copy only what's needed for installation
+COPY mcp-video-converter/pyproject.toml mcp-video-converter/README.md mcp-video-converter/LICENSE ./
+COPY mcp-video-converter/src ./src/
+
+# Install dependencies using pip
+RUN pip install --no-cache-dir -e . && \
+    pip install --no-cache-dir fastmcp
+
+# Runtime stage
+FROM python:3.10-slim
+
+# Install FFmpeg and runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    ca-certificates \
+    curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up working directory
+WORKDIR /app
+
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+
+# Copy source code
+COPY --from=builder /app /app
+
+# Copy tests for potential testing
+COPY mcp-video-converter/tests ./tests/
+
+# Set environment variables
+ENV PYTHONPATH="/app" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/usr/local/bin:$PATH"
+
+# Create directory for converted videos
+RUN mkdir -p /app/converted_videos && \
+    chmod 777 /app/converted_videos
+
+# Healthcheck for container monitoring
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('mcp_video_converter') else 1)"
+
+# Debug container with bash
+ENTRYPOINT ["/bin/bash"]
+
+# Expose port for HTTP transport (if needed in the future)
+EXPOSE 8000

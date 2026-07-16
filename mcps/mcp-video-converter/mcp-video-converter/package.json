@@ -1,0 +1,31 @@
+{
+  "name": "mcp-video-converter",
+  "version": "0.1.0",
+  "description": "An MCP server for video conversion using FFmpeg",
+  "main": "index.js",
+  "scripts": {
+    "start": "cd \"$(dirname \"$0\")\" && source .venv/bin/activate && python -m mcp_video_converter.server"
+  },
+  "smithery": {
+    "name": "MCP Video Converter",
+    "description": "Convert videos between formats and check FFmpeg installation",
+    "scripts": {
+      "start": "cd \"$(dirname \"$0\")\" && source .venv/bin/activate && python -m mcp_video_converter.server"
+    },
+    "requires": ["ffmpeg"],
+    "setup": "cd \"$(dirname \"$0\")\" && python -m venv .venv && source .venv/bin/activate && pip install -e . && pip install fastmcp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adamanz/mcp-video-converter"
+  },
+  "keywords": [
+    "mcp",
+    "video",
+    "converter",
+    "ffmpeg",
+    "mcp-server"
+  ],
+  "author": "",
+  "license": "MIT"
+}

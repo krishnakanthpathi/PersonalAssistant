@@ -126,6 +126,18 @@ export class MCPManager {
 				logger.warn(`Failed to initialize Memory MCP client on boot: ${err.message}`);
 			}
 		}
+
+		// 10. Initialize Video Converter Client if configured
+		if (config.mcpServers['video-converter']) {
+			try {
+				const { VideoConverterClient } = await import('./clients/video-converter.js');
+				const videoConverterClient = new VideoConverterClient(config.mcpServers['video-converter']);
+				await videoConverterClient.connect();
+				this.servers.set('video-converter', videoConverterClient);
+			} catch (err) {
+				logger.warn(`Failed to initialize Video Converter MCP client on boot: ${err.message}`);
+			}
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**
@@ -213,6 +225,12 @@ export class MCPManager {
 			const memoryClient = new MemoryClient(serverConfig);
 			await memoryClient.connect();
 			this.servers.set(serverName, memoryClient);
+			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
+		} else if (serverName === 'video-converter') {
+			const { VideoConverterClient } = await import('./clients/video-converter.js');
+			const videoConverterClient = new VideoConverterClient(serverConfig);
+			await videoConverterClient.connect();
+			this.servers.set(serverName, videoConverterClient);
 			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
 		}
 	}

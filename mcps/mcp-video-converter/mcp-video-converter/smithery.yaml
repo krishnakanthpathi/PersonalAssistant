@@ -1,0 +1,63 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      ffmpegPath:
+        type: string
+        title: "FFmpeg Path"
+        description: "Optional path to FFmpeg executable (uses system PATH by default)"
+      outputDirectory:
+        type: string
+        title: "Output Directory"
+        description: "Optional custom directory for output files (defaults to creating a 'converted_videos' folder)"
+      quality:
+        type: string
+        enum: ["low", "medium", "high"]
+        default: "medium"
+        title: "Default Quality"
+        description: "Default quality setting for video conversion"
+  commandFunction: |
+    (config) => {
+      // Use uv to run Python without creating a virtual environment
+      // This is faster and more reliable than the bash approach
+      
+      // Prepare environment variables
+      const env = {
+        ...process.env,
+        // Set PYTHONPATH to the container's application directory
+        PYTHONPATH: "/app",
+        // Set this to avoid FFmpeg slowness on first run
+        MCP_SKIP_FFMPEG_CHECK_ON_INIT: "true"
+      };
+      
+      // Add FFmpeg path if provided
+      if (config.ffmpegPath) {
+        env.FFMPEG_PATH = config.ffmpegPath;
+      }
+      
+      // Add output directory if provided
+      if (config.outputDirectory) {
+        env.OUTPUT_DIRECTORY = config.outputDirectory;
+      }
+      
+      // Add default quality if provided
+      if (config.quality) {
+        env.DEFAULT_QUALITY = config.quality;
+      }
+      
+      return {
+        command: "uv",
+        args: ["run", "-m", "mcp_video_converter.server"],
+        env: env,
+        // Ensure server starts in the correct working directory
+        cwd: "/app"
+      };
+    }
+
+# Build configuration for containerization
+build:
+  dockerfile: Dockerfile  # Path to Dockerfile relative to this file
+  dockerBuildPath: .      # Docker build context relative to this file
+  env:
+    OUTPUT_DIRECTORY: "/data/converted"

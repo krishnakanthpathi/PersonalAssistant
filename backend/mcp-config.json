@@ -71,6 +71,13 @@
 			"env": {
 				"MEMORY_FILE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/memory.json"
 			}
+		},
+		"video-converter": {
+			"command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/mcp-video-converter/mcp-video-converter/.venv/bin/python",
+			"args": [
+				"-m",
+				"mcp_video_converter.server"
+			]
 		}
 	}
 }

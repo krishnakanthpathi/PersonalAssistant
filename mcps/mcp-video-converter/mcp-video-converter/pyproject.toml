@@ -1,0 +1,25 @@
+[project]
+name = "mcp-video-converter"
+version = "0.1.0"
+description = "An MCP server with video conversion tools using FFmpeg."
+authors = [{ name = "MCP Video Converter Contributors" }]
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0.0",
+]
+readme = "README.md"
+license = { text = "MIT" }
+
+[project.urls]
+Repository = "https://github.com/adamanz/mcp-video-converter"
+Issues = "https://github.com/adamanz/mcp-video-converter/issues"
+
+[project.scripts]
+mcp-video-converter = "mcp_video_converter.server:main_cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
