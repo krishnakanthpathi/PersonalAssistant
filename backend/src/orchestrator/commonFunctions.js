@@ -41,6 +41,89 @@ export async function loadSystemPrompt() {
 	return systemPromptText;
 }
 
+export async function loadMemoryContext(query) {
+	try {
+		const memoryPath = path.join(__dirname, '../../data/memory.json');
+		if (!fs.existsSync(memoryPath)) {
+			return '';
+		}
+
+		const fileContent = await fs.promises.readFile(memoryPath, 'utf8');
+		const lines = fileContent.split('\n').filter(l => l.trim() !== '');
+
+		// Parse entities
+		const entities = [];
+		for (const line of lines) {
+			try {
+				const item = JSON.parse(line);
+				if (item.type === 'entity') {
+					entities.push(item);
+				}
+			} catch (e) {}
+		}
+
+		// Tokenize query into lowercase keywords, filtering out common stopwords
+		const stopwords = new Set(['do', 'i', 'have', 'any', 'experience', 'with', 'the', 'a', 'an', 'is', 'of', 'in', 'to', 'what', 'about', 'my', 'your', 'you', 'me', 'our', 'we', 'are', 'for', 'on', 'this', 'that']);
+		const keywords = query
+			.toLowerCase()
+			.replace(/[^\w\s]/g, '')
+			.split(/\s+/)
+			.filter(word => word.length > 2 && !stopwords.has(word));
+
+		if (keywords.length === 0) {
+			// If no keywords, just return a tiny snippet or nothing to save tokens
+			return '';
+		}
+
+		const matches = [];
+		for (const entity of entities) {
+			let matchCount = 0;
+			const nameLower = entity.name.toLowerCase();
+			const typeLower = (entity.entityType || '').toLowerCase();
+
+			// Check if keywords match name, type, or observations
+			for (const keyword of keywords) {
+				if (nameLower.includes(keyword) || typeLower.includes(keyword)) {
+					matchCount += 3; // Weight name/type matches higher
+				}
+				for (const obs of entity.observations || []) {
+					if (obs.toLowerCase().includes(keyword)) {
+						matchCount += 1;
+					}
+				}
+			}
+
+			if (matchCount > 0) {
+				matches.push({ entity, score: matchCount });
+			}
+		}
+
+		// Sort by relevance score descending and take top 10
+		matches.sort((a, b) => b.score - a.score);
+		const topMatches = matches.slice(0, 10).map(m => m.entity);
+
+		if (topMatches.length === 0) {
+			return '';
+		}
+
+		// Format into a clean Markdown context block
+		let contextBlock = '\n\n## User Long-Term Memory (Relevant Facts Found)\n';
+		contextBlock += 'The following relevant facts about the user (Krishnakanth) were found in local long-term memory:\n';
+		for (const entity of topMatches) {
+			contextBlock += `### Entity: ${entity.name} (${entity.entityType || 'Thing'})\n`;
+			for (const obs of entity.observations || []) {
+				contextBlock += `- ${obs}\n`;
+			}
+		}
+		
+		logger.info(`Injected ${topMatches.length} memory entities into system prompt based on query keywords: [${keywords.join(', ')}]`);
+		return contextBlock;
+	} catch (error) {
+		logger.error(`Failed to load memory context: ${error.message}`);
+		return '';
+	}
+}
+
 export async function prepareMessages(prompt, history) {
 	const cleanedHistory = history
 		.map(m => ({
@@ -49,7 +132,13 @@ export async function prepareMessages(prompt, history) {
 		}))
 		.filter(m => m.role && m.content);
 
-	const systemPromptText = await loadSystemPrompt();
+	let systemPromptText = await loadSystemPrompt();
+
+	// Inject matching memory context directly into the system prompt
+	const memoryContext = await loadMemoryContext(prompt);
+	if (memoryContext) {
+		systemPromptText = `${systemPromptText}${memoryContext}`;
+	}
 
 	const messages = [
 		{

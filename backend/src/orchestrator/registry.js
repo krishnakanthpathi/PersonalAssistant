@@ -181,7 +181,13 @@ class ToolRegistry {
 			);
 
 			// Core UI tools that should always be present
-			const CORE_TOOLS = new Set();
+			const CORE_TOOLS = new Set([
+				'read_graph',
+				'search_nodes',
+				'open_nodes',
+				'create_entities',
+				'add_observations'
+			]);
 
 			for (const tool of allTools) {
 				const toolName = tool.function?.name || tool.name;
