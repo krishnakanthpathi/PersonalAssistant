@@ -135,17 +135,17 @@ export async function prepareMessages(prompt, history) {
 	let systemPromptText = await loadSystemPrompt();
 
 	// Inject matching memory context directly into the system prompt
-	const memoryContext = await loadMemoryContext(prompt);
-	if (memoryContext) {
-		systemPromptText = `${systemPromptText}${memoryContext}`;
-	}
+	// const memoryContext = await loadMemoryContext(prompt);
+	// if (memoryContext) {
+	// 	systemPromptText = `${systemPromptText}${memoryContext}`;
+	// }
 
 	const messages = [
 		{
 			role: 'system',
 			content: systemPromptText
 		},
-		...cleanedHistory,
+		// ...cleanedHistory, // Commented out to stop history injection (to be replaced with RAG)
 		{ role: 'user', content: prompt }
 	];
 
