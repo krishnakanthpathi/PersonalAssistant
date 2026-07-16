@@ -335,7 +335,33 @@ export function parseXmlToolCalls(msg, activeTools = []) {
 			}
 		}
 
-		// 3. Try markdown JSON code blocks (```json ... ```)
+		// 3. Try <name>...</name><arguments>...</arguments> format (DeepSeek style)
+		if (toolCalls.length === 0) {
+			const nameArgRegex = /<name>\s*([\s\S]*?)\s*<\/name>\s*<arguments>\s*([\s\S]*?)\s*<\/arguments>/gi;
+			while ((match = nameArgRegex.exec(msg.content)) !== null) {
+				const toolName = match[1].trim();
+				const argsText = match[2].trim();
+				if (toolName && (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName))) {
+					let parsedArgs = {};
+					try {
+						parsedArgs = JSON.parse(argsText);
+					} catch (e) {
+						logger.warn(`Failed to parse arguments JSON in <name>/<arguments> block for tool "${toolName}": ${e.message}`);
+					}
+					toolCalls.push({
+						id: 'xml_' + Math.random().toString(36).substr(2, 9),
+						type: 'function',
+						isXml: true,
+						function: {
+							name: toolName,
+							arguments: parsedArgs
+						}
+					});
+				}
+			}
+		}
+
+		// 4. Try markdown JSON code blocks (```json ... ```)
 		if (toolCalls.length === 0) {
 			const mdJsonRegex = /```json\s*([\s\S]*?)\s*```/gi;
 			while ((match = mdJsonRegex.exec(msg.content)) !== null) {
@@ -346,15 +372,16 @@ export function parseXmlToolCalls(msg, activeTools = []) {
 			}
 		}
 
-		// 4. Try parsing the entire trimmed content as JSON
+		// 5. Try parsing the entire trimmed content as JSON (strip <thinking> first)
 		if (toolCalls.length === 0) {
-			const parsed = tryParseJsonBlock(msg.content, activeToolNames);
+			const strippedContent = stripThinkingTags(msg.content);
+			const parsed = tryParseJsonBlock(strippedContent, activeToolNames);
 			if (parsed) {
 				toolCalls.push(parsed);
 			}
 		}
 
-		// 5. Try finding raw JSON blocks inside the text by scanning braces
+		// 6. Try finding raw JSON blocks inside the text by scanning braces
 		if (toolCalls.length === 0) {
 			const blocks = findJsonBlocks(msg.content);
 			for (const block of blocks) {
@@ -372,9 +399,12 @@ export function parseXmlToolCalls(msg, activeTools = []) {
 }
 
 function parseSingleToolCallBlock(block, activeToolNames) {
-	// Try parsing as JSON first
+	// Strip <thinking> tags that some models prepend before the JSON tool call
+	const cleanedBlock = stripThinkingTags(block);
+
+	// Try parsing as JSON first (using cleaned block without <thinking> tags)
 	try {
-		const toolJson = JSON.parse(block);
+		const toolJson = JSON.parse(cleanedBlock);
 		const toolName = toolJson.name;
 		if (toolName && (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName))) {
 			return {
@@ -388,9 +418,32 @@ function parseSingleToolCallBlock(block, activeToolNames) {
 			};
 		}
 	} catch (e) {
-		// Not JSON, try parsing as XML/HTML tags (<invoke> format)
+		// Not JSON — try <name>/<arguments> tag format
+		const nameArgMatch = cleanedBlock.match(/<name>\s*([\s\S]*?)\s*<\/name>\s*<arguments>\s*([\s\S]*?)\s*<\/arguments>/i);
+		if (nameArgMatch) {
+			const toolName = nameArgMatch[1].trim();
+			if (toolName && (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName))) {
+				let parsedArgs = {};
+				try {
+					parsedArgs = JSON.parse(nameArgMatch[2].trim());
+				} catch (jsonErr) {
+					logger.warn(`Failed to parse arguments in <name>/<arguments> block for "${toolName}": ${jsonErr.message}`);
+				}
+				return {
+					id: 'xml_' + Math.random().toString(36).substr(2, 9),
+					type: 'function',
+					isXml: true,
+					function: {
+						name: toolName,
+						arguments: parsedArgs
+					}
+				};
+			}
+		}
+
+		// Try parsing as XML/HTML tags (<invoke> format)
 		const invokeRegex = /<invoke\s+name=["']([^"']+)["']/i;
-		const nameMatch = block.match(invokeRegex);
+		const nameMatch = cleanedBlock.match(invokeRegex);
 		if (nameMatch) {
 			const toolName = nameMatch[1];
 			if (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName)) {
@@ -398,7 +451,7 @@ function parseSingleToolCallBlock(block, activeToolNames) {
 				
 				const paramRegex = /<parameter\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/parameter>/gi;
 				let pMatch;
-				while ((pMatch = paramRegex.exec(block)) !== null) {
+				while ((pMatch = paramRegex.exec(cleanedBlock)) !== null) {
 					const pName = pMatch[1];
 					const pVal = pMatch[2].trim();
 					args[pName] = parseParamValue(pVal);
@@ -417,12 +470,33 @@ function parseSingleToolCallBlock(block, activeToolNames) {
 		}
 
 		// Try parsing as tag-based XML keys/values (<arg_key>/<arg_value> format)
-		const tagBased = parseTagBasedToolCall(block, activeToolNames);
+		const tagBased = parseTagBasedToolCall(cleanedBlock, activeToolNames);
 		if (tagBased) {
 			return tagBased;
 		}
 
-		logger.error(`Failed to parse XML tool call block: ${block}`, e);
+		// Last resort: try finding JSON blocks within the cleaned block
+		const jsonBlocks = findJsonBlocks(cleanedBlock);
+		for (const jsonBlock of jsonBlocks) {
+			try {
+				const parsed = JSON.parse(jsonBlock);
+				if (parsed && parsed.name && (activeToolNames.size === 0 || activeToolNames.has(parsed.name) || registry.tools.has(parsed.name))) {
+					return {
+						id: 'xml_' + Math.random().toString(36).substr(2, 9),
+						type: 'function',
+						isXml: true,
+						function: {
+							name: parsed.name,
+							arguments: parsed.arguments || {}
+						}
+					};
+				}
+			} catch (innerErr) {
+				// continue
+			}
+		}
+
+		logger.error(`Failed to parse XML tool call block: ${block.substring(0, 200)}`, e);
 	}
 	return null;
 }
@@ -495,6 +569,17 @@ function tryParseJsonBlock(text, activeToolNames) {
 		// Ignore
 	}
 	return null;
+}
+
+/**
+ * Strips <thinking>...</thinking> tags (and similar reasoning wrappers) from text.
+ * Models like DeepSeek often prepend these before tool call JSON.
+ */
+function stripThinkingTags(text) {
+	return text
+		.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+		.replace(/<think>[\s\S]*?<\/think>/gi, '')
+		.trim();
 }
 
 function findJsonBlocks(text) {
