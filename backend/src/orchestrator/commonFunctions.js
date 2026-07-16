@@ -11,6 +11,7 @@ import { logger } from '../utils/logger.js';
 import { metricsService } from '../utils/metrics.js';
 import { env } from '../config/env.js';
 import { getDB } from '../config/mongodb.js';
+import { getToolCallingCapability, standardizeToolSchema, injectXmlToolsInstructions, prepareMessagesPayload } from './toolCallFilter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROMPT_FILE_PATH = path.join(__dirname, '../config/system_prompt.md');
@@ -80,6 +81,46 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 	let promptEvalDuration = 0;
 	let generatedContent = '';
 
+	// Determine model and baseUrl based on provider
+	let model = '';
+	let baseUrl = '';
+	if (provider === 'openai') {
+		model = env.OPENAI_MODEL;
+		baseUrl = env.OPENAI_BASE_URL || '';
+	} else if (provider === 'grok') {
+		model = env.GROK_MODEL || 'grok-2-1218';
+		baseUrl = env.GROK_BASE_URL || 'https://api.x.ai/v1';
+	} else if (provider === 'ollama') {
+		model = env.OLLAMA_MODEL;
+		baseUrl = env.OLLAMA_URL;
+	}
+
+	// Classify tool calling strategy
+	const { strategy } = getToolCallingCapability(provider, model, baseUrl);
+
+	// Standardize tools list
+	let processedTools = [];
+	if (tools && tools.length > 0) {
+		processedTools = tools.map(t => standardizeToolSchema(t));
+	}
+
+	let useNativeTools = false;
+	let finalMsgs = msgs;
+
+	if (includeTools && processedTools.length > 0) {
+		if (strategy === 'native') {
+			useNativeTools = true;
+		} else if (strategy === 'xml') {
+			logger.info(`Using XML fallback for tool calling with model: ${model}`);
+			finalMsgs = injectXmlToolsInstructions(msgs, processedTools);
+		} else {
+			logger.info(`Tool calling is disabled (strategy: none) for model: ${model}`);
+		}
+	}
+
+	// Prepare and clean messages history for the API payload
+	finalMsgs = prepareMessagesPayload(finalMsgs, strategy);
+
 	if (provider === 'openai') {
 		if (!env.OPENAI_API_KEY) {
 			throw new Error('OPENAI_API_KEY is not defined in the environment variables.');
@@ -91,16 +132,16 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 
 		const payload = {
 			model: env.OPENAI_MODEL,
-			messages: msgs,
+			messages: finalMsgs,
 			stream: false
 		};
 
-		if (includeTools && tools.length > 0) {
-			payload.tools = tools;
+		if (useNativeTools) {
+			payload.tools = processedTools;
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`OpenAI request: model=${env.OPENAI_MODEL}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`OpenAI request: model=${env.OPENAI_MODEL}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
@@ -147,16 +188,16 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 
 		const payload = {
 			model: env.GROK_MODEL || 'grok-2-1218',
-			messages: msgs,
+			messages: finalMsgs,
 			stream: false
 		};
 
-		if (includeTools && tools.length > 0) {
-			payload.tools = tools;
+		if (useNativeTools) {
+			payload.tools = processedTools;
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`Grok request: model=${payload.model}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`Grok request: model=${payload.model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
@@ -195,18 +236,18 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 	} else {
 		const payload = {
 			model: env.OLLAMA_MODEL,
-			messages: msgs,
+			messages: finalMsgs,
 			stream: false,
 			options: {
 				num_ctx: 32768
 			}
 		};
-		if (includeTools && tools.length > 0) {
-			payload.tools = tools;
+		if (useNativeTools) {
+			payload.tools = processedTools;
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`Ollama request: model=${env.OLLAMA_MODEL}, messages=${msgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`Ollama request: model=${env.OLLAMA_MODEL}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
@@ -243,26 +284,240 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 // 3. XML Tool Call Parser
 // ==========================================
 
-export function parseXmlToolCalls(msg) {
-	if ((!msg.tool_calls || msg.tool_calls.length === 0) && msg.content && msg.content.includes('<tool_call>')) {
-		msg.tool_calls = [];
-		const regex = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+export function parseXmlToolCalls(msg, activeTools = []) {
+	if ((!msg.tool_calls || msg.tool_calls.length === 0) && msg.content) {
+		const toolCalls = [];
+		const activeToolNames = new Set(activeTools.map(t => t.function?.name || t.name));
+
+		// 1. Try extracting <tool_call> / <toolcall> blocks
+		const toolCallRegex = /<tool_?call>([\s\S]*?)<\/tool_?call>/gi;
 		let match;
-		while ((match = regex.exec(msg.content)) !== null) {
-			try {
-				const toolJson = JSON.parse(match[1].trim());
-				msg.tool_calls.push({
+		let foundTags = false;
+
+		while ((match = toolCallRegex.exec(msg.content)) !== null) {
+			foundTags = true;
+			const block = match[1].trim();
+			const parsed = parseSingleToolCallBlock(block, activeToolNames);
+			if (parsed) {
+				toolCalls.push(parsed);
+			}
+		}
+
+		// 2. Try raw <invoke> blocks if no <tool_call> tags found
+		if (!foundTags) {
+			const invokeRegex = /<invoke\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/invoke>/gi;
+			while ((match = invokeRegex.exec(msg.content)) !== null) {
+				foundTags = true;
+				const toolName = match[1];
+				const innerContent = match[2];
+
+				// Only parse if it is a valid active tool
+				if (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName)) {
+					const args = {};
+					const paramRegex = /<parameter\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/parameter>/gi;
+					let pMatch;
+					while ((pMatch = paramRegex.exec(innerContent)) !== null) {
+						const pName = pMatch[1];
+						const pVal = pMatch[2].trim();
+						args[pName] = parseParamValue(pVal);
+					}
+
+					toolCalls.push({
+						id: 'xml_' + Math.random().toString(36).substr(2, 9),
+						type: 'function',
+						isXml: true,
+						function: {
+							name: toolName,
+							arguments: args
+						}
+					});
+				}
+			}
+		}
+
+		// 3. Try markdown JSON code blocks (```json ... ```)
+		if (toolCalls.length === 0) {
+			const mdJsonRegex = /```json\s*([\s\S]*?)\s*```/gi;
+			while ((match = mdJsonRegex.exec(msg.content)) !== null) {
+				const parsed = tryParseJsonBlock(match[1], activeToolNames);
+				if (parsed) {
+					toolCalls.push(parsed);
+				}
+			}
+		}
+
+		// 4. Try parsing the entire trimmed content as JSON
+		if (toolCalls.length === 0) {
+			const parsed = tryParseJsonBlock(msg.content, activeToolNames);
+			if (parsed) {
+				toolCalls.push(parsed);
+			}
+		}
+
+		// 5. Try finding raw JSON blocks inside the text by scanning braces
+		if (toolCalls.length === 0) {
+			const blocks = findJsonBlocks(msg.content);
+			for (const block of blocks) {
+				const parsed = tryParseJsonBlock(block, activeToolNames);
+				if (parsed) {
+					toolCalls.push(parsed);
+				}
+			}
+		}
+
+		if (toolCalls.length > 0) {
+			msg.tool_calls = toolCalls;
+		}
+	}
+}
+
+function parseSingleToolCallBlock(block, activeToolNames) {
+	// Try parsing as JSON first
+	try {
+		const toolJson = JSON.parse(block);
+		const toolName = toolJson.name;
+		if (toolName && (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName))) {
+			return {
+				id: 'xml_' + Math.random().toString(36).substr(2, 9),
+				type: 'function',
+				isXml: true,
+				function: {
+					name: toolName,
+					arguments: toolJson.arguments || {}
+				}
+			};
+		}
+	} catch (e) {
+		// Not JSON, try parsing as XML/HTML tags (<invoke> format)
+		const invokeRegex = /<invoke\s+name=["']([^"']+)["']/i;
+		const nameMatch = block.match(invokeRegex);
+		if (nameMatch) {
+			const toolName = nameMatch[1];
+			if (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName)) {
+				const args = {};
+				
+				const paramRegex = /<parameter\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/parameter>/gi;
+				let pMatch;
+				while ((pMatch = paramRegex.exec(block)) !== null) {
+					const pName = pMatch[1];
+					const pVal = pMatch[2].trim();
+					args[pName] = parseParamValue(pVal);
+				}
+
+				return {
+					id: 'xml_' + Math.random().toString(36).substr(2, 9),
+					type: 'function',
 					isXml: true,
 					function: {
-						name: toolJson.name,
-						arguments: toolJson.arguments
+						name: toolName,
+						arguments: args
 					}
-				});
-			} catch (e) {
-				logger.error(`Failed to parse XML tool call: ${match[1]}`, e);
+				};
+			}
+		}
+
+		// Try parsing as tag-based XML keys/values (<arg_key>/<arg_value> format)
+		const tagBased = parseTagBasedToolCall(block, activeToolNames);
+		if (tagBased) {
+			return tagBased;
+		}
+
+		logger.error(`Failed to parse XML tool call block: ${block}`, e);
+	}
+	return null;
+}
+
+function parseTagBasedToolCall(block, activeToolNames) {
+	const firstArgKeyIdx = block.indexOf('<arg_key>');
+	if (firstArgKeyIdx === -1) {
+		return null;
+	}
+
+	const toolName = block.substring(0, firstArgKeyIdx).trim();
+	if (!toolName || (activeToolNames.size > 0 && !activeToolNames.has(toolName) && !registry.tools.has(toolName))) {
+		return null;
+	}
+
+	const args = {};
+	const keyRegex = /<arg_key>([\s\S]*?)<\/arg_key>\s*<arg_value>([\s\S]*?)<\/arg_value>/gi;
+	let match;
+	while ((match = keyRegex.exec(block)) !== null) {
+		const key = match[1].trim();
+		const val = match[2].trim();
+		args[key] = parseParamValue(val);
+	}
+
+	return {
+		id: 'xml_' + Math.random().toString(36).substr(2, 9),
+		type: 'function',
+		isXml: true,
+		function: {
+			name: toolName,
+			arguments: args
+		}
+	};
+}
+
+function parseParamValue(val) {
+	if (val === 'true') return true;
+	if (val === 'false') return false;
+	if (!isNaN(val) && val.trim() !== '') {
+		return val.includes('.') ? parseFloat(val) : parseInt(val, 10);
+	}
+	if (val.startsWith('{') || val.startsWith('[')) {
+		try {
+			return JSON.parse(val);
+		} catch (e) {
+			// ignore and return string
+		}
+	}
+	return val;
+}
+
+function tryParseJsonBlock(text, activeToolNames) {
+	try {
+		const parsed = JSON.parse(text.trim());
+		if (parsed && typeof parsed === 'object' && parsed.name) {
+			const toolName = parsed.name;
+			if (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName)) {
+				return {
+					id: 'xml_' + Math.random().toString(36).substr(2, 9),
+					type: 'function',
+					isXml: true,
+					function: {
+						name: toolName,
+						arguments: parsed.arguments || {}
+					}
+				};
+			}
+		}
+	} catch (e) {
+		// Ignore
+	}
+	return null;
+}
+
+function findJsonBlocks(text) {
+	const blocks = [];
+	let braceCount = 0;
+	let startIdx = -1;
+
+	for (let i = 0; i < text.length; i++) {
+		if (text[i] === '{') {
+			if (braceCount === 0) {
+				startIdx = i;
+			}
+			braceCount++;
+		} else if (text[i] === '}') {
+			if (braceCount > 0) {
+				braceCount--;
+				if (braceCount === 0 && startIdx !== -1) {
+					blocks.push(text.substring(startIdx, i + 1));
+				}
 			}
 		}
 	}
+	return blocks;
 }
 
 // ==========================================

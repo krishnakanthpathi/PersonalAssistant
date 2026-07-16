@@ -23,7 +23,7 @@ export class Agent {
 	 * @param {Array} history 
 	 * @param {Function} onStatusUpdate 
 	 */
-	run = catchErrors(async (prompt, history = [], onStatusUpdate = null) => {
+	run = catchErrors(async (prompt, history = [], onStatusUpdate = null, shouldStop = null) => {
 		const requestId = metricsService.startRequest(prompt);
 		const logs = [];
 		const triggerStatusUpdate = (status) => {
@@ -35,7 +35,15 @@ export class Agent {
 			}
 		};
 
+		const checkAborted = () => {
+			if (shouldStop && shouldStop()) {
+				throw new Error('Agent execution was stopped by user.');
+			}
+		};
+
 		try {
+			checkAborted();
+
 			// 1. Prepare message history and RAG search query
 			const { messages, cleanedHistory, combinedRAGQuery } = await prepareMessages(prompt, history);
 
@@ -53,15 +61,17 @@ export class Agent {
 			let iteration = 0;
 
 			// 3. First call to LLM including the tools list
+			checkAborted();
 			triggerStatusUpdate('Thinking...');
 			const response = await callLLM(messages, true, tools, requestId);
 			let message = response.message;
 
 			// Parse XML tool calls in the initial response
-			parseXmlToolCalls(message);
+			parseXmlToolCalls(message, tools);
 
 			// Keep executing tool calls as long as the model requests them (Reasoning Loop)
 			while (message.tool_calls && message.tool_calls.length > 0) {
+				checkAborted();
 				iteration++;
 
 				if (iteration > MAX_ITERATIONS) {
@@ -73,6 +83,7 @@ export class Agent {
 				messages.push(message);
 
 				for (const call of message.tool_calls) {
+					checkAborted();
 					const toolName = call.function.name;
 					const toolArgs = parseToolArguments(call.function.arguments);
 					const toolContext = createToolContext(toolName, triggerStatusUpdate);
@@ -87,11 +98,12 @@ export class Agent {
 					}
 				}
 
+				checkAborted();
 				triggerStatusUpdate(`Thinking... (step ${iteration})`);
-				const nextResponse = await callLLM(messages, false, tools, requestId);
+				const nextResponse = await callLLM(messages, true, tools, requestId);
 				message = nextResponse.message;
 
-				parseXmlToolCalls(message);
+				parseXmlToolCalls(message, tools);
 			}
 
 			metricsService.endRequest(requestId, true);

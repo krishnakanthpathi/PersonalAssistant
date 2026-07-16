@@ -440,6 +440,7 @@ function MainApp() {
   const [autoTtsEnabled, setAutoTtsEnabled] = useState(false);
   const autoTtsEnabledRef = useRef(false);
   const utteranceRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   // Sync autoTtsEnabledRef
   useEffect(() => {
@@ -1041,6 +1042,10 @@ function MainApp() {
 
     if (!textToSend) setPrompt('');
 
+    // Create an AbortController for this request
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     // Append user message
     const userMessage = { role: 'user', content: inputMsg };
     setMessages(prev => [...prev, userMessage]);
@@ -1055,7 +1060,8 @@ function MainApp() {
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: inputMsg, history: messages, sessionId: currentSessionId })
+        body: JSON.stringify({ prompt: inputMsg, history: messages, sessionId: currentSessionId }),
+        signal: controller.signal
       });
 
       if (!response.body) {
@@ -1139,20 +1145,53 @@ function MainApp() {
         }
       }
     } catch (err) {
-      console.error('Stream processing failed:', err);
-      setMessages(prev => {
-        const updated = [...prev];
-        if (updated[assistantMsgIndex]) {
-          updated[assistantMsgIndex].content = `Failed to connect or stream from backend assistant. Make sure the backend server is running.`;
-          updated[assistantMsgIndex].isError = true;
-        }
-        return updated;
-      });
-      setCurrentStatusLog('');
+      if (err.name === 'AbortError') {
+        // User stopped the request — update UI gracefully
+        setMessages(prev => {
+          const updated = [...prev];
+          if (updated[assistantMsgIndex]) {
+            updated[assistantMsgIndex].content = updated[assistantMsgIndex].content || 'Generation stopped by user.';
+            updated[assistantMsgIndex].isStopped = true;
+          }
+          return updated;
+        });
+        setCurrentStatusLog('');
+      } else {
+        console.error('Stream processing failed:', err);
+        setMessages(prev => {
+          const updated = [...prev];
+          if (updated[assistantMsgIndex]) {
+            updated[assistantMsgIndex].content = `Failed to connect or stream from backend assistant. Make sure the backend server is running.`;
+            updated[assistantMsgIndex].isError = true;
+          }
+          return updated;
+        });
+        setCurrentStatusLog('');
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
       // Fetch latest chats after run completes
       fetchChats();
+    }
+  };
+
+  const handleStop = async () => {
+    // 1. Abort the frontend fetch/SSE stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // 2. Tell the backend to cancel the agent reasoning loop
+    try {
+      await fetch('http://localhost:3000/api/chat/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: currentSessionId })
+      });
+    } catch (e) {
+      console.error('Failed to send stop signal to backend:', e);
     }
   };
 
@@ -1303,6 +1342,7 @@ function MainApp() {
               prompt={prompt}
               setPrompt={setPrompt}
               handleSend={handleSend}
+              handleStop={handleStop}
               isListening={isListening}
               toggleListening={toggleListening}
               parseMarkdown={parseMarkdown}

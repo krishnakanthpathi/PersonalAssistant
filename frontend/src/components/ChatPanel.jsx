@@ -8,7 +8,8 @@ import {
   Globe,
   Mic,
   MicOff,
-  Send
+  Send,
+  Square
 } from 'lucide-react';
 
 const getToolNameFromLog = (log) => {
@@ -35,6 +36,7 @@ export default function ChatPanel({
   prompt,
   setPrompt,
   handleSend,
+  handleStop,
   isListening,
   toggleListening,
   parseMarkdown
@@ -257,13 +259,23 @@ export default function ChatPanel({
             >
               {isListening ? <MicOff size={16} /> : <Mic size={16} />}
             </button>
-            <button
-              className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm shrink-0"
-              onClick={() => handleSend()}
-              disabled={!prompt.trim() || isProcessing}
-            >
-              <Send size={16} />
-            </button>
+            {isProcessing ? (
+              <button
+                className="w-9 h-9 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all shadow-sm shrink-0 animate-pulse"
+                onClick={handleStop}
+                title="Stop generation"
+              >
+                <Square size={14} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm shrink-0"
+                onClick={() => handleSend()}
+                disabled={!prompt.trim()}
+              >
+                <Send size={16} />
+              </button>
+            )}
           </div>
           {messages.length > 0 && starterPrompts.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">

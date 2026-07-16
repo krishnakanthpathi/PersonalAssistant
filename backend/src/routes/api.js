@@ -3,7 +3,7 @@ import { getStatus, getConfig, updateConfig, getAvailableModels } from '../contr
 import { getTools } from '../controllers/toolsController.js';
 import { getMetrics, clearMetrics } from '../controllers/metricsController.js';
 import { getSystemPrompt, saveSystemPrompt, activateSystemPrompt, deleteSystemPrompt } from '../controllers/systemPromptController.js';
-import { handleChat, getChats, getChatMessages, deleteChatSession } from '../controllers/chatController.js';
+import { handleChat, stopChat, getChats, getChatMessages, deleteChatSession } from '../controllers/chatController.js';
 import { updateMcpProgress, getMcpStatus } from '../controllers/mcpStatusController.js';
 import { getGoogleAuthUrl, handleGoogleCallback, getGoogleAuthStatus, disconnectGoogle } from '../controllers/authController.js';
 
@@ -40,6 +40,7 @@ router.delete("/api/system-prompt/:id", deleteSystemPrompt);
 
 // Chat stream and sessions
 router.post("/api/chat", handleChat);
+router.post("/api/chat/stop", stopChat);
 router.get("/api/chats", getChats);
 router.get("/api/chats/:sessionId", getChatMessages);
 router.delete("/api/chats/:sessionId", deleteChatSession);

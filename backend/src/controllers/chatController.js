@@ -4,6 +4,7 @@ import { getDB } from '../config/mongodb.js';
 import crypto from 'crypto';
 
 const agent = new Agent();
+const activeSessions = new Map();
 
 export const handleChat = async (req, res) => {
 	let { prompt, history, sessionId } = req.body;
@@ -13,6 +14,24 @@ export const handleChat = async (req, res) => {
 	if (!sessionId) {
 		sessionId = crypto.randomUUID();
 	}
+
+	// Abort any existing execution on this session
+	const existingAbort = activeSessions.get(sessionId);
+	if (existingAbort) {
+		existingAbort();
+		activeSessions.delete(sessionId);
+	}
+
+	let isAborted = false;
+	activeSessions.set(sessionId, () => {
+		isAborted = true;
+	});
+
+	// Listen to client disconnect (SSE stream close) to clean up
+	res.on('close', () => {
+		isAborted = true;
+		activeSessions.delete(sessionId);
+	});
 
 	// Set headers for Server-Sent Events (SSE)
 	res.setHeader('Content-Type', 'text/event-stream');
@@ -53,10 +72,10 @@ export const handleChat = async (req, res) => {
 			{ $push: { messages: userMessage } }
 		);
 
-		// 3. Run agent with history
+		// 3. Run agent with history and abort checks
 		const response = await agent.run(prompt, history, (status) => {
 			sendSSE('status', status);
-		});
+		}, () => isAborted);
 
 		// 4. Save assistant response
 		const assistantMessage = {
@@ -96,8 +115,23 @@ export const handleChat = async (req, res) => {
 		}
 		sendSSE('error', error.message);
 	} finally {
+		activeSessions.delete(sessionId);
 		res.end();
 	}
+};
+
+export const stopChat = async (req, res) => {
+	const { sessionId } = req.body;
+	if (!sessionId) {
+		return res.status(400).json({ success: false, error: 'sessionId is required' });
+	}
+	const abort = activeSessions.get(sessionId);
+	if (abort) {
+		abort();
+		activeSessions.delete(sessionId);
+		return res.json({ success: true, message: 'Agent execution stopped successfully.' });
+	}
+	res.json({ success: false, message: 'No active agent session found to stop.' });
 };
 
 // Get all chat sessions
