@@ -16,18 +16,12 @@ import { clipboardTool } from '../tools/mac/clipboard.js';
 import { mediaControlTool } from '../tools/mac/mediaControl.js';
 import { darkModeTool } from '../tools/mac/darkMode.js';
 import { systemPowerTool } from '../tools/mac/systemPower.js';
-import { wifiControlTool } from '../tools/mac/wifiControl.js';
 import { keystrokeTool } from '../tools/mac/keystroke.js';
 import { activeWindowTool } from '../tools/mac/activeWindow.js';
 import { runAppleScriptTool } from '../tools/mac/runAppleScriptTool.js';
-import { moveMouseTool } from '../tools/mac/moveMouseTool.js';
-// import { getUIElementsTool } from '../tools/mac/getUIElements.js';
-import { mouseClickTool } from '../tools/mac/mouseClick.js';
-// import { annotateScreenTool } from '../tools/mac/annotateScreen.js';
 import { timerTool } from '../tools/mac/timer.js';
 import { remindersTool } from '../tools/mac/reminders.js';
 import { rdsQueryTool } from '../tools/rdsQuery.js';
-import { getAccessibilityTreeTool } from '../tools/mac/getAccessibilityTree.js';
 
 
 import { mcpManager } from '../mcp/mcpManager.js';
@@ -61,18 +55,12 @@ class ToolRegistry {
 		this.tools.set(mediaControlTool.definition.name, mediaControlTool);
 		this.tools.set(darkModeTool.definition.name, darkModeTool);
 		this.tools.set(systemPowerTool.definition.name, systemPowerTool);
-		this.tools.set(wifiControlTool.definition.name, wifiControlTool);
 		this.tools.set(keystrokeTool.definition.name, keystrokeTool);
 		this.tools.set(activeWindowTool.definition.name, activeWindowTool);
 		this.tools.set(runAppleScriptTool.definition.name, runAppleScriptTool);
-		this.tools.set(moveMouseTool.definition.name, moveMouseTool);
-		// this.tools.set(getUIElementsTool.definition.name, getUIElementsTool);
-		this.tools.set(mouseClickTool.definition.name, mouseClickTool);
-		// this.tools.set(annotateScreenTool.definition.name, annotateScreenTool);
 		this.tools.set(timerTool.definition.name, timerTool);
 		this.tools.set(remindersTool.definition.name, remindersTool);
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
-		this.tools.set(getAccessibilityTreeTool.definition.name, getAccessibilityTreeTool);
 	}
 
 	// Ensure database connection is loaded

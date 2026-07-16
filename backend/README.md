@@ -116,15 +116,10 @@ Local tools are registered in [src/tools/mac/index.js](file:///Users/krishnakant
 * **`media_control`**: Commands play/pause/skip events in Spotify and Apple Music.
 
 ### Network & Performance Diagnostics
-* **`wifi_control`**: Reports current SSID name or toggles Wi-Fi cards.
 * **`get_system_stats`**: Retrieves battery metrics and primary disk space limits.
 
-### Desktop Screen Automation & Screen Understanding
+### Desktop Screen Automation
 * **`take_screenshot`**: Captures screen images and saves files inside `data/screenshots/`.
-* **`get_ui_elements`**: Scraping UI hierarchy structures and bounding boxes of visible controls.
-* **`annotate_screen`**: Captures screen images and overlays numerical coordinates onto elements, outputting a visual layout map.
-* **`mouse_click`**: Clicks coordinates absolutely on macOS screens.
-* **`move_mouse`**: Handles cursor displacements and drag operations.
 
 ### Task Utilities
 * **`timer`**: Emulates macOS clock operations to set alerts or count-down timers.

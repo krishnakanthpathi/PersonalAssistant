@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  History, 
-  ArrowLeft, 
-  RefreshCw, 
-  Trash2, 
-  Volume2, 
-  FileText, 
-  Calendar, 
-  Globe, 
-  Wrench, 
+import {
+  LayoutDashboard,
+  History,
+  ArrowLeft,
+  RefreshCw,
+  Trash2,
+  Volume2,
+  FileText,
+  Calendar,
+  Globe,
+  Wrench,
   AlertCircle,
   Activity,
   Cpu,
@@ -52,12 +52,10 @@ export default function AdminDashboard() {
       averageContextProcessingTime: 0,
       totalScreenshots: 0,
       totalAppleScripts: 0,
-      totalFetchUis: 0,
-      totalAnnotations: 0,
       tools: {}
     }
   });
-  
+
   const [tools, setTools] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
@@ -160,7 +158,7 @@ export default function AdminDashboard() {
       {/* Header */}
       <header className="flex-shrink-0 h-16 border-b border-border-color bg-bg-secondary/40 backdrop-blur-md px-6 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={handleBack}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition"
           >
@@ -188,7 +186,7 @@ export default function AdminDashboard() {
 
       {/* Main Container */}
       <div className="flex flex-grow h-[calc(100vh-64px)] overflow-hidden">
-        
+
         {/* Left Sidebar: Recent Request History List */}
         <aside className="w-80 flex-shrink-0 border-r border-border-color bg-bg-secondary/20 flex flex-col h-full overflow-hidden">
           <div className="p-4 border-b border-border-color bg-bg-secondary/10 flex items-center gap-2">
@@ -208,11 +206,10 @@ export default function AdminDashboard() {
                   <button
                     key={req.id}
                     onClick={() => setSelectedRequest(req)}
-                    className={`p-3 text-left rounded-xl transition-all duration-200 border text-xs ${
-                      isSelected
-                        ? 'bg-accent-blue/10 border-accent-blue/30 text-white font-semibold shadow-glow'
-                        : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
-                    }`}
+                    className={`p-3 text-left rounded-xl transition-all duration-200 border text-xs ${isSelected
+                      ? 'bg-accent-blue/10 border-accent-blue/30 text-white font-semibold shadow-glow'
+                      : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full ${req.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
@@ -246,7 +243,7 @@ export default function AdminDashboard() {
               {/* Detail Header */}
               <div className="flex items-center justify-between pb-4 border-b border-border-color">
                 <div className="flex items-center gap-3">
-                  <button 
+                  <button
                     onClick={() => setSelectedRequest(null)}
                     className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-300 hover:text-white transition"
                   >
@@ -290,7 +287,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Targeted Action Telemetries */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
                   <span className="text-gray-400">Screenshots:</span>
                   <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.screenshotCount || 0}</span>
@@ -298,14 +295,6 @@ export default function AdminDashboard() {
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
                   <span className="text-gray-400">Apple Scripts:</span>
                   <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.appleScriptCount || 0}</span>
-                </div>
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
-                  <span className="text-gray-400">Fetch UI:</span>
-                  <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.fetchUiCount || 0}</span>
-                </div>
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs">
-                  <span className="text-gray-400">Annotations:</span>
-                  <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{selectedRequest.annotateCount || 0}</span>
                 </div>
               </div>
 
@@ -375,7 +364,7 @@ export default function AdminDashboard() {
           ) : (
             /* ================= METRICS AGGREGATES VIEW ================= */
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-7xl mx-auto w-full">
-              
+
               {/* Left Column (2/3 width): Aggregate charts and statistics */}
               <div className="lg:col-span-2 flex flex-col gap-6">
                 <div className="flex items-center justify-between pb-4 border-b border-border-color">
@@ -384,14 +373,14 @@ export default function AdminDashboard() {
                     <p className="text-xs text-gray-400">Review aggregates, API runtimes, and tool latencies in real time.</p>
                   </div>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       onClick={fetchMetrics}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition"
                       title="Refresh statistics"
                     >
                       <RefreshCw size={12} className={isLoadingMetrics ? 'animate-spin' : ''} /> Refresh
                     </button>
-                    <button 
+                    <button
                       onClick={handleClearTelemetry}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition"
                       title="Delete logs history"
@@ -465,7 +454,7 @@ export default function AdminDashboard() {
                 {/* Cumulative telemetries */}
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Total Interaction Breakdown</span>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
                       <span className="text-gray-400">Screenshots:</span>
                       <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalScreenshots || 0}</span>
@@ -474,21 +463,13 @@ export default function AdminDashboard() {
                       <span className="text-gray-400">Apple Scripts:</span>
                       <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAppleScripts || 0}</span>
                     </div>
-                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                      <span className="text-gray-400">Fetch UI (elements):</span>
-                      <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalFetchUis || 0}</span>
-                    </div>
-                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                      <span className="text-gray-400">Annotations:</span>
-                      <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAnnotations || 0}</span>
-                    </div>
                   </div>
                 </div>
 
                 {/* Tool latencies and success statistics table */}
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Detailed Tool Execution Performance</span>
-                  
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
@@ -521,7 +502,7 @@ export default function AdminDashboard() {
                                     {(data.successRate * 100).toFixed(0)}%
                                   </span>
                                   <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden hidden sm:block border border-white/5">
-                                    <div 
+                                    <div
                                       className={`h-full rounded-full ${data.successRate >= 0.9 ? 'bg-accent-emerald' : data.successRate >= 0.5 ? 'bg-yellow-400' : 'bg-red-500'}`}
                                       style={{ width: `${(data.successRate * 100).toFixed(0)}%` }}
                                     />

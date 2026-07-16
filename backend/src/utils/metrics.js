@@ -21,8 +21,6 @@ class MetricsService {
 			generatedContext: '',
 			screenshotCount: 0,
 			appleScriptCount: 0,
-			fetchUiCount: 0,
-			annotateCount: 0,
 			toolCalls: [],
 			startTime: Date.now()
 		};
@@ -70,10 +68,6 @@ class MetricsService {
 				req.screenshotCount++;
 			} else if (name === 'run_apple_script') {
 				req.appleScriptCount++;
-			} else if (name === 'get_ui_elements') {
-				req.fetchUiCount++;
-			} else if (name === 'annotate_screen') {
-				req.annotateCount++;
 			}
 		}
 	}
@@ -105,8 +99,6 @@ class MetricsService {
 				generatedContext: req.generatedContext,
 				screenshotCount: req.screenshotCount,
 				appleScriptCount: req.appleScriptCount,
-				fetchUiCount: req.fetchUiCount,
-				annotateCount: req.annotateCount,
 				toolCalls: req.toolCalls,
 				error: req.error || null
 			};
@@ -157,8 +149,6 @@ class MetricsService {
 				generatedContext: log.generatedContext,
 				screenshotCount: log.screenshotCount,
 				appleScriptCount: log.appleScriptCount,
-				fetchUiCount: log.fetchUiCount,
-				annotateCount: log.annotateCount,
 				toolCalls: log.toolCalls || []
 			}));
 
@@ -174,8 +164,6 @@ class MetricsService {
 				averageContextProcessingTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.contextProcessingTime || 0), 0) / count) : 0,
 				totalScreenshots: rawLogs.reduce((sum, log) => sum + (log.screenshotCount || 0), 0),
 				totalAppleScripts: rawLogs.reduce((sum, log) => sum + (log.appleScriptCount || 0), 0),
-				totalFetchUis: rawLogs.reduce((sum, log) => sum + (log.fetchUiCount || 0), 0),
-				totalAnnotations: rawLogs.reduce((sum, log) => sum + (log.annotateCount || 0), 0),
 				tools: {}
 			};
 
@@ -234,8 +222,6 @@ class MetricsService {
 					averageContextProcessingTime: 0,
 					totalScreenshots: 0,
 					totalAppleScripts: 0,
-					totalFetchUis: 0,
-					totalAnnotations: 0,
 					tools: {}
 				}
 			};

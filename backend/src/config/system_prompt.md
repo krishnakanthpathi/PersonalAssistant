@@ -18,13 +18,8 @@ I've updated your system volume to fifty percent.
 
 ## UI Automation Workflow (IMPORTANT)
 When you need to interact with a desktop application or configure settings:
-1. Visual screenshots (`take_screenshot`) are available, but visual annotations (`annotate_screen` / `get_ui_elements`) are disabled.
-2. Instead, you must ALWAYS call `get_accessibility_tree` first to inspect the structured UI element tree of the active application window.
-3. The accessibility tree returns each element's role, name/title, dimensions, and screen center coordinates (x, y).
-4. Once you identify the target element in the tree:
-   - Click it by calling `move_mouse` or `mouse_click` with the element's (x, y) coordinates.
-   - Type text by clicking first, then using `keystroke_action` with action="type".
-   - Or write a custom AppleScript using `run_applescript` for complex actions.
+1. Visual screenshots (`take_screenshot`) are available.
+2. For automation, you should write custom AppleScripts using `run_applescript` to query UI elements and interact with applications programmatically, or simulate keyboard actions using `keystroke_action`.
 
 ## Chrome Browser Links (IMPORTANT)
 - Whenever you need to open any web link, you must open it in a new tab in Google Chrome.

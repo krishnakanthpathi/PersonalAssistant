@@ -32,8 +32,7 @@ graph TD
     LLM["LLM Provider<br/>(OpenAI / Ollama)"]:::external
     
     subgraph macOS Tools
-        T_SYS["Native macOS Scripts<br/>(AppleScript, Shell, Cliclick)"]:::backend
-        T_UI["Screen Understanding<br/>(annotate_screen, get_ui_elements)"]:::backend
+        T_SYS["Native macOS Scripts<br/>(AppleScript, Shell, Cliclick, Screenshots)"]:::backend
     end
     
     subgraph MCP Servers
@@ -57,7 +56,6 @@ graph TD
     AGT --> |Dispatch tool calls| REG
     
     REG --> |Execute native tools| T_SYS
-    REG --> |Inspect visual layout| T_UI
     REG --> |Route via stdio streams| MGR
     
     MGR <--> |Filesystem control| M_FS
@@ -76,13 +74,12 @@ graph TD
 * **System Utilities**: Adjusts speaker volume, checks display stats, locks the screen, empties Finder trash, and toggles Dark/Light appearance modes.
 * **Application Control**: Indexes all installed GUI applications, launches them, and gracefully terminates them.
 * **Music Playback**: Controls track playback (play, pause, skip, previous) in Spotify and Apple Music.
-* **Network & Diagnostics**: Monitors active Wi-Fi SSID network connection status and returns real-time disk and battery health metrics.
+* **Network & Diagnostics**: Returns real-time disk and battery health metrics.
 * **Text-To-Speech (TTS)**: Synthesizes speech feedback natively using the macOS `say` command.
 
-### 2. Screen & UI Automation (Screen Understanding)
-* **Screen Annotations**: Captures full-screen screenshots and overlays numerical coordinate tags on visible UI elements (`annotate_screen`).
-* **UI Element Scraping**: Extracts a semantic tree of screen components with exact spatial geometries (`get_ui_elements`).
-* **Visual Workflows**: Combines screen parsing and mouse/keyboard emulation to interact with any desktop application without native API keys (e.g., clicking search buttons, typing in text inputs, selecting contacts).
+### 2. Screen & UI Automation
+* **Screenshots**: Captures full-screen screenshots of macOS screens (`take_screenshot`).
+* **Visual Workflows**: Combines mouse/keyboard emulation to interact with desktop applications.
 
 ### 3. Model Context Protocol (MCP) Integration
 * **Filesystem MCP**: Grants secure read, write, search, and directory tree navigation inside the workspace.

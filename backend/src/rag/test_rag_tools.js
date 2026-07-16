@@ -59,10 +59,6 @@ async function testRAGSelection() {
 			expectedKeywords: ['system_power']
 		},
 		{
-			query: 'Check my wifi network status',
-			expectedKeywords: ['wifi_control']
-		},
-		{
 			query: 'Type my username krishnakanth on screen',
 			expectedKeywords: ['keystroke']
 		},
@@ -81,18 +77,6 @@ async function testRAGSelection() {
 		{
 			query: 'Run a custom AppleScript script to check finder files',
 			expectedKeywords: ['applescript']
-		},
-		{
-			query: 'What buttons are visible on screen right now',
-			expectedKeywords: ['ui_elements', 'annotate']
-		},
-		{
-			query: 'Take an annotated blueprint screenshot to understand the screen layout',
-			expectedKeywords: ['annotate']
-		},
-		{
-			query: 'Click on the send button at position x 100 y 200',
-			expectedKeywords: ['mouse', 'click']
 		}
 	];
 
@@ -102,13 +86,13 @@ async function testRAGSelection() {
 		console.log('==================================================');
 
 		const selectedTools = await registry.getRelevantTools(tc.query);
-		
+
 		console.log(`Selected ${selectedTools.length} tools:`);
 		const selectedNames = selectedTools.map(t => t.function?.name || t.name);
 		console.log(selectedNames);
 
 		// Verify that at least one relevant tool is present
-		const matchesKeyword = selectedNames.some(name => 
+		const matchesKeyword = selectedNames.some(name =>
 			tc.expectedKeywords.some(keyword => name.toLowerCase().includes(keyword))
 		);
 
@@ -212,46 +196,6 @@ async function testRAGSelection() {
 	} catch (error) {
 		console.log('❌ EXECUTION FAILED:', error.message);
 	}
-
-
-	// 9. Direct execution test of get_ui_elements
-	console.log('\n==================================================');
-	console.log('EXECUTING: get_ui_elements');
-	console.log('==================================================');
-	try {
-		const result = await registry.callTool('get_ui_elements', {});
-		console.log('Result (first 600 chars):');
-		console.log(result.substring(0, 600));
-		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
-	} catch (error) {
-		console.log('❌ EXECUTION FAILED:', error.message);
-	}
-
-	// 10. Direct execution test of annotate_screen
-	console.log('\n==================================================');
-	console.log('EXECUTING: annotate_screen');
-	console.log('==================================================');
-	try {
-		const result = await registry.callTool('annotate_screen', { max_elements: 20 });
-		console.log('Result (first 600 chars):');
-		console.log(result.substring(0, 600));
-		console.log('✅ EXECUTION PASSED: Blueprint annotated successfully.');
-	} catch (error) {
-		console.log('❌ EXECUTION FAILED:', error.message);
-	}
-
-	// 11. Direct execution test of move_mouse (safe: just move, no click)
-	console.log('\n==================================================');
-	console.log('EXECUTING: move_mouse (move only)');
-	console.log('==================================================');
-	try {
-		const result = await registry.callTool('move_mouse', { x: 200, y: 200, action: 'move' });
-		console.log('Result:', result);
-		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
-	} catch (error) {
-		console.log('❌ EXECUTION FAILED:', error.message);
-	}
-
 	console.log('\nEnding RAG selection test.');
 	process.exit(0);
 }
