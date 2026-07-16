@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Save, 
   AlertCircle, 
@@ -6,7 +6,9 @@ import {
   Sparkles,
   Link2,
   Settings,
-  Palette
+  Palette,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 
 export default function SettingsPanel({
@@ -22,8 +24,58 @@ export default function SettingsPanel({
   handleDisconnectGoogle,
   codeTheme,
   setCodeTheme,
-  codeThemes = []
+  codeThemes = [],
+  availableModels = [],
+  fetchAvailableModels
 }) {
+  const [openaiModels, setOpenaiModels] = useState([]);
+  const [grokModels, setGrokModels] = useState([]);
+  const [ollamaModels, setOllamaModels] = useState([]);
+  const [fetchingStatus, setFetchingStatus] = useState({ openai: false, grok: false, ollama: false });
+  const [showManualInput, setShowManualInput] = useState({ openai: false, grok: false, ollama: false });
+
+  // Sync loaded/fetched models for the current active provider
+  useEffect(() => {
+    if (availableModels && availableModels.length > 0) {
+      if (settingsForm.provider === 'openai') setOpenaiModels(availableModels);
+      if (settingsForm.provider === 'grok') setGrokModels(availableModels);
+      if (settingsForm.provider === 'ollama') setOllamaModels(availableModels);
+    }
+  }, [availableModels, settingsForm.provider]);
+
+  const handleFetchModels = async (providerName) => {
+    setFetchingStatus(prev => ({ ...prev, [providerName]: true }));
+    try {
+      const list = await fetchAvailableModels(providerName, settingsForm);
+      if (providerName === 'openai') {
+        setOpenaiModels(list || []);
+        if (list && list.length > 0 && !showManualInput.openai) {
+          if (!settingsForm.openaiModel) {
+            setSettingsForm(prev => ({ ...prev, openaiModel: list[0] }));
+          }
+        }
+      } else if (providerName === 'grok') {
+        setGrokModels(list || []);
+        if (list && list.length > 0 && !showManualInput.grok) {
+          if (!settingsForm.grokModel) {
+            setSettingsForm(prev => ({ ...prev, grokModel: list[0] }));
+          }
+        }
+      } else if (providerName === 'ollama') {
+        setOllamaModels(list || []);
+        if (list && list.length > 0 && !showManualInput.ollama) {
+          if (!settingsForm.ollamaModel) {
+            setSettingsForm(prev => ({ ...prev, ollamaModel: list[0] }));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching models for ' + providerName, e);
+    } finally {
+      setFetchingStatus(prev => ({ ...prev, [providerName]: false }));
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-y-auto p-6">
       {/* Page Header */}
@@ -97,10 +149,53 @@ export default function SettingsPanel({
                       className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
-                    <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                    <input type="text" placeholder="gpt-4o" value={settingsForm.openaiModel}
-                      onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-gray-400 text-[10px]">Model Name</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleFetchModels('openai')}
+                          disabled={fetchingStatus.openai}
+                          className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
+                          title="Fetch available models from OpenAI URL"
+                        >
+                          {fetchingStatus.openai ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-2.5 h-2.5" />
+                          )}
+                          Fetch
+                        </button>
+                        {openaiModels.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowManualInput(prev => ({ ...prev, openai: !prev.openai }))}
+                            className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
+                            title="Toggle manual input"
+                          >
+                            {showManualInput.openai ? 'Select List' : 'Type Name'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {(!showManualInput.openai && openaiModels.length > 0) ? (
+                      <select
+                        value={settingsForm.openaiModel}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
+                      >
+                        {!openaiModels.includes(settingsForm.openaiModel) && settingsForm.openaiModel && (
+                          <option value={settingsForm.openaiModel}>{settingsForm.openaiModel}</option>
+                        )}
+                        {openaiModels.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" placeholder="gpt-4o" value={settingsForm.openaiModel}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -119,10 +214,53 @@ export default function SettingsPanel({
                       className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
-                    <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                    <input type="text" placeholder="llama3.1" value={settingsForm.ollamaModel}
-                      onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-gray-400 text-[10px]">Model Name</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleFetchModels('ollama')}
+                          disabled={fetchingStatus.ollama}
+                          className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
+                          title="Fetch locally running Ollama models"
+                        >
+                          {fetchingStatus.ollama ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-2.5 h-2.5" />
+                          )}
+                          Fetch
+                        </button>
+                        {ollamaModels.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowManualInput(prev => ({ ...prev, ollama: !prev.ollama }))}
+                            className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
+                            title="Toggle manual input"
+                          >
+                            {showManualInput.ollama ? 'Select List' : 'Type Name'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {(!showManualInput.ollama && ollamaModels.length > 0) ? (
+                      <select
+                        value={settingsForm.ollamaModel}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
+                      >
+                        {!ollamaModels.includes(settingsForm.ollamaModel) && settingsForm.ollamaModel && (
+                          <option value={settingsForm.ollamaModel}>{settingsForm.ollamaModel}</option>
+                        )}
+                        {ollamaModels.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" placeholder="llama3.1" value={settingsForm.ollamaModel}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -147,10 +285,53 @@ export default function SettingsPanel({
                       className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                   </div>
                   <div>
-                    <label className="block text-gray-400 mb-1 text-[10px]">Model Name</label>
-                    <input type="text" placeholder="grok-2-1218" value={settingsForm.grokModel}
-                      onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-gray-400 text-[10px]">Model Name</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleFetchModels('grok')}
+                          disabled={fetchingStatus.grok}
+                          className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
+                          title="Fetch available Grok models"
+                        >
+                          {fetchingStatus.grok ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-2.5 h-2.5" />
+                          )}
+                          Fetch
+                        </button>
+                        {grokModels.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowManualInput(prev => ({ ...prev, grok: !prev.grok }))}
+                            className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
+                            title="Toggle manual input"
+                          >
+                            {showManualInput.grok ? 'Select List' : 'Type Name'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {(!showManualInput.grok && grokModels.length > 0) ? (
+                      <select
+                        value={settingsForm.grokModel}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
+                      >
+                        {!grokModels.includes(settingsForm.grokModel) && settingsForm.grokModel && (
+                          <option value={settingsForm.grokModel}>{settingsForm.grokModel}</option>
+                        )}
+                        {grokModels.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" placeholder="grok-2-1218" value={settingsForm.grokModel}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
+                    )}
                   </div>
                 </div>
               </div>

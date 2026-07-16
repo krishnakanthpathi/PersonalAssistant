@@ -366,13 +366,25 @@ function MainApp() {
     openaiBaseUrl: 'default',
     port: 3000
   });
+  const [availableModels, setAvailableModels] = useState([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
 
   // MCP Background Tasks state
   const [mcpTasks, setMcpTasks] = useState([]);
 
   // Chat Sessions States
   const [chats, setChats] = useState([]);
-  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    return localStorage.getItem('currentSessionId') || null;
+  });
+
+  useEffect(() => {
+    if (currentSessionId) {
+      localStorage.setItem('currentSessionId', currentSessionId);
+    } else {
+      localStorage.removeItem('currentSessionId');
+    }
+  }, [currentSessionId]);
 
   // System Prompt States
   const [systemPrompts, setSystemPrompts] = useState({ activePrompt: null, history: [] });
@@ -669,6 +681,85 @@ function MainApp() {
     }
   };
 
+  const fetchAvailableModels = async (provider, customSettings = null) => {
+    setIsFetchingModels(true);
+    try {
+      let url = `http://localhost:3000/api/models?provider=${provider}`;
+      const settings = customSettings || settingsForm;
+      if (provider === 'openai') {
+        const apiKey = settings.openaiApiKey;
+        const baseUrl = settings.openaiBaseUrl;
+        if (apiKey) url += `&apiKey=${encodeURIComponent(apiKey)}`;
+        if (baseUrl) url += `&baseUrl=${encodeURIComponent(baseUrl)}`;
+      } else if (provider === 'grok') {
+        const apiKey = settings.grokApiKey;
+        const baseUrl = settings.grokBaseUrl;
+        if (apiKey) url += `&apiKey=${encodeURIComponent(apiKey)}`;
+        if (baseUrl) url += `&baseUrl=${encodeURIComponent(baseUrl)}`;
+      } else if (provider === 'ollama') {
+        const baseUrl = settings.ollamaUrl;
+        if (baseUrl) url += `&baseUrl=${encodeURIComponent(baseUrl)}`;
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success) {
+        setAvailableModels(data.models || []);
+        return data.models || [];
+      } else {
+        console.warn('Failed to fetch available models:', data.error);
+        setAvailableModels([]);
+        return [];
+      }
+    } catch (err) {
+      console.error('Error fetching available models:', err);
+      setAvailableModels([]);
+      return [];
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
+  const handleSelectModel = async (newModelName) => {
+    try {
+      const updatedConfig = { ...config, model: newModelName };
+      setConfig(updatedConfig);
+      
+      const payload = {
+        ...settingsForm,
+        provider: config.provider,
+        openaiModel: config.provider === 'openai' ? newModelName : settingsForm.openaiModel,
+        grokModel: config.provider === 'grok' ? newModelName : settingsForm.grokModel,
+        ollamaModel: config.provider === 'ollama' ? newModelName : settingsForm.ollamaModel
+      };
+
+      const res = await fetch('http://localhost:3000/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSettingsForm(prev => ({
+          ...prev,
+          openaiModel: config.provider === 'openai' ? newModelName : prev.openaiModel,
+          grokModel: config.provider === 'grok' ? newModelName : prev.grokModel,
+          ollamaModel: config.provider === 'ollama' ? newModelName : prev.ollamaModel
+        }));
+      } else {
+        console.error('Failed to auto-save selected model configuration on backend:', data.error);
+      }
+    } catch (err) {
+      console.error('Error auto-saving selected model:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (config.provider && isConnected) {
+      fetchAvailableModels(config.provider);
+    }
+  }, [config.provider, isConnected]);
+
   // Fetch backend status and config on mount
   const fetchData = async () => {
     try {
@@ -683,7 +774,7 @@ function MainApp() {
         });
         setIsConnected(true);
         if (configData.settings) {
-          setSettingsForm({
+          const loadedSettings = {
             provider: configData.settings.provider || 'ollama',
             openaiApiKey: configData.settings.openaiApiKey || '',
             openaiBaseUrl: configData.settings.openaiBaseUrl || '',
@@ -693,7 +784,9 @@ function MainApp() {
             grokApiKey: configData.settings.grokApiKey || '',
             grokBaseUrl: configData.settings.grokBaseUrl || '',
             grokModel: configData.settings.grokModel || ''
-          });
+          };
+          setSettingsForm(loadedSettings);
+          fetchAvailableModels(configData.provider, loadedSettings);
         }
       }
 
@@ -916,6 +1009,11 @@ function MainApp() {
     fetchChats();
     fetchMcpStatus();
 
+    const cachedSessionId = localStorage.getItem('currentSessionId');
+    if (cachedSessionId) {
+      loadChatSession(cachedSessionId);
+    }
+
     // Check if redirect query parameters exist
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'google') {
@@ -1107,9 +1205,47 @@ function MainApp() {
             <h2 className="text-sm sm:text-md font-semibold text-white truncate">
               {activeTab === 'chat' ? 'Chat Assistant' : activeTab === 'system-prompt' ? 'System Prompt' : 'Settings'}
             </h2>
-            <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-mono font-mono uppercase tracking-wider border border-accent-mono/10 flex-shrink-0">
-              {config.provider === 'openai' ? 'OpenAI SDK' : config.provider === 'grok' ? 'Grok API' : 'Ollama API'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-accent-mono font-mono uppercase tracking-wider border border-accent-mono/10 flex-shrink-0">
+                {config.provider === 'openai' ? 'OpenAI SDK' : config.provider === 'grok' ? 'Grok API' : 'Ollama API'}
+              </span>
+              {activeTab === 'chat' && (
+                <div className="relative flex items-center">
+                  <select
+                    value={config.model}
+                    onChange={(e) => handleSelectModel(e.target.value)}
+                    disabled={isFetchingModels || isProcessing}
+                    className="appearance-none bg-black/40 border border-white/10 hover:border-accent-blue/40 text-gray-200 text-xs rounded-xl pl-3 pr-8 py-1.5 outline-none transition-all duration-200 cursor-pointer min-w-[120px] max-w-[180px] sm:max-w-[220px] truncate disabled:opacity-50"
+                  >
+                    {isFetchingModels ? (
+                      <option disabled>Loading models...</option>
+                    ) : availableModels.length > 0 ? (
+                      <>
+                        {!availableModels.includes(config.model) && config.model !== 'loading...' && (
+                          <option value={config.model}>{config.model}</option>
+                        )}
+                        {availableModels.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value={config.model}>{config.model || 'No models found'}</option>
+                    )}
+                  </select>
+                  <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center text-gray-400">
+                    {isFetchingModels ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-accent-blue" />
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
@@ -1204,6 +1340,8 @@ function MainApp() {
               codeTheme={codeTheme}
               setCodeTheme={setCodeTheme}
               codeThemes={CODE_THEMES}
+              availableModels={availableModels}
+              fetchAvailableModels={fetchAvailableModels}
             />
           )}
         </div>

@@ -60,8 +60,47 @@ export async function loadDbConfig() {
 	if (!db) return;
 	try {
 		const collection = db.collection('app_config');
-		const configDoc = await collection.findOne({ _id: 'llm_settings' });
-		if (configDoc) {
+		let configDoc = await collection.findOne({ _id: 'llm_settings' });
+		
+		if (!configDoc) {
+			configDoc = {
+				_id: 'llm_settings',
+				provider: env.LLM_PROVIDER,
+				openaiApiKey: env.OPENAI_API_KEY,
+				openaiBaseUrl: env.OPENAI_BASE_URL,
+				openaiModel: env.OPENAI_MODEL,
+				ollamaUrl: env.OLLAMA_URL,
+				ollamaModel: env.OLLAMA_MODEL,
+				grokApiKey: env.GROK_API_KEY,
+				grokBaseUrl: env.GROK_BASE_URL,
+				grokModel: env.GROK_MODEL
+			};
+			await collection.insertOne(configDoc);
+		} else {
+			// Check if keys or URLs in the .env file were updated, and sync to DB
+			let needsUpdate = false;
+			if (env.OPENAI_API_KEY && env.OPENAI_API_KEY !== configDoc.openaiApiKey) {
+				configDoc.openaiApiKey = env.OPENAI_API_KEY;
+				needsUpdate = true;
+			}
+			if (env.GROK_API_KEY && env.GROK_API_KEY !== configDoc.grokApiKey) {
+				configDoc.grokApiKey = env.GROK_API_KEY;
+				needsUpdate = true;
+			}
+			if (env.OPENAI_BASE_URL && env.OPENAI_BASE_URL !== configDoc.openaiBaseUrl) {
+				configDoc.openaiBaseUrl = env.OPENAI_BASE_URL;
+				needsUpdate = true;
+			}
+			if (env.GROK_BASE_URL && env.GROK_BASE_URL !== configDoc.grokBaseUrl) {
+				configDoc.grokBaseUrl = env.GROK_BASE_URL;
+				needsUpdate = true;
+			}
+			
+			if (needsUpdate) {
+				await collection.updateOne({ _id: 'llm_settings' }, { $set: configDoc });
+				logger.info("Synchronized updated .env configurations into MongoDB database.");
+			}
+
 			if (configDoc.provider) env.LLM_PROVIDER = configDoc.provider;
 			if (configDoc.openaiApiKey) env.OPENAI_API_KEY = configDoc.openaiApiKey;
 			if (configDoc.openaiBaseUrl) env.OPENAI_BASE_URL = configDoc.openaiBaseUrl;
