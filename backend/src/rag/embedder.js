@@ -11,8 +11,8 @@ export class Embedder {
 		this.provider = env.EMBEDDING_PROVIDER || ((env.LLM_PROVIDER === 'openai' || (env.LLM_PROVIDER === 'grok' && env.OPENAI_API_KEY)) ? 'openai' : 'ollama');
 		if (this.provider === 'openai') {
 			this.openai = new OpenAI({
-				apiKey: env.OPENAI_API_KEY,
-				baseURL: env.OPENAI_BASE_URL || undefined
+				apiKey: env.EMBEDDING_API_KEY || env.OPENAI_API_KEY,
+				baseURL: env.EMBEDDING_BASE_URL || env.OPENAI_BASE_URL || undefined
 			});
 		}
 	}

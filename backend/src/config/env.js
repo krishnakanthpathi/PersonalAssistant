@@ -35,6 +35,8 @@ export const env = {
 
 	// embeddings
 	OLLAMA_EMBEDDING_MODEL: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
+	EMBEDDING_API_KEY: process.env.EMBEDDING_API_KEY,
+	EMBEDDING_BASE_URL: process.env.EMBEDDING_BASE_URL,
 
 	// youtube
 	YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
@@ -46,6 +48,9 @@ export const env = {
 	// mongodb
 	MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017',
 	MONGO_DB_NAME: process.env.MONGO_DB_NAME || 'assistant_platform',
+
+	// chroma
+	CHROMA_URL: process.env.CHROMA_URL || 'http://localhost:8000',
 };
 
 

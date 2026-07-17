@@ -61,7 +61,8 @@ class MetricsService {
 				latencyFromRequestStart,
 				success,
 				error: error || null,
-				resultSummary: result ? String(result).substring(0, 200) + (String(result).length > 200 ? '...' : '') : ''
+				resultSummary: result ? String(result).substring(0, 200) + (String(result).length > 200 ? '...' : '') : '',
+				result: result || null
 			});
 
 			if (name === 'screenshot') {

@@ -9,7 +9,7 @@ export class GmailClient {
 	}
 
 	async connect() {
-		logger.info(`Initializing Gmail MCP (stdio) transport using local @shinzolabs/gmail-mcp with config: ${JSON.stringify(this.config)}`);
+		logger.info('Initializing Gmail MCP transport...');
 
 		const transport = new StdioClientTransport({
 			command: this.config.command,

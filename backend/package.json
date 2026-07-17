@@ -10,9 +10,11 @@
 		"build": "node esbuild.config.js"
 	},
 	"dependencies": {
+		"@chroma-core/default-embed": "^0.1.9",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"axios": "^1.18.1",
 		"better-sqlite3": "^12.11.1",
+		"chromadb": "^3.5.0",
 		"cors": "^2.8.6",
 		"dotenv": "^16.4.5",
 		"express": "^4.19.2",

@@ -9,6 +9,7 @@ import { logger } from './utils/logger.js';
 import { env } from './config/env.js';
 import { connectToMongoDB } from './config/mongodb.js';
 import apiRoutes from './routes/api.js';
+import { PersonalInfoVectorDB } from './rag/personalDb.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -39,6 +40,19 @@ async function startServer() {
 
 	// Initialize MCP Manager & spawn the filesystem server
 	await mcpManager.initialize();
+
+	// Connect and synchronize personal information RAG in Chroma in the background
+	try {
+		const personalDb = new PersonalInfoVectorDB();
+		await personalDb.connect();
+		personalDb.syncFromMemoryJson().then(() => {
+			logger.info('Chroma personal info RAG synchronization complete.');
+		}).catch(err => {
+			logger.error(`Chroma personal info RAG synchronization failed: ${err.message}`);
+		});
+	} catch (err) {
+		logger.error(`Failed to initialize Chroma personal info RAG on startup: ${err.message}`);
+	}
 
 	app.listen(env.PORT, () => {
 		console.log(`Server running on port ${env.PORT}`);
