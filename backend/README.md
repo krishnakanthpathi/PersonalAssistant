@@ -97,6 +97,14 @@ The codebase is organized into modular services:
 
 ---
 
+## 💬 Multi-Turn Chat History Retrieval
+
+The assistant uses a hybrid context strategy to maintain multi-turn memory without degrading latency:
+* **Immediate Context (Sliding Window)**: The last 6 messages of the active session are always passed directly to the LLM, giving it instant memory of immediate references (e.g. "what is that?").
+* **Keyword Search Retrieval**: For messages older than the sliding window, the orchestrator tokenizes the current user prompt, groups the old history into User-Assistant QA turns, and scores them. The top 3 matching turns are dynamically injected into the prompt. This provides fast (<1ms) and cost-free retrieval of older session topics without requiring slow real-time embedding API calls.
+
+---
+
 ## 🛠️ Registered macOS Native Tools
 
 Local tools are registered in [src/tools/mac/index.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/tools/mac/index.js) and run natively via child shell processes, CLI programs, or AppleScript.

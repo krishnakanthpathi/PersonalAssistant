@@ -116,6 +116,10 @@ graph TD
 * **Settings Control Panel**: Dynamically updates LLM providers, model sizes, custom base URLs, and Google OAuth login/disconnect states.
 * **Admin Logs & Test Center**: Streams raw system logs in real-time. Includes tools for manual single-function triggers and a RAG performance evaluation test suite.
 
+### 5. High-Performance Hybrid Chat History
+* **Sliding Window Context**: Injects the last 6 active session messages directly into the LLM context to ensure perfect short-term recall.
+* **In-Memory Keyword Search**: Groups older session logs into QA turns and dynamically retrieves relevant turns via fast token search, enabling long-term session recall with 0ms embedding latency.
+
 ---
 
 ## 🛠️ Getting Started

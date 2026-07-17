@@ -94,7 +94,74 @@ export async function prepareMessages(prompt, history) {
 		}))
 		.filter(m => m.role && m.content);
 
+	const SLIDING_WINDOW_SIZE = 6;
+	const slidingWindow = cleanedHistory.length > SLIDING_WINDOW_SIZE
+		? cleanedHistory.slice(-SLIDING_WINDOW_SIZE)
+		: cleanedHistory;
+	const olderHistory = cleanedHistory.length > SLIDING_WINDOW_SIZE
+		? cleanedHistory.slice(0, -SLIDING_WINDOW_SIZE)
+		: [];
+
 	let systemPromptText = await loadSystemPrompt();
+
+	// Retrieve relevant older messages from history using keyword scoring
+	if (olderHistory.length > 0) {
+		const queryTerms = prompt.toLowerCase().split(/\W+/).filter(term => term.length > 2);
+		if (queryTerms.length > 0) {
+			// Group older history into QA turns
+			const turns = [];
+			for (let i = 0; i < olderHistory.length; i++) {
+				if (olderHistory[i].role === 'user') {
+					const turn = {
+						user: olderHistory[i].content,
+						assistant: ''
+					};
+					if (i + 1 < olderHistory.length && olderHistory[i + 1].role === 'assistant') {
+						turn.assistant = olderHistory[i + 1].content;
+						i++;
+					}
+					turns.push(turn);
+				} else {
+					turns.push({
+						user: '',
+						assistant: olderHistory[i].content
+					});
+				}
+			}
+
+			// Score each turn based on keyword frequency
+			const scoredTurns = turns.map(turn => {
+				const searchText = ((turn.user || '') + ' ' + (turn.assistant || '')).toLowerCase();
+				let score = 0;
+				for (const term of queryTerms) {
+					const regex = new RegExp(term.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+					const matches = searchText.match(regex);
+					if (matches) {
+						score += matches.length;
+					}
+				}
+				return { turn, score };
+			});
+
+			// Filter matching turns and sort by descending score
+			const matchingTurns = scoredTurns
+				.filter(item => item.score > 0)
+				.sort((a, b) => b.score - a.score)
+				.slice(0, 3)
+				.map(item => item.turn);
+
+			if (matchingTurns.length > 0) {
+				let historyContext = '\n\n## Relevant Past Messages (from earlier in the session):\n';
+				for (const turn of matchingTurns) {
+					if (turn.user) historyContext += `User: ${turn.user}\n`;
+					if (turn.assistant) historyContext += `Assistant: ${turn.assistant}\n`;
+					historyContext += '---\n';
+				}
+				systemPromptText = `${systemPromptText}${historyContext}`;
+				logger.info(`Injected ${matchingTurns.length} relevant historical QA turns into context using keyword search.`);
+			}
+		}
+	}
 
 	// Inject matching memory context directly into the system prompt using Chroma
 	const memoryContext = await loadMemoryContext(prompt);
@@ -107,7 +174,7 @@ export async function prepareMessages(prompt, history) {
 			role: 'system',
 			content: systemPromptText
 		},
-		// ...cleanedHistory, // Commented out to stop history injection (to be replaced with RAG)
+		...slidingWindow,
 		{ role: 'user', content: prompt }
 	];
 
