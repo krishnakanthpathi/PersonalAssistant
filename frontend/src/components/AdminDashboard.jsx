@@ -18,7 +18,10 @@ import {
   CheckCircle2,
   XCircle,
   Sliders,
-  Terminal
+  Terminal,
+  Search,
+  Pause,
+  Play
 } from 'lucide-react';
 
 // Helper to get tool icons dynamically
@@ -65,6 +68,14 @@ export default function AdminDashboard() {
     model: 'loading...',
     port: 3000
   });
+
+  const [activeView, setActiveView] = useState('overview'); // 'overview' or 'logs'
+  const [logs, setLogs] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [levelFilter, setLevelFilter] = useState('all');
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
 
   // Load request from navigation state if present
   useEffect(() => {
@@ -134,6 +145,90 @@ export default function AdminDashboard() {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const consoleContainerRef = React.useRef(null);
+
+  // Live log streaming connection
+  useEffect(() => {
+    setConnectionStatus('connecting');
+    const eventSource = new EventSource('http://localhost:3000/api/logs/stream');
+
+    eventSource.onopen = () => {
+      setConnectionStatus('connected');
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const { type, data } = JSON.parse(event.data);
+        if (type === 'history') {
+          setLogs(data);
+        } else if (type === 'log') {
+          setIsPaused((paused) => {
+            if (paused) return paused;
+            setLogs((prev) => {
+              const isDuplicate = prev.slice(-25).some(
+                (l) => l.timestamp === data.timestamp && l.message === data.message && l.level === data.level
+              );
+              if (isDuplicate) return prev;
+              return [...prev, data].slice(-1000);
+            });
+            return paused;
+          });
+        }
+      } catch (e) {
+        console.error('Error parsing log event:', e);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('Log SSE connection failed, retrying...', err);
+      setConnectionStatus('disconnected');
+    };
+
+    return () => {
+      eventSource.close();
+      setConnectionStatus('disconnected');
+    };
+  }, []);
+
+  // Auto-scroll to bottom of console logs
+  useEffect(() => {
+    if (autoScroll && consoleContainerRef.current) {
+      consoleContainerRef.current.scrollTop = consoleContainerRef.current.scrollHeight;
+    }
+  }, [logs, autoScroll]);
+
+  // Log filter helpers
+  const filteredLogs = logs.filter((log) => {
+    const matchesLevel =
+      levelFilter === 'all' || log.level?.toLowerCase() === levelFilter.toLowerCase();
+    
+    const messageStr = typeof log.message === 'string' ? log.message : JSON.stringify(log.message || '');
+    const matchesSearch =
+      searchQuery === '' ||
+      messageStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.level?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+    return matchesLevel && matchesSearch;
+  });
+
+  const formatTime = (isoString) => {
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch (e) {
+      return '00:00:00';
+    }
+  };
+
+  const getLevelBadgeStyles = (level) => {
+    const lvl = level?.toLowerCase();
+    if (lvl === 'error') return 'bg-red-500/10 text-red-400 border border-red-500/20';
+    if (lvl === 'warn' || lvl === 'warning') return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+    if (lvl === 'info') return 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
+    if (lvl === 'debug') return 'bg-purple-500/10 text-purple-400 border border-purple-500/20';
+    return 'bg-gray-500/10 text-gray-400 border border-gray-500/20';
+  };
 
   const handleClearTelemetry = async () => {
     if (!window.confirm('Are you sure you want to clear all telemetry data?')) return;
@@ -363,196 +458,372 @@ export default function AdminDashboard() {
             </div>
           ) : (
             /* ================= METRICS AGGREGATES VIEW ================= */
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-7xl mx-auto w-full">
-
-              {/* Left Column (2/3 width): Aggregate charts and statistics */}
-              <div className="lg:col-span-2 flex flex-col gap-6">
-                <div className="flex items-center justify-between pb-4 border-b border-border-color">
-                  <div>
-                    <h2 className="text-md font-semibold text-white font-sans">Diagnostics & Performance</h2>
-                    <p className="text-xs text-gray-400">Review aggregates, API runtimes, and tool latencies in real time.</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={fetchMetrics}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition"
-                      title="Refresh statistics"
-                    >
-                      <RefreshCw size={12} className={isLoadingMetrics ? 'animate-spin' : ''} /> Refresh
-                    </button>
-                    <button
-                      onClick={handleClearTelemetry}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition"
-                      title="Delete logs history"
-                    >
-                      <Trash2 size={12} /> Clear Telemetry
-                    </button>
-                  </div>
-                </div>
-
-                {/* Summary cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  {/* Card 1: Total runs & success */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Requests</span>
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-3xl font-extrabold text-white">{metrics.aggregates?.totalRequests || 0}</span>
-                      <span className="text-xs text-gray-500">runs</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                      <span className="text-gray-400">Success Rate:</span>
-                      <span className="font-semibold text-accent-emerald">
-                        {metrics.aggregates?.totalRequests ? `${((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100).toFixed(0)}%` : '0%'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card 2: Average latencies */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Average Latency</span>
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-3xl font-extrabold text-accent-mono">
-                        {metrics.aggregates?.averageTotalDuration ? `${(metrics.aggregates.averageTotalDuration / 1000).toFixed(1)}s` : '0.0s'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                      <span className="text-gray-400">Avg RAG Duration:</span>
-                      <span className="font-semibold text-accent-mono">{metrics.aggregates?.averageRetrievalTime || 0} ms</span>
-                    </div>
-                  </div>
-
-                  {/* Card 3: Execution metrics */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Tools Execution</span>
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-3xl font-extrabold text-accent-blue">{totalToolCalls}</span>
-                      <span className="text-xs text-gray-500">calls</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                      <span className="text-gray-400">Avg Calls/Run:</span>
-                      <span className="font-semibold text-accent-blue">
-                        {metrics.aggregates?.totalRequests ? (totalToolCalls / metrics.aggregates.totalRequests).toFixed(1) : '0.0'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Accuracy Metrics */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Reliability</span>
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-3xl font-extrabold text-accent-emerald">
-                        {totalToolCalls ? `${((successfulToolCalls / totalToolCalls) * 100).toFixed(0)}%` : '100%'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                      <span className="text-gray-400">Failed tool runs:</span>
-                      <span className="font-semibold text-red-400">{failedToolCalls}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cumulative telemetries */}
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Total Interaction Breakdown</span>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                      <span className="text-gray-400">Screenshots:</span>
-                      <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalScreenshots || 0}</span>
-                    </div>
-                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
-                      <span className="text-gray-400">Apple Scripts:</span>
-                      <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAppleScripts || 0}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tool latencies and success statistics table */}
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Detailed Tool Execution Performance</span>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-white/[0.02] text-gray-400 border-b border-white/10">
-                          <th className="font-semibold py-3 px-4 rounded-l-xl pr-4 text-left">Tool Name</th>
-                          <th className="font-semibold py-3 px-4 text-center">Total Calls</th>
-                          <th className="font-semibold py-3 px-4 text-center">Response (Success) Rate</th>
-                          <th className="font-semibold py-3 px-4 text-right">Avg Execution Latency</th>
-                          <th className="font-semibold py-3 px-4 rounded-r-xl text-right">Avg Latency (Reasoning)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {Object.keys(metrics.aggregates?.tools || {}).length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="text-center py-8 text-gray-500">No tools have been called yet.</td>
-                          </tr>
-                        ) : (
-                          Object.entries(metrics.aggregates.tools).map(([name, data]) => (
-                            <tr key={name} className="hover:bg-white/[0.03] border-b border-white/5 transition-all">
-                              <td className="py-3 px-4 font-mono font-bold text-white flex items-center gap-2">
-                                <span className="p-1 bg-white/5 rounded">
-                                  {getToolIcon(name)}
-                                </span>
-                                {name}
-                              </td>
-                              <td className="py-3 px-4 text-center font-mono text-gray-300">{data.calls}</td>
-                              <td className="py-3 px-4 font-mono">
-                                <div className="flex items-center gap-3 justify-center">
-                                  <span className={`text-xs font-bold ${data.successRate >= 0.9 ? 'text-accent-emerald' : data.successRate >= 0.5 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                    {(data.successRate * 100).toFixed(0)}%
-                                  </span>
-                                  <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden hidden sm:block border border-white/5">
-                                    <div
-                                      className={`h-full rounded-full ${data.successRate >= 0.9 ? 'bg-accent-emerald' : data.successRate >= 0.5 ? 'bg-yellow-400' : 'bg-red-500'}`}
-                                      style={{ width: `${(data.successRate * 100).toFixed(0)}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-right font-mono text-white font-medium">{data.averageLatency} ms</td>
-                              <td className="py-3 px-4 text-right font-mono text-accent-blue font-semibold">{data.averageLatencyFromRequestStart} ms</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+            <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full flex-grow overflow-hidden">
+              {/* Tab Header Selector */}
+              <div className="flex border-b border-white/5 pb-0 items-center justify-between flex-shrink-0">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => { setActiveView('overview'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'overview'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <Sliders size={13} />
+                    Overview & Telemetry
+                  </button>
+                  <button
+                    onClick={() => { setActiveView('logs'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'logs'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <Terminal size={13} />
+                    Live Server Logs
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      connectionStatus === 'connected' ? 'bg-accent-emerald animate-pulse' : 'bg-red-500'
+                    }`} />
+                  </button>
                 </div>
               </div>
 
-              {/* Right Column (1/3 width): Available Tools list card */}
-              <div className="flex flex-col gap-6 lg:sticky lg:top-6">
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col max-h-[calc(100vh-80px)] overflow-hidden">
-                  <div className="flex items-center gap-2 mb-4 text-gray-200">
-                    <Wrench className="w-4 h-4 text-accent-mono" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Active Tools ({tools.length})</span>
+              {activeView === 'overview' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start w-full">
+                  {/* Left Column (2/3 width): Aggregate charts and statistics */}
+                  <div className="lg:col-span-2 flex flex-col gap-6">
+                    <div className="flex items-center justify-between pb-4 border-b border-border-color">
+                      <div>
+                        <h2 className="text-md font-semibold text-white font-sans">Diagnostics & Performance</h2>
+                        <p className="text-xs text-gray-400">Review aggregates, API runtimes, and tool latencies in real time.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={fetchMetrics}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition cursor-pointer"
+                          title="Refresh statistics"
+                        >
+                          <RefreshCw size={12} className={isLoadingMetrics ? 'animate-spin' : ''} /> Refresh
+                        </button>
+                        <button
+                          onClick={handleClearTelemetry}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition cursor-pointer"
+                          title="Delete logs history"
+                        >
+                          <Trash2 size={12} /> Clear Telemetry
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      {/* Card 1: Total runs & success */}
+                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Requests</span>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-3xl font-extrabold text-white">{metrics.aggregates?.totalRequests || 0}</span>
+                          <span className="text-xs text-gray-500">runs</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                          <span className="text-gray-400">Success Rate:</span>
+                          <span className="font-semibold text-accent-emerald">
+                            {metrics.aggregates?.totalRequests ? `${((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100).toFixed(0)}%` : '0%'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card 2: Average latencies */}
+                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Average Latency</span>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-3xl font-extrabold text-accent-mono">
+                            {metrics.aggregates?.averageTotalDuration ? `${(metrics.aggregates.averageTotalDuration / 1000).toFixed(1)}s` : '0.0s'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                          <span className="text-gray-400">Avg RAG Duration:</span>
+                          <span className="font-semibold text-accent-mono">{metrics.aggregates?.averageRetrievalTime || 0} ms</span>
+                        </div>
+                      </div>
+
+                      {/* Card 3: Execution metrics */}
+                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Tools Execution</span>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-3xl font-extrabold text-accent-blue">{totalToolCalls}</span>
+                          <span className="text-xs text-gray-500">calls</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                          <span className="text-gray-400">Avg Calls/Run:</span>
+                          <span className="font-semibold text-accent-blue">
+                            {metrics.aggregates?.totalRequests ? (totalToolCalls / metrics.aggregates.totalRequests).toFixed(1) : '0.0'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card 4: Accuracy Metrics */}
+                      <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Agent Reliability</span>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-3xl font-extrabold text-accent-emerald">
+                            {totalToolCalls ? `${((successfulToolCalls / totalToolCalls) * 100).toFixed(0)}%` : '100%'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
+                          <span className="text-gray-400">Failed tool runs:</span>
+                          <span className="font-semibold text-red-400">{failedToolCalls}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cumulative telemetries */}
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Total Interaction Breakdown</span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
+                          <span className="text-gray-400">Screenshots:</span>
+                          <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalScreenshots || 0}</span>
+                        </div>
+                        <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-xs flex flex-col gap-1.5">
+                          <span className="text-gray-400">Apple Scripts:</span>
+                          <span className="font-mono font-semibold text-white">{metrics.aggregates?.totalAppleScripts || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tool latencies and success statistics table */}
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-4">Detailed Tool Execution Performance</span>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-white/[0.02] text-gray-400 border-b border-white/10">
+                              <th className="font-semibold py-3 px-4 rounded-l-xl pr-4 text-left">Tool Name</th>
+                              <th className="font-semibold py-3 px-4 text-center">Total Calls</th>
+                              <th className="font-semibold py-3 px-4 text-center">Response (Success) Rate</th>
+                              <th className="font-semibold py-3 px-4 text-right">Avg Execution Latency</th>
+                              <th className="font-semibold py-3 px-4 rounded-r-xl text-right">Avg Latency (Reasoning)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {Object.keys(metrics.aggregates?.tools || {}).length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="text-center py-8 text-gray-500">No tools have been called yet.</td>
+                              </tr>
+                            ) : (
+                              Object.entries(metrics.aggregates.tools).map(([name, data]) => (
+                                <tr key={name} className="hover:bg-white/[0.03] border-b border-white/5 transition-all">
+                                  <td className="py-3 px-4 font-mono font-bold text-white flex items-center gap-2">
+                                    <span className="p-1 bg-white/5 rounded">
+                                      {getToolIcon(name)}
+                                    </span>
+                                    {name}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-mono text-gray-300">{data.calls}</td>
+                                  <td className="py-3 px-4 font-mono">
+                                    <div className="flex items-center gap-3 justify-center">
+                                      <span className={`text-xs font-bold ${data.successRate >= 0.9 ? 'text-accent-emerald' : data.successRate >= 0.5 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                        {(data.successRate * 100).toFixed(0)}%
+                                      </span>
+                                      <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden hidden sm:block border border-white/5">
+                                        <div
+                                          className={`h-full rounded-full ${data.successRate >= 0.9 ? 'bg-accent-emerald' : data.successRate >= 0.5 ? 'bg-yellow-400' : 'bg-red-500'}`}
+                                          style={{ width: `${(data.successRate * 100).toFixed(0)}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono text-white font-medium">{data.averageLatency} ms</td>
+                                  <td className="py-3 px-4 text-right font-mono text-accent-blue font-semibold">{data.averageLatencyFromRequestStart} ms</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2 overflow-y-auto pr-1">
-                    {tools.length === 0 ? (
-                      <div className="text-gray-500 text-xs text-center py-4 border border-dashed border-white/5 rounded-xl">
-                        No active tools found.
+
+                  {/* Right Column (1/3 width): Available Tools list card */}
+                  <div className="flex flex-col gap-6 lg:sticky lg:top-6">
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col max-h-[calc(100vh-80px)] overflow-hidden">
+                      <div className="flex items-center gap-2 mb-4 text-gray-200">
+                        <Wrench className="w-4 h-4 text-accent-mono" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Active Tools ({tools.length})</span>
+                      </div>
+                      <div className="flex flex-col gap-2 overflow-y-auto pr-1">
+                        {tools.length === 0 ? (
+                          <div className="text-gray-500 text-xs text-center py-4 border border-dashed border-white/5 rounded-xl">
+                            No active tools found.
+                          </div>
+                        ) : (
+                          tools.map((tool, idx) => {
+                            const toolName = tool.function?.name || tool.name;
+                            const toolDesc = tool.function?.description || tool.description || 'No description provided';
+                            return (
+                              <div key={idx} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-200 border border-white/5 hover:border-white/10" title={toolName}>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <span className="p-1 bg-white/5 rounded-lg">
+                                    {getToolIcon(toolName)}
+                                  </span>
+                                  <span className="font-mono text-xs font-bold text-gray-200 truncate">{toolName}</span>
+                                </div>
+                                <span className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{toolDesc}</span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ================= LIVE LOGS VIEW ================= */
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                  {/* Header / Toolbar */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                        System Event Stream
+                        <span className={`px-2.5 py-0.5 text-[9px] rounded-full font-mono font-bold ${
+                          connectionStatus === 'connected'
+                            ? 'bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20'
+                            : connectionStatus === 'connecting'
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                          {connectionStatus.toUpperCase()}
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-gray-500">Real-time standard output and action logs from your personal assistant backend.</p>
+                    </div>
+
+                    {/* Filter controls */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {/* Search bar */}
+                      <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input
+                          type="text"
+                          placeholder="Search logs..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-44 transition-all"
+                        />
+                        {searchQuery && (
+                          <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Level selector */}
+                      <select
+                        value={levelFilter}
+                        onChange={(e) => setLevelFilter(e.target.value)}
+                        className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-gray-300 focus:outline-none focus:border-accent-blue/50 transition-all cursor-pointer"
+                      >
+                        <option value="all">All Levels</option>
+                        <option value="info">Info</option>
+                        <option value="warn">Warning</option>
+                        <option value="error">Error</option>
+                        <option value="debug">Debug</option>
+                      </select>
+
+                      <div className="h-4 w-px bg-white/10 mx-1" />
+
+                      {/* Pause/Resume stream */}
+                      <button
+                        onClick={() => setIsPaused(!isPaused)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          isPaused
+                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20'
+                            : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
+                        }`}
+                        title={isPaused ? 'Resume live log stream' : 'Pause live log stream'}
+                      >
+                        {isPaused ? <Play size={12} /> : <Pause size={12} />}
+                        {isPaused ? 'Resume' : 'Pause'}
+                      </button>
+
+                      {/* Auto-scroll */}
+                      <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg cursor-pointer transition-all text-xs text-gray-300 select-none">
+                        <input
+                          type="checkbox"
+                          checked={autoScroll}
+                          onChange={(e) => setAutoScroll(e.target.checked)}
+                          className="rounded border-white/10 text-accent-blue bg-black/40 focus:ring-0 cursor-pointer"
+                        />
+                        <span>Auto-scroll</span>
+                      </label>
+
+                      {/* Clear Console */}
+                      <button
+                        onClick={() => setLogs([])}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-gray-300 hover:text-white transition-all cursor-pointer text-xs"
+                        title="Clear console view"
+                      >
+                        <Trash2 size={12} />
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Terminal Console View */}
+                  <div
+                    ref={consoleContainerRef}
+                    className="flex-grow bg-black/40 border border-white/5 rounded-xl mt-4 p-4 font-mono text-[11px] overflow-y-auto flex flex-col gap-1.5 select-text scroll-smooth"
+                  >
+                    {filteredLogs.length === 0 ? (
+                      <div className="text-gray-500 text-center py-20 italic">
+                        {logs.length === 0
+                          ? 'No events received yet.'
+                          : 'No logs match the current search filters.'}
                       </div>
                     ) : (
-                      tools.map((tool, idx) => {
-                        const toolName = tool.function?.name || tool.name;
-                        const toolDesc = tool.function?.description || tool.description || 'No description provided';
+                      filteredLogs.map((log, index) => {
+                        const messageStr = typeof log.message === 'string' ? log.message : JSON.stringify(log.message);
                         return (
-                          <div key={idx} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-200 border border-white/5 hover:border-white/10" title={toolName}>
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="p-1 bg-white/5 rounded-lg">
-                                {getToolIcon(toolName)}
+                          <div key={index} className="flex items-start gap-2 hover:bg-white/[0.02] py-0.5 px-1 rounded transition-colors group">
+                            <span className="text-gray-600 font-medium select-none flex-shrink-0">
+                              [{formatTime(log.timestamp)}]
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider select-none flex-shrink-0 leading-none mt-0.5 ${getLevelBadgeStyles(log.level)}`}>
+                              {log.level || 'info'}
+                            </span>
+                            <span className="text-gray-300 break-all leading-relaxed whitespace-pre-wrap flex-grow">
+                              {messageStr}
+                            </span>
+                            {Object.keys(log).some(k => !['timestamp', 'level', 'message'].includes(k)) && (
+                              <span className="text-[10px] text-gray-600 bg-white/5 px-1 rounded select-all group-hover:text-gray-400 transition-colors flex-shrink-0 font-mono">
+                                JSON
                               </span>
-                              <span className="font-mono text-xs font-bold text-gray-200 truncate">{toolName}</span>
-                            </div>
-                            <span className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{toolDesc}</span>
+                            )}
                           </div>
                         );
                       })
                     )}
                   </div>
-                </div>
-              </div>
 
+                  {/* Footer status summary */}
+                  <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono pt-3 mt-1 border-t border-white/5 flex-shrink-0">
+                    <div>
+                      Showing {filteredLogs.length} of {logs.length} events
+                    </div>
+                    {isPaused && (
+                      <div className="text-amber-400 font-semibold animate-pulse">
+                        [STREAM PAUSED - {logs.length - filteredLogs.length} updates buffered]
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>

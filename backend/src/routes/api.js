@@ -6,6 +6,7 @@ import { getSystemPrompt, saveSystemPrompt, activateSystemPrompt, deleteSystemPr
 import { handleChat, stopChat, getChats, getChatMessages, deleteChatSession } from '../controllers/chatController.js';
 import { updateMcpProgress, getMcpStatus } from '../controllers/mcpStatusController.js';
 import { getGoogleAuthUrl, handleGoogleCallback, getGoogleAuthStatus, disconnectGoogle } from '../controllers/authController.js';
+import { streamLogs } from '../controllers/logsController.js';
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.get("/api/mcp/status", getMcpStatus);
 // Metrics
 router.get("/api/metrics", getMetrics);
 router.delete("/api/metrics", clearMetrics);
+router.get("/api/logs/stream", streamLogs);
 
 // System Prompts
 router.get("/api/system-prompt", getSystemPrompt);

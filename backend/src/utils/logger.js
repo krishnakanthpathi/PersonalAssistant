@@ -4,8 +4,24 @@
 import winston from 'winston';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { EventEmitter } from 'events';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export const logEmitter = new EventEmitter();
+logEmitter.setMaxListeners(100);
+
+class EmitterTransport extends winston.Transport {
+	constructor(opts) {
+		super(opts);
+	}
+	log(info, callback) {
+		setImmediate(() => {
+			logEmitter.emit('log', info);
+		});
+		callback();
+	}
+}
 
 export const logger = winston.createLogger({
 	level: 'info',
@@ -29,6 +45,7 @@ export const logger = winston.createLogger({
 		}),
 		new winston.transports.File({
 			filename: path.join(__dirname, '../../data/logs/combined.log')
-		})
+		}),
+		new EmitterTransport()
 	]
 });
