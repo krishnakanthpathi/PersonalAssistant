@@ -73,7 +73,12 @@ export async function loadDbConfig() {
 				ollamaModel: env.OLLAMA_MODEL,
 				grokApiKey: env.GROK_API_KEY,
 				grokBaseUrl: env.GROK_BASE_URL,
-				grokModel: env.GROK_MODEL
+				grokModel: env.GROK_MODEL,
+				embeddingProvider: env.EMBEDDING_PROVIDER,
+				embeddingApiKey: env.EMBEDDING_API_KEY,
+				embeddingBaseUrl: env.EMBEDDING_BASE_URL,
+				openaiEmbeddingModel: env.OPENAI_EMBEDDING_MODEL,
+				ollamaEmbeddingModel: env.OLLAMA_EMBEDDING_MODEL
 			};
 			await collection.insertOne(configDoc);
 		} else {
@@ -95,6 +100,14 @@ export async function loadDbConfig() {
 				configDoc.grokBaseUrl = env.GROK_BASE_URL;
 				needsUpdate = true;
 			}
+			if (env.EMBEDDING_API_KEY && env.EMBEDDING_API_KEY !== configDoc.embeddingApiKey) {
+				configDoc.embeddingApiKey = env.EMBEDDING_API_KEY;
+				needsUpdate = true;
+			}
+			if (env.EMBEDDING_BASE_URL && env.EMBEDDING_BASE_URL !== configDoc.embeddingBaseUrl) {
+				configDoc.embeddingBaseUrl = env.EMBEDDING_BASE_URL;
+				needsUpdate = true;
+			}
 			
 			if (needsUpdate) {
 				await collection.updateOne({ _id: 'llm_settings' }, { $set: configDoc });
@@ -110,6 +123,11 @@ export async function loadDbConfig() {
 			if (configDoc.grokApiKey) env.GROK_API_KEY = configDoc.grokApiKey;
 			if (configDoc.grokBaseUrl) env.GROK_BASE_URL = configDoc.grokBaseUrl;
 			if (configDoc.grokModel) env.GROK_MODEL = configDoc.grokModel;
+			if (configDoc.embeddingProvider) env.EMBEDDING_PROVIDER = configDoc.embeddingProvider;
+			if (configDoc.embeddingApiKey) env.EMBEDDING_API_KEY = configDoc.embeddingApiKey;
+			if (configDoc.embeddingBaseUrl) env.EMBEDDING_BASE_URL = configDoc.embeddingBaseUrl;
+			if (configDoc.openaiEmbeddingModel) env.OPENAI_EMBEDDING_MODEL = configDoc.openaiEmbeddingModel;
+			if (configDoc.ollamaEmbeddingModel) env.OLLAMA_EMBEDDING_MODEL = configDoc.ollamaEmbeddingModel;
 			logger.info("Loaded custom LLM provider configuration overrides from MongoDB database.");
 		}
 	} catch (error) {

@@ -23,9 +23,13 @@ export const volumeSetTool = {
 	},
 
 	execute: catchErrors(async ({ level }) => {
+		const parsed = Number(level);
+		if (isNaN(parsed)) {
+			throw new Error('Level is not a valid number');
+		}
 		// 1. Sanitize the input to ensure it is a safe integer between 0-100
 		const safeLevel = Math.max(
-			0, Math.min(100, Math.round(Number(level)))
+			0, Math.min(100, Math.round(parsed))
 		);
 
 		// 2. Execute the exact volume AppleScript

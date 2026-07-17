@@ -616,6 +616,7 @@ function MainApp() {
 
   const toggleListeningRef = useRef(null);
   toggleListeningRef.current = toggleListening;
+  const startNewChatRef = useRef(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -623,6 +624,13 @@ function MainApp() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
         toggleListeningRef.current?.();
+        return;
+      }
+
+      // Check for Ctrl+N (or Cmd+N) to start a new chat
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        startNewChatRef.current?.();
         return;
       }
 
@@ -882,6 +890,8 @@ function MainApp() {
     setCurrentSessionId(null);
     setActiveTab('chat');
   };
+
+  startNewChatRef.current = startNewChat;
 
   const handleConnectGoogle = async () => {
     try {

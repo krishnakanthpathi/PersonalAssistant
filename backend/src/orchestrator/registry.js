@@ -219,9 +219,10 @@ class ToolRegistry {
 		const allTools = await this.getOllamaTools();
 		logger.info(`[RAG Warmup] Found ${allTools.length} total tools.`);
 
-		const currentModel = env.OPENAI_API_KEY
+		const activeProvider = env.EMBEDDING_PROVIDER || (env.OPENAI_API_KEY ? 'openai' : 'ollama');
+		const currentModel = activeProvider === 'openai'
 			? (env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small')
-			: (env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text');
+			: (env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text');
 
 		const toolsToEmbed = [];
 		const toolsToEmbedTexts = [];
@@ -282,26 +283,19 @@ class ToolRegistry {
 
 	// Dynamic filtering of tools based on RAG relevance to query
 	async getRelevantTools(query) {
-		logger.info('[RAG] Step 1: Ensuring DB is loaded...');
 		await this.ensureDbLoaded();
-		logger.info('[RAG] Step 1: DB loaded OK.');
-
-		// Fetch all currently active tools
-		logger.info('[RAG] Step 2: Fetching all active tools (local + MCP)...');
 		const allTools = await this.getOllamaTools();
-		logger.info(`[RAG] Step 2: Fetched ${allTools.length} total tools.`);
 
 		if (!query || typeof query !== 'string' || query.trim() === '') {
 			return allTools;
 		}
 
-		const currentModel = env.OPENAI_API_KEY
+		const activeProvider = env.EMBEDDING_PROVIDER || (env.OPENAI_API_KEY ? 'openai' : 'ollama');
+		const currentModel = activeProvider === 'openai'
 			? (env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small')
-			: (env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text');
+			: (env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text');
 
 		try {
-			// Find out which tools are outdated or not cached
-			logger.info('[RAG] Step 3: Checking which tools need re-embedding...');
 			const toolsToEmbed = [];
 			const toolsToEmbedTexts = [];
 
@@ -316,56 +310,64 @@ class ToolRegistry {
 					toolsToEmbedTexts.push(textToEmbed);
 				}
 			}
-			logger.info(`[RAG] Step 3: ${toolsToEmbed.length} tools need embedding, ${allTools.length - toolsToEmbed.length} are up-to-date.`);
 
-			// Batch embed any new or modified tools
 			if (toolsToEmbed.length > 0) {
-				logger.info(`[RAG] Step 4: Generating embeddings for ${toolsToEmbed.length} new/updated tools using model: ${currentModel}...`);
 				const embeddings = await this.embedder.embedBatch(toolsToEmbedTexts);
-				logger.info(`[RAG] Step 4: Embeddings generated OK.`);
 				for (let i = 0; i < toolsToEmbed.length; i++) {
 					const tool = toolsToEmbed[i];
 					const toolName = tool.function?.name || tool.name;
 					this.vectorDb.set(toolName, tool, embeddings[i], currentModel);
 				}
-				// Save updated cache to disk
-				logger.info('[RAG] Step 4b: Saving embeddings to ChromaDB...');
 				await this.vectorDb.save();
-				logger.info('[RAG] Step 4b: Saved to ChromaDB OK.');
-			} else {
-				logger.info('[RAG] Step 4: All tools cached, skipping embedding.');
 			}
 
-			// Generate embedding for the user query
-			logger.info(`[RAG] Step 5: Embedding user query: "${query}"...`);
+			let selectedTools = [];
+			const availableToolNames = new Set(allTools.map(t => t.function?.name || t.name));
+
 			let queryEmbedding = null;
 			try {
 				queryEmbedding = await this.embedder.embed(query);
-				logger.info('[RAG] Step 5: Query embedding generated OK.');
 			} catch (err) {
-				logger.error(`Failed to embed query "${query}", falling back to keyword search: ${err.message}`);
+				// Silent fallback
 			}
 
-			// Rank all tools using RAG
-			logger.info('[RAG] Step 6: Ranking tools...');
-			const cachedToolsList = this.vectorDb.getAll();
+			if (queryEmbedding) {
+				try {
+					const results = await this.vectorDb.query(queryEmbedding, env.MAX_RELEVANT_TOOLS);
+					if (results && results.ids && results.ids[0]) {
+						for (let i = 0; i < results.ids[0].length; i++) {
+							const name = results.ids[0][i];
+							const metadata = results.metadatas[0][i];
+							if (availableToolNames.has(name) && metadata && metadata.tool) {
+								const toolObj = JSON.parse(metadata.tool);
+								const distance = results.distances[0][i];
+								toolObj.score = 1 - distance;
+								selectedTools.push(toolObj);
+							}
+						}
+					}
+				} catch (err) {
+					// log fall backing
+					logger.error(`Failed to query Chroma DB natively: ${err.message}. Falling back to manual ranking.`);
+				}
+			}
 
-			// Filter tools list to only include tools that are currently registered and active
-			const availableToolNames = new Set(allTools.map(t => t.function?.name || t.name));
-			const activeCachedTools = cachedToolsList.filter(item => {
-				const name = item.tool.function?.name || item.tool.name;
-				return availableToolNames.has(name);
-			});
+			if (selectedTools.length === 0) {
+				const cachedToolsList = this.vectorDb.getAll();
+				const activeCachedTools = cachedToolsList.filter(item => {
+					const name = item.tool.function?.name || item.tool.name;
+					return availableToolNames.has(name);
+				});
 
-			const selectedTools = rankTools(
-				query,
-				queryEmbedding,
-				activeCachedTools,
-				env.TOOL_SIMILARITY_THRESHOLD,
-				env.MAX_RELEVANT_TOOLS
-			);
+				selectedTools = rankTools(
+					query,
+					queryEmbedding,
+					activeCachedTools,
+					env.TOOL_SIMILARITY_THRESHOLD,
+					env.MAX_RELEVANT_TOOLS
+				);
+			}
 
-			// Core UI tools that should always be present
 			const CORE_TOOLS = new Set([
 				'read_graph',
 				'search_nodes',
@@ -384,10 +386,8 @@ class ToolRegistry {
 				}
 			}
 
-			logger.info(`[RAG] Step 6: RAG selected ${selectedTools.length} / ${allTools.length} tools (including core UI tools) for the user query.`);
 			return selectedTools;
 		} catch (error) {
-			logger.error(`[RAG] Error in getRelevantTools, returning all tools: ${error.message}`);
 			return allTools;
 		}
 	}

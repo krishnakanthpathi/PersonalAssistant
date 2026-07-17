@@ -42,7 +42,7 @@ export const env = {
 	YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
 
 	// tools
-	MAX_RELEVANT_TOOLS: parseInt(process.env.MAX_RELEVANT_TOOLS || '10', 10),
+	MAX_RELEVANT_TOOLS: parseInt(process.env.MAX_RELEVANT_TOOLS || '20', 10),
 	TOOL_SIMILARITY_THRESHOLD: parseFloat(process.env.TOOL_SIMILARITY_THRESHOLD || '0.25'),
 
 	// mongodb

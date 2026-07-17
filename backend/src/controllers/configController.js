@@ -37,7 +37,12 @@ export const getConfig = async (req, res) => {
 				ollamaModel: dbSettings.ollamaModel || env.OLLAMA_MODEL || '',
 				grokApiKey: dbSettings.grokApiKey || env.GROK_API_KEY || '',
 				grokBaseUrl: dbSettings.grokBaseUrl || env.GROK_BASE_URL || '',
-				grokModel: dbSettings.grokModel || env.GROK_MODEL || ''
+				grokModel: dbSettings.grokModel || env.GROK_MODEL || '',
+				embeddingProvider: dbSettings.embeddingProvider || env.EMBEDDING_PROVIDER || '',
+				embeddingApiKey: dbSettings.embeddingApiKey || env.EMBEDDING_API_KEY || '',
+				embeddingBaseUrl: dbSettings.embeddingBaseUrl || env.EMBEDDING_BASE_URL || '',
+				openaiEmbeddingModel: dbSettings.openaiEmbeddingModel || env.OPENAI_EMBEDDING_MODEL || '',
+				ollamaEmbeddingModel: dbSettings.ollamaEmbeddingModel || env.OLLAMA_EMBEDDING_MODEL || ''
 			}
 		});
 	} catch (error) {
@@ -56,12 +61,22 @@ export const updateConfig = async (req, res) => {
 			ollamaModel,
 			grokApiKey,
 			grokBaseUrl,
-			grokModel
+			grokModel,
+			embeddingProvider,
+			embeddingApiKey,
+			embeddingBaseUrl,
+			openaiEmbeddingModel,
+			ollamaEmbeddingModel
 		} = req.body;
 
 		// Validate provider
 		if (provider && !['openai', 'ollama', 'grok'].includes(provider)) {
 			return res.status(400).json({ success: false, error: 'Invalid provider value. Must be openai, ollama, or grok.' });
+		}
+
+		// Validate embedding provider
+		if (embeddingProvider && !['openai', 'ollama'].includes(embeddingProvider)) {
+			return res.status(400).json({ success: false, error: 'Invalid embedding provider value. Must be openai or ollama.' });
 		}
 
 		const db = getDB();
@@ -75,6 +90,11 @@ export const updateConfig = async (req, res) => {
 		if (grokApiKey !== undefined) updateData.grokApiKey = grokApiKey;
 		if (grokBaseUrl !== undefined) updateData.grokBaseUrl = grokBaseUrl;
 		if (grokModel !== undefined) updateData.grokModel = grokModel;
+		if (embeddingProvider !== undefined) updateData.embeddingProvider = embeddingProvider;
+		if (embeddingApiKey !== undefined) updateData.embeddingApiKey = embeddingApiKey;
+		if (embeddingBaseUrl !== undefined) updateData.embeddingBaseUrl = embeddingBaseUrl;
+		if (openaiEmbeddingModel !== undefined) updateData.openaiEmbeddingModel = openaiEmbeddingModel;
+		if (ollamaEmbeddingModel !== undefined) updateData.ollamaEmbeddingModel = ollamaEmbeddingModel;
 
 		await db.collection('app_config').updateOne(
 			{ _id: 'llm_settings' },
@@ -92,6 +112,11 @@ export const updateConfig = async (req, res) => {
 		if (grokApiKey !== undefined) env.GROK_API_KEY = grokApiKey;
 		if (grokBaseUrl !== undefined) env.GROK_BASE_URL = grokBaseUrl;
 		if (grokModel !== undefined) env.GROK_MODEL = grokModel;
+		if (embeddingProvider !== undefined) env.EMBEDDING_PROVIDER = embeddingProvider;
+		if (embeddingApiKey !== undefined) env.EMBEDDING_API_KEY = embeddingApiKey;
+		if (embeddingBaseUrl !== undefined) env.EMBEDDING_BASE_URL = embeddingBaseUrl;
+		if (openaiEmbeddingModel !== undefined) env.OPENAI_EMBEDDING_MODEL = openaiEmbeddingModel;
+		if (ollamaEmbeddingModel !== undefined) env.OLLAMA_EMBEDDING_MODEL = ollamaEmbeddingModel;
 
 		res.json({
 			success: true,

@@ -188,6 +188,7 @@ export default function Sidebar({
             <button
               onClick={startNewChat}
               disabled={isProcessing}
+              title="New Chat (Ctrl+N)"
               className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-xs font-bold flex items-center gap-1 border border-white/10 hover:border-accent-mono/30 active:scale-95 cursor-pointer shadow-sm"
             >
               + New Chat

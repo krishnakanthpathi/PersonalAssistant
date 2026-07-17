@@ -25,8 +25,10 @@ export const testTool = async (req, res) => {
 		const { name, args } = req.body;
 		if (!name) throw new Error('Tool name is required');
 		logger.info(`Test-executing tool: ${name} with args: ${JSON.stringify(args)}`);
+		const startTime = Date.now();
 		const result = await registry.callTool(name, args || {});
-		res.json({ success: true, result });
+		const latency = Date.now() - startTime;
+		res.json({ success: true, result, latency });
 	} catch (error) {
 		res.json({ success: false, error: error.message });
 	}

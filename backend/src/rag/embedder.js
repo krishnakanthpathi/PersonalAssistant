@@ -19,19 +19,31 @@ function withTimeout(promise, ms, label) {
 
 export class Embedder {
 	constructor() {
-		this.provider = env.EMBEDDING_PROVIDER || (env.OPENAI_API_KEY ? 'openai' : 'ollama');
-		logger.info(`[Embedder] Using provider: ${this.provider}`);
-		if (this.provider === 'openai') {
-			const baseURL = env.EMBEDDING_BASE_URL || 'https://api.openai.com/v1';
-			logger.info(`[Embedder] OpenAI base URL: ${baseURL}`);
-			this.openai = new OpenAI({
-				apiKey: env.EMBEDDING_API_KEY || env.OPENAI_API_KEY,
-				// Always use the real OpenAI API for embeddings unless EMBEDDING_BASE_URL is explicitly set.
-				// Do NOT inherit OPENAI_BASE_URL — it may point to a non-OpenAI provider (e.g. AWS Bedrock, Grok)
-				// that doesn't support the /embeddings endpoint.
-				baseURL,
-				timeout: EMBED_TIMEOUT_MS
-			});
+		this._lastEnvKey = null;
+		this.provider = null;
+		this.openai = null;
+	}
+
+	_updateSettings() {
+		const key = `${env.EMBEDDING_PROVIDER}-${env.OPENAI_API_KEY}-${env.EMBEDDING_API_KEY}-${env.EMBEDDING_BASE_URL}`;
+		if (key !== this._lastEnvKey) {
+			this.provider = env.EMBEDDING_PROVIDER || (env.OPENAI_API_KEY ? 'openai' : 'ollama');
+			logger.info(`[Embedder] Dynamic update: Using provider: ${this.provider}`);
+			if (this.provider === 'openai') {
+				const baseURL = env.EMBEDDING_BASE_URL || 'https://api.openai.com/v1';
+				logger.info(`[Embedder] OpenAI base URL: ${baseURL}`);
+				this.openai = new OpenAI({
+					apiKey: env.EMBEDDING_API_KEY || env.OPENAI_API_KEY,
+					// Always use the real OpenAI API for embeddings unless EMBEDDING_BASE_URL is explicitly set.
+					// Do NOT inherit OPENAI_BASE_URL — it may point to a non-OpenAI provider (e.g. AWS Bedrock, Grok)
+					// that doesn't support the /embeddings endpoint.
+					baseURL,
+					timeout: EMBED_TIMEOUT_MS
+				});
+			} else {
+				this.openai = null;
+			}
+			this._lastEnvKey = key;
 		}
 	}
 
@@ -39,6 +51,7 @@ export class Embedder {
 		if (!text || typeof text !== 'string' || text.trim() === '') {
 			return [];
 		}
+		this._updateSettings();
 		try {
 			if (this.provider === 'openai') {
 				try {
@@ -71,6 +84,7 @@ export class Embedder {
 		if (!texts || !Array.isArray(texts) || texts.length === 0) {
 			return [];
 		}
+		this._updateSettings();
 		try {
 			if (this.provider === 'openai') {
 				try {
@@ -102,7 +116,7 @@ export class Embedder {
 	async embedOllama(text) {
 		// CHANGED: Endpoint path updated to /api/embed
 		const response = await axios.post(`${env.OLLAMA_URL}/api/embed`, {
-			model: env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text',
+			model: env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
 			input: text // Note: Ollama's /api/embed accepts 'input' or 'prompt'
 		}, { timeout: EMBED_TIMEOUT_MS });
 
@@ -114,7 +128,7 @@ export class Embedder {
 		// CHANGED: Endpoint path updated to /api/embed
 		const promises = texts.map(text =>
 			axios.post(`${env.OLLAMA_URL}/api/embed`, {
-				model: env.OLLAMA_EMBEDDING_MODEL || env.OLLAMA_MODEL || 'nomic-embed-text',
+				model: env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
 				input: text
 			}, { timeout: EMBED_TIMEOUT_MS }).then(res => res.data.embeddings[0])
 		);

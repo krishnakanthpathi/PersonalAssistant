@@ -215,6 +215,22 @@ export class VectorDB {
 		return Array.from(this.toolsCache.values());
 	}
 
+	async query(queryEmbedding, limit = 20) {
+		if (!this.collection) {
+			throw new Error('Chroma collection is not initialized.');
+		}
+		try {
+			const response = await this.collection.query({
+				queryEmbeddings: [queryEmbedding],
+				nResults: limit
+			});
+			return response;
+		} catch (error) {
+			logger.error(`Error querying Chroma tools collection: ${error.message}`);
+			throw error;
+		}
+	}
+
 	async clear() {
 		try {
 			this.toolsCache.clear();

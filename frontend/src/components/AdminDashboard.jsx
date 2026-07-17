@@ -21,7 +21,8 @@ import {
   Terminal,
   Search,
   Pause,
-  Play
+  Play,
+  Save
 } from 'lucide-react';
 
 // Helper to get tool icons dynamically
@@ -66,8 +67,23 @@ export default function AdminDashboard() {
   const [config, setConfig] = useState({
     provider: 'ollama',
     model: 'loading...',
-    port: 3000
+    port: 3000,
+    ollamaUrl: 'http://localhost:11434'
   });
+
+  const [embeddingForm, setEmbeddingForm] = useState({
+    embeddingProvider: 'ollama',
+    embeddingApiKey: '',
+    embeddingBaseUrl: '',
+    openaiEmbeddingModel: '',
+    ollamaEmbeddingModel: ''
+  });
+  const [isSavingEmbedding, setIsSavingEmbedding] = useState(false);
+  const [embeddingSuccess, setEmbeddingSuccess] = useState('');
+  const [embeddingError, setEmbeddingError] = useState('');
+  
+  const [isCheckingLatency, setIsCheckingLatency] = useState(false);
+  const [latencyResult, setLatencyResult] = useState(null);
 
   const [activeView, setActiveView] = useState('overview'); // 'overview' or 'logs'
   const [logs, setLogs] = useState([]);
@@ -194,7 +210,8 @@ export default function AdminDashboard() {
           const mappedTools = (data.tools || []).map(t => ({
             name: t.function?.name || t.name,
             description: t.function?.description || t.description,
-            function: t.function || t
+            function: t.function || t,
+            score: t.score
           }));
           setSemanticResults(mappedTools);
         }
@@ -253,13 +270,90 @@ export default function AdminDashboard() {
         setConfig({
           provider: configData.provider,
           model: configData.model,
-          port: configData.port
+          port: configData.port,
+          ollamaUrl: configData.settings?.ollamaUrl || 'http://localhost:11434'
         });
+        if (configData.settings) {
+          setEmbeddingForm({
+            embeddingProvider: configData.settings.embeddingProvider || 'ollama',
+            embeddingApiKey: configData.settings.embeddingApiKey || '',
+            embeddingBaseUrl: configData.settings.embeddingBaseUrl || '',
+            openaiEmbeddingModel: configData.settings.openaiEmbeddingModel || '',
+            ollamaEmbeddingModel: configData.settings.ollamaEmbeddingModel || ''
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch tools or config:', error);
     } finally {
       setIsFetchingTools(false);
+    }
+  };
+
+  const handleSaveEmbedding = async (e) => {
+    if (e) e.preventDefault();
+    setIsSavingEmbedding(true);
+    setEmbeddingSuccess('');
+    setEmbeddingError('');
+    try {
+      const response = await fetch('http://localhost:3000/api/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(embeddingForm),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setEmbeddingSuccess('Embedding configuration saved and applied dynamically!');
+        // Refresh local settings to ensure sync
+        fetchToolsAndConfig();
+      } else {
+        setEmbeddingError(data.error || 'Failed to save embedding configuration.');
+      }
+    } catch (err) {
+      setEmbeddingError(err.message || 'An error occurred while saving.');
+    } finally {
+      setIsSavingEmbedding(false);
+    }
+  };
+
+  const handleCheckToolLatency = async () => {
+    if (!selectedExplorerTool) return;
+    setIsCheckingLatency(true);
+    setLatencyResult(null);
+    try {
+      const response = await fetch('http://localhost:3000/api/tools/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: selectedExplorerTool.name,
+          args: {}
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setLatencyResult({
+          success: true,
+          latency: data.latency !== undefined ? data.latency : 0
+        });
+      } else {
+        setLatencyResult({
+          success: false,
+          latency: 0,
+          error: data.error || 'Execution failed.'
+        });
+      }
+    } catch (err) {
+      setLatencyResult({
+        success: false,
+        latency: 0,
+        error: err.message || 'An error occurred during call.'
+      });
+    } finally {
+      setIsCheckingLatency(false);
     }
   };
 
@@ -628,6 +722,17 @@ export default function AdminDashboard() {
                   >
                     <Wrench size={13} />
                     Tools Explorer
+                  </button>
+                  <button
+                    onClick={() => { setActiveView('embeddings'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'embeddings'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <Cpu size={13} />
+                    Embedding Config
                   </button>
                   <button
                     onClick={() => { setActiveView('test'); setSelectedRequest(null); }}
@@ -1039,23 +1144,31 @@ export default function AdminDashboard() {
                           return (
                             <button
                               key={idx}
-                              onClick={() => setSelectedExplorerTool({
-                                name: toolName,
-                                description: toolDesc,
-                                parameters: tool.function?.parameters || tool.inputSchema || {}
-                              })}
+                              onClick={() => {
+                                setSelectedExplorerTool({
+                                  name: toolName,
+                                  description: toolDesc,
+                                  parameters: tool.function?.parameters || tool.inputSchema || {}
+                                });
+                                setLatencyResult(null);
+                              }}
                               className={`p-3 text-left rounded-xl transition-all duration-200 border text-xs flex flex-col gap-1.5 cursor-pointer ${
                                 isSelected
                                   ? 'bg-accent-blue/10 border-accent-blue/30 text-white font-semibold'
                                   : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
                               }`}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="p-1 bg-white/5 rounded-lg">
-                                  {getToolIcon(toolName)}
-                                </span>
-                                <span className="font-mono font-bold">{toolName}</span>
-                              </div>
+                               <div className="flex items-center gap-2 w-full">
+                                 <span className="p-1 bg-white/5 rounded-lg">
+                                   {getToolIcon(toolName)}
+                                 </span>
+                                 <span className="font-mono font-bold truncate">{toolName}</span>
+                                 {tool.score !== undefined && (
+                                   <span className="ml-auto text-[9px] px-1.5 py-0.5 bg-accent-blue/15 border border-accent-blue/30 text-accent-blue font-mono font-bold rounded-md whitespace-nowrap">
+                                     {tool.score.toFixed(3)}
+                                   </span>
+                                 )}
+                               </div>
                               <span className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{toolDesc}</span>
                             </button>
                           );
@@ -1083,6 +1196,60 @@ export default function AdminDashboard() {
                               {JSON.stringify(selectedExplorerTool.parameters, null, 2)}
                             </pre>
                           </div>
+
+                          <div className="border-t border-white/5 pt-4">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Tool Latency Checker</span>
+                            <div className="flex flex-col gap-3 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-1">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <span className="text-xs text-gray-400">Trigger a trial call to this tool to measure execution latency.</span>
+                                <button
+                                  type="button"
+                                  onClick={handleCheckToolLatency}
+                                  disabled={isCheckingLatency}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 hover:border-accent-blue/50 text-accent-blue font-bold rounded-lg text-[10px] transition cursor-pointer disabled:opacity-50 flex-shrink-0"
+                                >
+                                  {isCheckingLatency ? (
+                                    <>
+                                      <RefreshCw size={11} className="animate-spin" />
+                                      Checking...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Activity size={11} />
+                                      Check Latency
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              {latencyResult && (
+                                <div className="border-t border-white/5 pt-3 mt-1 flex flex-col gap-2 animate-fadeIn">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-gray-400">Result Status:</span>
+                                    <span className={`font-bold flex items-center gap-1.5 ${latencyResult.success ? 'text-accent-emerald' : 'text-red-400'}`}>
+                                      {latencyResult.success ? (
+                                        <>
+                                          <CheckCircle2 size={12} /> Success
+                                        </>
+                                      ) : (
+                                        <>
+                                          <XCircle size={12} /> Error
+                                        </>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-gray-400">Measured Latency:</span>
+                                    <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded">{latencyResult.latency} ms</span>
+                                  </div>
+                                  {!latencyResult.success && latencyResult.error && (
+                                    <div className="text-[10px] text-red-400 bg-red-500/5 border border-red-500/10 p-3 rounded-xl font-mono mt-1 leading-relaxed select-text">
+                                      {latencyResult.error}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </>
                       ) : (
                         <div className="flex-grow flex flex-col items-center justify-center text-center text-gray-500 py-10">
@@ -1092,6 +1259,151 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </div>
+                </div>
+              ) : activeView === 'embeddings' ? (
+                /* ================= EMBEDDING CONFIG VIEW ================= */
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-6 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-y-auto">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0 mb-6">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                        Embedding Config Panel
+                      </h3>
+                      <p className="text-[11px] text-gray-400">Configure model configurations, custom endpoints, and providers for generating vector embeddings.</p>
+                    </div>
+                  </div>
+
+                  {embeddingError && (
+                    <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
+                      <AlertCircle size={14} className="flex-shrink-0" />
+                      <span>{embeddingError}</span>
+                    </div>
+                  )}
+                  {embeddingSuccess && (
+                    <div className="mb-4 p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
+                      <CheckCircle2 size={14} className="flex-shrink-0" />
+                      <span>{embeddingSuccess}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSaveEmbedding} className="space-y-6 max-w-3xl">
+                    {/* Active Provider Selector */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Active Embedding Provider</label>
+                      <select
+                        value={embeddingForm.embeddingProvider}
+                        onChange={(e) => setEmbeddingForm(prev => ({ ...prev, embeddingProvider: e.target.value }))}
+                        className="w-full md:w-1/2 p-3 bg-black/40 border border-white/10 rounded-xl text-xs text-gray-200 outline-none focus:border-accent-blue/50 cursor-pointer"
+                      >
+                        <option value="ollama">Ollama (Local Embeddings)</option>
+                        <option value="openai">OpenAI (Cloud / API Compatible Embeddings)</option>
+                      </select>
+                      <p className="text-[10px] text-gray-500 mt-2">
+                        OpenAI embeddings offer higher semantic accuracy but require cloud API keys and active internet. Ollama runs fully local and offline.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* OpenAI Embeddings Card */}
+                      <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all duration-200 ${
+                        embeddingForm.embeddingProvider === 'openai' 
+                          ? 'border-accent-blue/40 bg-accent-blue/[0.02] shadow-[0_0_15px_rgba(59,130,246,0.05)]' 
+                          : 'border-white/5 opacity-60'
+                      }`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold uppercase tracking-wider text-white">OpenAI embedding settings</span>
+                          {embeddingForm.embeddingProvider === 'openai' && (
+                            <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>
+                          )}
+                        </div>
+                        <div className="space-y-4 text-xs">
+                          <div>
+                            <label className="block text-gray-400 mb-1.5 text-[10px]">API KEY</label>
+                            <input
+                              type="password"
+                              placeholder="sk-..."
+                              value={embeddingForm.embeddingApiKey}
+                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, embeddingApiKey: e.target.value }))}
+                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
+                            />
+                            <p className="text-[9px] text-gray-500 mt-1">Falls back to the global OpenAI API Key if empty.</p>
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 mb-1.5 text-[10px]">BASE URL</label>
+                            <input
+                              type="text"
+                              placeholder="https://api.openai.com/v1"
+                              value={embeddingForm.embeddingBaseUrl}
+                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, embeddingBaseUrl: e.target.value }))}
+                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 mb-1.5 text-[10px]">MODEL NAME</label>
+                            <input
+                              type="text"
+                              placeholder="text-embedding-3-small"
+                              value={embeddingForm.openaiEmbeddingModel}
+                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, openaiEmbeddingModel: e.target.value }))}
+                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ollama Embeddings Card */}
+                      <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all duration-200 ${
+                        embeddingForm.embeddingProvider === 'ollama' 
+                          ? 'border-accent-blue/40 bg-accent-blue/[0.02] shadow-[0_0_15px_rgba(59,130,246,0.05)]' 
+                          : 'border-white/5 opacity-60'
+                      }`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold uppercase tracking-wider text-white">Ollama embedding settings</span>
+                          {embeddingForm.embeddingProvider === 'ollama' && (
+                            <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>
+                          )}
+                        </div>
+                        <div className="space-y-4 text-xs">
+                          <div>
+                            <label className="block text-gray-400 mb-1.5 text-[10px]">OLLAMA MODEL NAME</label>
+                            <input
+                              type="text"
+                              placeholder="nomic-embed-text"
+                              value={embeddingForm.ollamaEmbeddingModel}
+                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, ollamaEmbeddingModel: e.target.value }))}
+                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
+                            />
+                            <p className="text-[9px] text-gray-500 mt-1">Make sure you run `ollama pull &lt;model-name&gt;` locally.</p>
+                          </div>
+                          <div className="pt-2 border-t border-white/5">
+                            <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Ollama Status Information</span>
+                            <p className="text-[10px] text-gray-500 leading-relaxed">
+                              Ollama embeddings will connect to your local server at <span className="font-mono text-gray-300">{config.ollamaUrl || 'http://localhost:11434'}</span>. You can change this local host URL in the primary LLM Settings panel.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t border-white/5">
+                      <button
+                        type="submit"
+                        disabled={isSavingEmbedding}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all disabled:opacity-50 shadow-glow cursor-pointer"
+                      >
+                        {isSavingEmbedding ? (
+                          <>
+                            <RefreshCw size={13} className="animate-spin" />
+                            Saving Settings...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={13} />
+                            Save Configuration
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               ) : (
                 /* ================= TEST CENTER VIEW ================= */
