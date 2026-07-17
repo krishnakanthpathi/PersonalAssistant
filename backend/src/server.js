@@ -10,6 +10,7 @@ import { env } from './config/env.js';
 import { connectToMongoDB } from './config/mongodb.js';
 import apiRoutes from './routes/api.js';
 import { PersonalInfoVectorDB } from './rag/personalDb.js';
+import { registry } from './orchestrator/registry.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -40,6 +41,13 @@ async function startServer() {
 
 	// Initialize MCP Manager & spawn the filesystem server
 	await mcpManager.initialize();
+
+	// Pre-warm tool embeddings (runs after MCP so all tools are available)
+	try {
+		await registry.warmUpEmbeddings();
+	} catch (err) {
+		logger.error(`[RAG Warmup] Failed to pre-warm tool embeddings: ${err.message}`);
+	}
 
 	// Connect and synchronize personal information RAG in Chroma in the background
 	try {

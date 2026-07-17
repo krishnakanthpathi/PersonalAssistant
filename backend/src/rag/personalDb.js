@@ -13,9 +13,11 @@ import { logger } from '../utils/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MEMORY_FILE_PATH = path.join(__dirname, '../../data/memory.json');
 
+// CHANGED: Tracking the specific model name suffix
+const TARGET_COLLECTION_NAME = 'personal_info_nomic_embed';
+
 const dummyEmbeddingFunction = {
 	generate: async (texts) => {
-		// Returns empty arrays; we always generate and pass custom embeddings manually
 		return texts.map(() => []);
 	}
 };
@@ -30,7 +32,7 @@ export class PersonalInfoVectorDB {
 		try {
 			const chromaUrl = env.CHROMA_URL || 'http://localhost:8000';
 			logger.info(`Connecting to Chroma DB for personal info database at: ${chromaUrl}`);
-			
+
 			let host = 'localhost';
 			let port = 8000;
 			let ssl = false;
@@ -43,7 +45,6 @@ export class PersonalInfoVectorDB {
 				logger.warn(`Failed to parse CHROMA_URL: ${chromaUrl}, falling back to defaults.`);
 			}
 
-			// Ensure personal_db database exists
 			const admin = new AdminClient({ host, port, ssl });
 			try {
 				await admin.createDatabase({ name: 'personal_db', tenant: 'default_tenant' });
@@ -52,24 +53,24 @@ export class PersonalInfoVectorDB {
 				// Ignore if already exists
 			}
 
-			// Connect targeting personal_db database
 			const chroma = new ChromaClient({ host, port, ssl, database: 'personal_db' });
-			
+
+			// CHANGED: target the updated collection name
 			this.collection = await chroma.getOrCreateCollection({
-				name: 'personal_info',
+				name: TARGET_COLLECTION_NAME,
 				metadata: { "hnsw:space": "cosine" },
 				embeddingFunction: dummyEmbeddingFunction
 			});
-			logger.info("Connected to Chroma DB 'personal_db' collection successfully.");
+			logger.info(`Connected to Chroma DB 'personal_db' collection '${TARGET_COLLECTION_NAME}' successfully.`);
 		} catch (error) {
-			logger.error(`Failed to connect to Chroma personal_info collection in personal_db: ${error.message}`);
+			logger.error(`Failed to connect to Chroma collection ${TARGET_COLLECTION_NAME} in personal_db: ${error.message}`);
 			throw error;
 		}
 	}
 
 	async syncFromMemoryJson() {
 		if (!this.collection) {
-			throw new Error('Chroma personal_info collection is not initialized. Call connect() first.');
+			throw new Error(`Chroma collection ${TARGET_COLLECTION_NAME} is not initialized. Call connect() first.`);
 		}
 
 		if (!fs.existsSync(MEMORY_FILE_PATH)) {
@@ -82,13 +83,12 @@ export class PersonalInfoVectorDB {
 			const fileContent = await fs.promises.readFile(MEMORY_FILE_PATH, 'utf8');
 			const lines = fileContent.split('\n').filter(line => line.trim() !== '');
 
-			// 1. Parse and chunk all entity items from memory.json
 			const entities = [];
 			for (const line of lines) {
 				try {
 					const item = JSON.parse(line);
 					if (item.type === 'entity' && item.name && Array.isArray(item.observations) && item.observations.length > 0) {
-						const CHUNK_SIZE = 15; // Max observations per chunk to prevent context limits
+						const CHUNK_SIZE = 15;
 						const name = item.name;
 						const entityType = item.entityType || 'Thing';
 
@@ -114,7 +114,6 @@ export class PersonalInfoVectorDB {
 
 			logger.info(`Parsed and chunked into ${entities.length} entities from memory.json.`);
 
-			// 2. Fetch existing items in Chroma to check content hashes
 			let existingResponse = null;
 			try {
 				existingResponse = await this.collection.get({
@@ -136,7 +135,6 @@ export class PersonalInfoVectorDB {
 				}
 			}
 
-			// 3. Find which entities are new or updated
 			const entitiesToEmbed = [];
 			let skipCount = 0;
 
@@ -151,7 +149,6 @@ export class PersonalInfoVectorDB {
 
 			logger.info(`Chroma Sync Status: ${skipCount} chunks already up-to-date, ${entitiesToEmbed.length} chunks need sync.`);
 
-			// 4. Ingest new/updated entities in batches to prevent API rate limits or excessive load
 			if (entitiesToEmbed.length > 0) {
 				const BATCH_SIZE = 50;
 				for (let i = 0; i < entitiesToEmbed.length; i += BATCH_SIZE) {
@@ -190,7 +187,7 @@ export class PersonalInfoVectorDB {
 						}
 					}
 				}
-				logger.info(`Successfully synchronized ${entitiesToEmbed.length} chunks to Chroma DB personal_info.`);
+				logger.info(`Successfully synchronized ${entitiesToEmbed.length} chunks to Chroma DB under collection ${TARGET_COLLECTION_NAME}.`);
 			}
 		} catch (error) {
 			logger.error(`Error during syncFromMemoryJson: ${error.message}`);
@@ -200,7 +197,7 @@ export class PersonalInfoVectorDB {
 
 	async query(queryEmbedding, limit = 5) {
 		if (!this.collection) {
-			throw new Error('Chroma personal_info collection is not initialized.');
+			throw new Error(`Chroma collection ${TARGET_COLLECTION_NAME} is not initialized.`);
 		}
 		try {
 			const response = await this.collection.query({
@@ -209,7 +206,7 @@ export class PersonalInfoVectorDB {
 			});
 			return response;
 		} catch (error) {
-			logger.error(`Error querying Chroma personal_info collection in personal_db: ${error.message}`);
+			logger.error(`Error querying Chroma collection ${TARGET_COLLECTION_NAME} in personal_db: ${error.message}`);
 			throw error;
 		}
 	}
@@ -217,7 +214,7 @@ export class PersonalInfoVectorDB {
 	async clear() {
 		try {
 			const chromaUrl = env.CHROMA_URL || 'http://localhost:8000';
-			
+
 			let host = 'localhost';
 			let port = 8000;
 			let ssl = false;
@@ -232,16 +229,17 @@ export class PersonalInfoVectorDB {
 
 			const chroma = new ChromaClient({ host, port, ssl, database: 'personal_db' });
 			try {
-				await chroma.deleteCollection({ name: 'personal_info' });
+				// CHANGED: Target the specific new collection name for deletion
+				await chroma.deleteCollection({ name: TARGET_COLLECTION_NAME });
 			} catch (e) {
 				// Ignore if collection didn't exist
 			}
 			this.collection = await chroma.getOrCreateCollection({
-				name: 'personal_info',
+				name: TARGET_COLLECTION_NAME,
 				metadata: { "hnsw:space": "cosine" },
 				embeddingFunction: dummyEmbeddingFunction
 			});
-			logger.info("Cleared and recreated personal_info collection in Chroma DB 'personal_db'.");
+			logger.info(`Cleared and recreated collection '${TARGET_COLLECTION_NAME}' in Chroma DB 'personal_db'.`);
 		} catch (error) {
 			logger.error(`Failed to clear personal info embeddings in Chroma DB: ${error.message}`);
 		}

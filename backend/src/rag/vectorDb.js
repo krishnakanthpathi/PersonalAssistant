@@ -11,9 +11,11 @@ import { logger } from '../utils/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_FILE_PATH = path.join(__dirname, '../../data/tool_embeddings.json');
 
+// CHANGED: Unified collection name to track the exact model space
+const TARGET_COLLECTION_NAME = 'tools_nomic_embed';
+
 const dummyEmbeddingFunction = {
 	generate: async (texts) => {
-		// Returns empty arrays; we always generate and pass custom embeddings manually
 		return texts.map(() => []);
 	}
 };
@@ -27,7 +29,7 @@ function extractToolMeta(tool) {
 
 export class VectorDB {
 	constructor() {
-		this.toolsCache = new Map(); // key: toolName -> { tool, embedding, embeddingModel }
+		this.toolsCache = new Map();
 		this.collection = null;
 	}
 
@@ -35,7 +37,7 @@ export class VectorDB {
 		try {
 			const chromaUrl = env.CHROMA_URL || 'http://localhost:8000';
 			logger.info(`Connecting to Chroma DB for tools database at: ${chromaUrl}`);
-			
+
 			let host = 'localhost';
 			let port = 8000;
 			let ssl = false;
@@ -48,27 +50,25 @@ export class VectorDB {
 				logger.warn(`Failed to parse CHROMA_URL: ${chromaUrl}, falling back to defaults.`);
 			}
 
-			// Ensure tools_db database exists
 			const admin = new AdminClient({ host, port, ssl });
 			try {
 				await admin.createDatabase({ name: 'tools_db', tenant: 'default_tenant' });
 				logger.info("Chroma database 'tools_db' created/verified.");
 			} catch (e) {
-				// Ignore if already exists
+				// Already exists
 			}
 
-			// Connect targeting tools_db database
 			const chroma = new ChromaClient({ host, port, ssl, database: 'tools_db' });
-			
+
+			// CHANGED: point to the new collection name
 			this.collection = await chroma.getOrCreateCollection({
-				name: 'tools',
+				name: TARGET_COLLECTION_NAME,
 				metadata: { "hnsw:space": "cosine" },
 				embeddingFunction: dummyEmbeddingFunction
 			});
 
 			const count = await this.collection.count();
 
-			// If Chroma is empty, seed from local JSON file if it exists
 			if (count === 0 && fs.existsSync(DB_FILE_PATH)) {
 				logger.info(`Seeding Chroma tool_embeddings from local JSON file: ${DB_FILE_PATH}`);
 				const rawData = fs.readFileSync(DB_FILE_PATH, 'utf8');
@@ -118,7 +118,6 @@ export class VectorDB {
 				}
 			}
 
-			// Load all documents from Chroma into in-memory cache
 			const response = await this.collection.get({
 				include: ['embeddings', 'metadatas', 'documents']
 			});
@@ -150,7 +149,6 @@ export class VectorDB {
 				return;
 			}
 
-			// Upsert all cached items to Chroma
 			for (const [name, val] of this.toolsCache.entries()) {
 				const document = `Tool: ${name}. Description: ${val.tool.function?.description || val.tool.description || ''}`;
 				try {
@@ -198,17 +196,15 @@ export class VectorDB {
 	isUpToDate(name, toolDef, currentModel) {
 		const cached = this.toolsCache.get(name);
 		if (!cached) return false;
-		
-		// Invalidate if the embedding model changed
+
 		if (cached.embeddingModel !== currentModel) {
 			logger.info(`Invalidating cache for tool "${name}" because model changed: ${cached.embeddingModel} -> ${currentModel}`);
 			return false;
 		}
-		
+
 		const cachedMeta = extractToolMeta(cached.tool);
 		const currentMeta = extractToolMeta(toolDef);
-		
-		// Check description and function parameters
+
 		const descriptionMatch = cachedMeta.description === currentMeta.description;
 		const parametersMatch = JSON.stringify(cachedMeta.parameters) === JSON.stringify(currentMeta.parameters);
 
@@ -223,7 +219,7 @@ export class VectorDB {
 		try {
 			this.toolsCache.clear();
 			const chromaUrl = env.CHROMA_URL || 'http://localhost:8000';
-			
+
 			let host = 'localhost';
 			let port = 8000;
 			let ssl = false;
@@ -238,16 +234,17 @@ export class VectorDB {
 
 			const chroma = new ChromaClient({ host, port, ssl, database: 'tools_db' });
 			try {
-				await chroma.deleteCollection({ name: 'tools' });
+				// CHANGED: target the specific new collection name for cleaning operations
+				await chroma.deleteCollection({ name: TARGET_COLLECTION_NAME });
 			} catch (e) {
-				// Ignore if collection didn't exist
+				// Collection didn't exist
 			}
 			this.collection = await chroma.getOrCreateCollection({
-				name: 'tools',
+				name: TARGET_COLLECTION_NAME,
 				metadata: { "hnsw:space": "cosine" },
 				embeddingFunction: dummyEmbeddingFunction
 			});
-			logger.info("Cleared and recreated tools collection in Chroma DB 'tools_db'.");
+			logger.info(`Cleared and recreated tools collection in Chroma DB 'tools_db' under name: ${TARGET_COLLECTION_NAME}`);
 		} catch (error) {
 			logger.error(`Failed to clear tool embeddings in Chroma DB: ${error.message}`);
 		}

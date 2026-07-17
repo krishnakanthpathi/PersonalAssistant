@@ -1059,12 +1059,14 @@ function MainApp() {
     setMessages(prev => [...prev, { role: 'assistant', content: '', logs: [] }]);
 
     try {
+      console.log('[CHAT] Sending request to /api/chat...');
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: inputMsg, history: messages, sessionId: currentSessionId }),
         signal: controller.signal
       });
+      console.log(`[CHAT] Response received. Status: ${response.status}`);
 
       if (!response.body) {
         throw new Error('ReadableStream not supported by response body');
@@ -1073,10 +1075,14 @@ function MainApp() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      console.log('[CHAT] Starting SSE stream read...');
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[CHAT] Stream ended (done=true).');
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -1090,6 +1096,7 @@ function MainApp() {
 
             try {
               const { type, content } = JSON.parse(rawData);
+              console.log(`[CHAT] SSE event: type=${type}`);
 
               if (type === 'status') {
                 setCurrentStatusLog(content);
@@ -1104,6 +1111,7 @@ function MainApp() {
                   return updated;
                 });
               } else if (type === 'result') {
+                console.log('[CHAT] Received final result.');
                 let speechText = '';
                 setMessages(prev => {
                   const updated = [...prev];
@@ -1130,6 +1138,7 @@ function MainApp() {
                 setCurrentStatusLog('');
                 fetchChats();
               } else if (type === 'error') {
+                console.error('[CHAT] Received error event:', content);
                 setMessages(prev => {
                   const updated = [...prev];
                   if (updated[assistantMsgIndex]) {
@@ -1148,6 +1157,7 @@ function MainApp() {
       }
     } catch (err) {
       if (err.name === 'AbortError') {
+        console.log('[CHAT] Request aborted by user.');
         // User stopped the request — update UI gracefully
         setMessages(prev => {
           const updated = [...prev];
@@ -1159,7 +1169,7 @@ function MainApp() {
         });
         setCurrentStatusLog('');
       } else {
-        console.error('Stream processing failed:', err);
+        console.error('[CHAT] Stream processing failed:', err);
         setMessages(prev => {
           const updated = [...prev];
           if (updated[assistantMsgIndex]) {
@@ -1171,6 +1181,7 @@ function MainApp() {
         setCurrentStatusLog('');
       }
     } finally {
+      console.log('[CHAT] Request completed (finally block).');
       abortControllerRef.current = null;
       setIsProcessing(false);
       // Fetch latest chats after run completes
