@@ -60,13 +60,13 @@ export async function loadMemoryContext(query) {
 
 		let contextBlock = '\n\n## User Long-Term Memory (Relevant Facts Found)\n';
 		contextBlock += 'The following relevant facts about the user (Krishnakanth) were found in local long-term memory:\n';
-		
+
 		let matchCount = 0;
 		for (let i = 0; i < results.documents[0].length; i++) {
 			const doc = results.documents[0][i];
 			const distance = results.distances[0][i];
 			const similarity = 1 - distance; // in cosine space: similarity = 1 - distance
-			
+
 			// Filter out facts with similarity score < 0.2
 			if (similarity >= 0.20) {
 				contextBlock += doc + '\n\n';
@@ -97,10 +97,10 @@ export async function prepareMessages(prompt, history) {
 	let systemPromptText = await loadSystemPrompt();
 
 	// Inject matching memory context directly into the system prompt using Chroma
-	// const memoryContext = await loadMemoryContext(prompt);
-	// if (memoryContext) {
-	// 	systemPromptText = `${systemPromptText}${memoryContext}`;
-	// }
+	const memoryContext = await loadMemoryContext(prompt);
+	if (memoryContext) {
+		systemPromptText = `${systemPromptText}${memoryContext}`;
+	}
 
 	const messages = [
 		{
@@ -499,7 +499,7 @@ function parseSingleToolCallBlock(block, activeToolNames) {
 			const toolName = nameMatch[1];
 			if (activeToolNames.size === 0 || activeToolNames.has(toolName) || registry.tools.has(toolName)) {
 				const args = {};
-				
+
 				const paramRegex = /<parameter\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/parameter>/gi;
 				let pMatch;
 				while ((pMatch = paramRegex.exec(cleanedBlock)) !== null) {
@@ -698,13 +698,13 @@ export async function executeToolWithLogging(toolName, toolArgs, toolContext, re
 	try {
 		let toolResult = await registry.callTool(toolName, toolArgs, toolContext);
 		const toolLatency = Date.now() - toolCallStart;
-		
+
 		const resultString = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
-		const MAX_RESULT_LENGTH = 50000;
+		const MAX_RESULT_LENGTH = 100000;
 		let finalResult = resultString;
 		if (resultString.length > MAX_RESULT_LENGTH) {
 			logger.warn(`Tool "${toolName}" result length (${resultString.length}) exceeds safety limit of ${MAX_RESULT_LENGTH}. Truncating.`);
-			finalResult = resultString.substring(0, MAX_RESULT_LENGTH) + 
+			finalResult = resultString.substring(0, MAX_RESULT_LENGTH) +
 				`\n\n[WARNING: Tool result truncated! Total length was ${resultString.length} characters. The remaining output has been omitted to prevent exceeding model context limits. If you need more specific details, please refine your search query or run a more targeted tool.]`;
 		}
 
