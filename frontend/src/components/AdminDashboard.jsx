@@ -82,6 +82,101 @@ export default function AdminDashboard() {
   const [semanticResults, setSemanticResults] = useState([]);
   const [isSearchingTools, setIsSearchingTools] = useState(false);
 
+  // States for Test Center
+  const [isTestingRag, setIsTestingRag] = useState(false);
+  const [ragTestOutput, setRagTestOutput] = useState('');
+  const [manualToolName, setManualToolName] = useState('');
+  const [manualToolArgs, setManualToolArgs] = useState('{\n  \n}');
+  const [manualToolResult, setManualToolResult] = useState('');
+  const [isExecutingTool, setIsExecutingTool] = useState(false);
+
+  const handleRunRagTests = async () => {
+    setIsTestingRag(true);
+    setRagTestOutput('Executing "node src/rag/test_rag_tools.js" on backend...\n');
+    try {
+      const res = await fetch('http://localhost:3000/api/tools/run-tests', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setRagTestOutput(data.stdout || 'Tests finished successfully with no stdout output.');
+      } else {
+        setRagTestOutput(`Test run failed!\nError: ${data.error || 'unknown'}\n\nSTDOUT:\n${data.stdout}\n\nSTDERR:\n${data.stderr}`);
+      }
+    } catch (error) {
+      setRagTestOutput(`Failed to trigger test suite: ${error.message}`);
+    } finally {
+      setIsTestingRag(false);
+    }
+  };
+
+  const handleStopRagTests = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/tools/stop-tests', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setRagTestOutput(prev => prev + '\n\n[Test execution stopped by user.]');
+      } else {
+        alert(`Failed to stop tests: ${data.error}`);
+      }
+    } catch (error) {
+      alert(`Error stopping tests: ${error.message}`);
+    } finally {
+      setIsTestingRag(false);
+    }
+  };
+
+  const handleSelectManualTool = (e) => {
+    const name = e.target.value;
+    setManualToolName(name);
+    
+    // Automatically generate sample schema if available
+    const selected = tools.find(t => (t.function?.name || t.name) === name);
+    if (selected) {
+      const params = selected.function?.parameters || selected.inputSchema || {};
+      const template = {};
+      if (params.properties) {
+        for (const [k, prop] of Object.entries(params.properties)) {
+          template[k] = prop.type === 'array' ? [] : prop.type === 'integer' || prop.type === 'number' ? 0 : prop.type === 'boolean' ? false : '';
+        }
+      }
+      setManualToolArgs(JSON.stringify(template, null, 2));
+    } else {
+      setManualToolArgs('{\n  \n}');
+    }
+  };
+
+  const handleExecuteTool = async () => {
+    if (!manualToolName) return;
+    setIsExecutingTool(true);
+    setManualToolResult(`Sending execution call to backend for tool "${manualToolName}"...`);
+    try {
+      let parsedArgs = {};
+      try {
+        parsedArgs = JSON.parse(manualToolArgs);
+      } catch (err) {
+        setManualToolResult(`Error parsing JSON Arguments: ${err.message}`);
+        setIsExecutingTool(false);
+        return;
+      }
+
+      const res = await fetch('http://localhost:3000/api/tools/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: manualToolName, args: parsedArgs })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const output = typeof data.result === 'object' ? JSON.stringify(data.result, null, 2) : data.result;
+        setManualToolResult(output || 'Tool executed successfully (returned empty/null).');
+      } else {
+        setManualToolResult(`Tool Execution Failed!\nError: ${data.error || 'unknown'}`);
+      }
+    } catch (error) {
+      setManualToolResult(`Network/Server error during execution: ${error.message}`);
+    } finally {
+      setIsExecutingTool(false);
+    }
+  };
+
   // Debounced semantic search effect
   useEffect(() => {
     if (!useSemanticSearch || !toolsSearchQuery.trim()) {
@@ -534,6 +629,17 @@ export default function AdminDashboard() {
                     <Wrench size={13} />
                     Tools Explorer
                   </button>
+                  <button
+                    onClick={() => { setActiveView('test'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'test'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <Play size={13} />
+                    Test Center
+                  </button>
                 </div>
               </div>
 
@@ -870,7 +976,7 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : activeView === 'tools' ? (
                 /* ================= TOOLS EXPLORER VIEW ================= */
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
@@ -984,6 +1090,94 @@ export default function AdminDashboard() {
                           <p className="text-xs">Select a tool from the list to view its parameters and description.</p>
                         </div>
                       )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ================= TEST CENTER VIEW ================= */
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                        Test Center
+                      </h3>
+                      <p className="text-[11px] text-gray-500">Run the RAG tool selection test suite or test-execute individual tools manually.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex-grow flex gap-6 overflow-hidden mt-4">
+                    {/* Left Pane: RAG Test suite */}
+                    <div className="w-1/2 flex flex-col gap-4 border-r border-white/5 pr-6 h-full overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">RAG Test Runner</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleRunRagTests}
+                            disabled={isTestingRag}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue/15 hover:bg-accent-blue/35 text-accent-blue font-bold rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                          >
+                            <Activity size={12} className={isTestingRag ? 'animate-spin' : ''} />
+                            {isTestingRag ? 'Running Tests...' : 'Run RAG Test Suite'}
+                          </button>
+                          {isTestingRag && (
+                            <button
+                              onClick={handleStopRagTests}
+                              className="flex items-center gap-1.5 px-4 py-2 bg-red-500/15 hover:bg-red-500/35 text-red-400 font-bold rounded-lg text-xs transition cursor-pointer"
+                            >
+                              Stop Tests
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex-grow bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap select-text">
+                        {ragTestOutput || 'Click "Run RAG Test Suite" to verify tool RAG indexes and execute automated tests.'}
+                      </div>
+                    </div>
+
+                    {/* Right Pane: Manual Tool execution */}
+                    <div className="w-1/2 flex flex-col gap-4 h-full overflow-y-auto pl-2">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Manual Tool Tester</span>
+                      
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase">Select Tool</label>
+                        <select
+                          value={manualToolName}
+                          onChange={handleSelectManualTool}
+                          className="w-full px-3 py-2 bg-black/40 border border-white/5 rounded-lg text-xs text-gray-300 focus:outline-none focus:border-accent-blue/50 transition-all cursor-pointer"
+                        >
+                          <option value="">-- Choose a tool to test --</option>
+                          {tools.map((t, idx) => {
+                            const name = t.function?.name || t.name;
+                            return <option key={idx} value={name}>{name}</option>;
+                          })}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase">JSON Arguments</label>
+                        <textarea
+                          value={manualToolArgs}
+                          onChange={(e) => setManualToolArgs(e.target.value)}
+                          rows={6}
+                          className="w-full px-3 py-2 bg-black/40 border border-white/5 rounded-lg text-xs text-accent-mono font-mono focus:outline-none focus:border-accent-blue/50 transition-all"
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleExecuteTool}
+                        disabled={isExecutingTool || !manualToolName}
+                        className="w-full py-2.5 bg-accent-emerald/15 hover:bg-accent-emerald/35 text-accent-emerald font-bold rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isExecutingTool ? 'Executing Tool...' : 'Execute Tool'}
+                      </button>
+
+                      <div className="flex flex-col gap-2 flex-grow">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase">Execution Output</label>
+                        <div className="bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-gray-300 overflow-y-auto whitespace-pre-wrap select-text leading-relaxed">
+                          {manualToolResult || 'Execution result will be displayed here.'}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

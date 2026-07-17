@@ -188,9 +188,9 @@ export default function Sidebar({
             <button
               onClick={startNewChat}
               disabled={isProcessing}
-              className="px-2 py-1 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all text-[10px] font-semibold flex items-center gap-1 border border-white/5 bg-white/[0.02]"
+              className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-xs font-bold flex items-center gap-1 border border-white/10 hover:border-accent-mono/30 active:scale-95 cursor-pointer shadow-sm"
             >
-              + New
+              + New Chat
             </button>
           </div>
           <div className="flex flex-col gap-2 overflow-y-auto pr-1 flex-grow">

@@ -848,6 +848,7 @@ function MainApp() {
       if (data.success) {
         setMessages(data.messages || []);
         setCurrentSessionId(sessionId);
+        setActiveTab('chat');
       }
     } catch (error) {
       console.error('Failed to load chat messages:', error);
@@ -879,6 +880,7 @@ function MainApp() {
     if (isProcessing) return;
     setMessages([]);
     setCurrentSessionId(null);
+    setActiveTab('chat');
   };
 
   const handleConnectGoogle = async () => {
