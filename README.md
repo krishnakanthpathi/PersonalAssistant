@@ -1,12 +1,12 @@
 # Personal Assistant Platform
 
-An agentic, multi-turn personal assistant platform built with Node.js, Express, React (Vite), and Model Context Protocol (MCP). It automates macOS workspace controls, runs UI/web automation flows, manages Notion workspaces, and queries local assets using a natural language interface.
+An agentic, multi-turn personal assistant platform built with Node.js, Express, React (Vite), MongoDB, ChromaDB, and the Model Context Protocol (MCP). It automates macOS workspace controls, runs UI/web automation flows, manages Notion databases, accesses Google services (Calendar, Gmail), converts media, registers long-term memory facts, and retrieves files/tools dynamically using a natural language interface.
 
 ---
 
 ## 🏗️ System Architecture
 
-The following diagram illustrates how the React dashboard, Express backend server, agentic loop, vector database (RAG), and local/MCP tools interact to execute commands and stream responses:
+The following diagram illustrates how the frontend React dashboard, Express orchestrator, agentic loop, vector databases (ChromaDB), document database (MongoDB), and the various native and MCP tool interfaces interact:
 
 ```mermaid
 graph TD
@@ -19,155 +19,151 @@ graph TD
     %% Nodes
     User([User])
     UI["Vite + React Dashboard<br/>(Tailwind CSS)"]:::frontend
-    SSE["SSE Connection & Telemetry Parser"]:::frontend
+    SSE["SSE Connection & Log Parser"]:::frontend
     
-    SRV["Express API Server<br/>(server.js)"]:::backend
+    SRV["Express API & gRPC Server<br/>(server.js)"]:::backend
     AGT["Agent Engine<br/>(Agent Loop)"]:::backend
     REG["Tool Registry"]:::backend
     MGR["MCP Manager"]:::backend
     
-    VDB[("Vector DB<br/>(tool_embeddings.json)")]:::database
+    C_DB[("ChromaDB Dual Collections<br/>(tools & memory)")]:::database
+    M_DB[("MongoDB Store<br/>(session logs & tokens)")]:::database
     EMB["Embedding Model<br/>(OpenAI / Ollama)"]:::backend
     
-    LLM["LLM Provider<br/>(OpenAI / Ollama)"]:::external
+    LLM["LLM Provider<br/>(OpenAI / Ollama / Grok)"]:::external
     
-    subgraph macOS Tools
+    subgraph macOS Tool Suite
         T_SYS["Native macOS Scripts<br/>(AppleScript, Shell, Cliclick, Screenshots)"]:::backend
+        T_FS["Native FS Utilities<br/>(fsRead/Write, edit, watch)"]:::backend
+        T_PROC["Process Manager<br/>(spawn, execute, kill)"]:::backend
     end
     
     subgraph MCP Servers
         M_FS["Filesystem MCP"]:::external
         M_NT["Notion MCP"]:::external
         M_PT["Puppeteer MCP"]:::external
+        M_GC["Google Calendar MCP"]:::external
+        M_GM["Gmail MCP"]:::external
+        M_YT["YouTube MCP"]:::external
+        M_FC["Firecrawl MCP"]:::external
+        M_MEM["Memory MCP"]:::external
+        M_VC["Video Converter MCP"]:::external
     end
 
     %% Connections
     User <--> |Natural Language / UI Interaction| UI
-    UI --> |HTTP POST /api/chat| SRV
-    SRV --> |SSE stream: status & result| SSE
-    SSE --> |Render text, voice bubbles & charts| UI
+    UI --> |HTTP / SSE Log Stream / Chat API| SRV
+    SRV --> |SSE stream: reasoning & logs| SSE
+    SSE --> |Render text, logs & charts| UI
     
     SRV <--> |Execute agent loop| AGT
-    AGT <--> |Retrieve relevant tools via query| REG
-    REG <--> |Match & cache descriptions| VDB
-    REG <--> |Generate query/tool embeddings| EMB
+    AGT <--> |Retrieve relevant tools & memory| REG
+    REG <--> |Vector search & match collections| C_DB
+    REG <--> |Generate text embeddings| EMB
+    SRV <--> |Persist tool execution logs & chats| M_DB
     
     AGT <--> |Multi-turn reasoning & tool-calls| LLM
     AGT --> |Dispatch tool calls| REG
     
-    REG --> |Execute native tools| T_SYS
-    REG --> |Route via stdio streams| MGR
+    REG --> |Execute native macOS utilities| T_SYS
+    REG --> |Run filesystem operations| T_FS
+    REG --> |Run binary commands| T_PROC
+    REG --> |Route standard I/O| MGR
     
-    MGR <--> |Filesystem control| M_FS
-    MGR <--> |Notes & Database sync| M_NT
-    MGR <--> |Headless Chrome automation| M_PT
+    MGR <--> |Filesystem| M_FS
+    MGR <--> |Notion pages| M_NT
+    MGR <--> |Headless Chrome| M_PT
+    MGR <--> |Calendar events| M_GC
+    MGR <--> |Send/Read email| M_GM
+    MGR <--> |Search YouTube videos| M_YT
+    MGR <--> |Scrap pages| M_FC
+    MGR <--> |Update context entities| M_MEM
+    MGR <--> |Ffmpeg media conversions| M_VC
 ```
 
 ---
 
 ## 🚀 Key Capabilities
 
-### 1. macOS Desktop & System Control
-* **Active Window Tracking**: Gets the name and title of the frontmost focused application.
-* **Keyboard Automation**: Simulates custom key combinations (like `Cmd+Space`, `Enter`, `Escape`) or types multi-line text (pasted safely via clipboard backup/restore to protect special characters).
-* **Mouse Control**: Performs absolute cursor movements and coordinates mouse clicking events.
-* **System Utilities**: Adjusts speaker volume, checks display stats, locks the screen, empties Finder trash, and toggles Dark/Light appearance modes.
-* **Application Control**: Indexes all installed GUI applications, launches them, and gracefully terminates them.
-* **Music Playback**: Controls track playback (play, pause, skip, previous) in Spotify and Apple Music.
-* **Network & Diagnostics**: Returns real-time disk and battery health metrics.
-* **Text-To-Speech (TTS)**: Synthesizes speech feedback natively using the macOS `say` command.
+### 1. Unified macOS Tool Suite
+* **Process Management**: Safely executes, monitors, lists, and kills allow-listed system processes (e.g. `git`, `rg`, `npm`, `shortcuts`, `osascript`).
+* **Advanced File System Controls**: Creates, copies, moves, deletes, reads, and edits files. Automatically watches for file changes, reads/sets extended file attributes (`xattr`), and exports text content as formatted PDFs.
+* **Window & Workspace control**: Indexes open app windows, focuses specific applications, shifts windows to precise coordinates, resizes views, and manages macOS virtual spaces.
+* **Desktop & Input Emulation**: Mimics complex cursor movements, clicks, dragging, scrolling, and safe keystroke inputting via clipboard staging.
+* **Apple Integrations**: Launches and monitors Apple Reminders (`reminder_list`, `reminder_add`) and handles macOS iPhone Mirroring launcher sessions.
+* **System Utilities & Playback**: Adjusts audio volume levels, locks screens, checks hardware/battery stats, triggers Dark/Light appearance modes, empties Finder trash, controls music (Spotify/Apple Music), and speaks text natively using the macOS `say` command.
 
-### 2. Screen & UI Automation
-* **Screenshots**: Captures full-screen screenshots of macOS screens (`take_screenshot`).
-* **Visual Workflows**: Combines mouse/keyboard emulation to interact with desktop applications.
+### 2. Dual-Collection ChromaDB RAG Pipeline
+* **Tools Collection (`tools_db` / `tools_nomic_embed`)**: Stores definitions and embeddings for all registered local and MCP tools. Dynamically selects and injects the top relative tools into the LLM context window to optimize latency and reliability.
+* **Long-Term Memory Collection (`personal_db` / `personal_info_nomic_embed`)**: Stores user-scoped observations, entities, and observations parsed from `memory.json` to maintain persistent user context across different threads.
+* **Embedding Providers**: Plugs dynamically into standard OpenAI endpoints (`text-embedding-3-small`) or local Ollama configurations (`nomic-embed-text`).
 
 ### 3. Model Context Protocol (MCP) Integration
-* **Filesystem MCP**: Grants secure read, write, search, and directory tree navigation inside the workspace.
-* **Notion MCP**: Integrates search, creation, reading, and updating pages or databases in your Notion workspace.
-* **Puppeteer MCP**: Enables browser automation to scrap pages, auto-fill forms, and click selectors.
+* Spawns and manages standard input/output (`stdio`) client sessions to **9 different MCP servers**:
+  - `filesystem` (Directory trees, read/write/find)
+  - `notion` (Integrates notes, tasks, page creation)
+  - `puppeteer` (Headless browser automation)
+  - `google-calendar` (Checks and creates calendar events)
+  - `gmail` (Drafts and reads email messages)
+  - `youtube` (Queries transcriptions and metadata)
+  - `firecrawl` (Web scraper markdown converter)
+  - `memory` (Semantic graph registry)
+  - `video-converter` (Ffmpeg-based video and audio transcoder)
 
-### 4. Dynamic RAG Tool Embedding System
-* Uses a local vector database to index descriptions of all registered tools (local macOS tools + external MCP tools).
-* Dynamically ranks the most relevant tools for your query on each prompt to keep the LLM context window small, reduce prompt latency, and maximize inference performance.
+### 4. Interactive Telemetry & Administrative Dashboard
+* **Server-Sent Events (SSE)**: Streams real-time LLM token replies, reasoning steps, tool calls, and execution logs.
+* **System Prompt Console**: Creates, reviews, deletes, and activates app-wide system prompt contexts dynamically.
+* **Settings Control Panel**: Dynamically updates LLM providers, model sizes, custom base URLs, and Google OAuth login/disconnect states.
+* **Admin Logs & Test Center**: Streams raw system logs in real-time. Includes tools for manual single-function triggers and a RAG performance evaluation test suite.
 
-### 5. Live Streaming Telemetry Dashboard
-* Connects to the backend server via **Server-Sent Events (SSE)** to display real-time LLM token streams, reasoning steps, tool calls, and tool execution status.
-* Displays dedicated UI speech-to-text bubbles side-by-side with rich markdown action responses.
-* Integrates a dedicated **Admin Metrics Dashboard** showing tool latencies, LLM call performance, token details, context size processing, and system execution counters.
-
----
 ---
 
 ## 🛠️ Getting Started
 
-### 1. Setup Environment Configuration
-Create a `.env` file inside `backend/` by copying `backend/.env.example` and filling in the environment variables:
-```env
-PORT=5001
-NODE_ENV=development
-LOG_LEVEL=info
-
-# LLM Provider: 'ollama' or 'openai'
-LLM_PROVIDER=openai
-
-# OpenAI Settings (e.g. for compatible endpoints like GLM 4 or OpenAI GPTs)
-OPENAI_API_KEY=your-api-key-here
-OPENAI_BASE_URL=https://api.openai.com/v1/ # Optional custom base URL
-OPENAI_MODEL=gpt-4o                        # Active model name/ID
-```
-
-### 2. Configure MCP Servers
-Add external servers inside `backend/mcp-config.json`:
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/Users/krishnakanth/Projects/PersonalAssisstent"
-      ]
-    },
-    "notion": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@notionhq/notion-mcp-server"
-      ]
-    },
-    "puppeteer": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-puppeteer"
-      ]
-    }
-  }
-}
-```
-
-### 3. Start the Platform
-You can run the backend API server and frontend React dashboard concurrently from the root directory:
+### 1. Start Database Infrastructure
+Make sure you have MongoDB and ChromaDB running locally:
 ```bash
-# Start both services
-bash start.sh
+# Start MongoDB locally (usually default port 27017)
+mongod --dbpath /usr/local/var/mongodb
+
+# Start ChromaDB locally (default port 8000)
+chroma run --path ./data/chroma_db
 ```
 
-Alternatively, run them separately in different terminal tabs:
-* **Backend**: 
+### 2. Setup Environment Configuration
+Copy the configuration template inside `backend/` to create a `.env` file:
+```bash
+cp backend/.env.example backend/.env
+```
+Open `backend/.env` and supply your API keys (e.g. `OPENAI_API_KEY`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `YOUTUBE_API_KEY`, `FIRECRAWL_API_KEY`).
+
+### 3. Configure Google OAuth Credentials (Optional)
+For Google Calendar and Gmail MCP servers, place your downloaded Google API credentials JSON at:
+`backend/gcp-oauth.keys.json`
+
+### 4. Install Dependencies & Run the App
+Install npm libraries in both folders and launch the services:
+
+* **Backend**:
   ```bash
   cd backend
+  npm install
   npm run dev
   ```
-* **Frontend**: 
+* **Frontend**:
   ```bash
   cd frontend
+  npm install
   npm run dev
   ```
+
+Open your browser and navigate to `http://localhost:5173`.
 
 ---
 
 ## 📂 Project Structure
-* [frontend/](file:///Users/krishnakanth/Projects/PersonalAssisstent/frontend): React (Vite) telemetry dashboard and chat client interface.
-* [backend/](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend): Node.js Express server orchestrating LLM tool selection (RAG) and macOS automation.
+
+* [/frontend](file:///Users/krishnakanth/Projects/PersonalAssisstent/frontend): React (Vite) telemetry dashboard, chat client, settings panel, and system prompt manager.
+* [/backend](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend): Node.js Express server acting as the agentic orchestrator, RAG query vector engine, and system automation dispatcher.
+* [/mcps](file:///Users/krishnakanth/Projects/PersonalAssisstent/mcps): Custom Python/Node MCP servers (YouTube, Video Converter).
+* [/orb](file:///Users/krishnakanth/Projects/PersonalAssisstent/orb): React + Vite auxiliary user interface environment.

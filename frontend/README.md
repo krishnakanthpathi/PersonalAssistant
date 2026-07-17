@@ -1,6 +1,6 @@
 # Personal Assistant Frontend Dashboard
 
-The frontend is a modern React application built on Vite and styled with Tailwind CSS. It acts as the interactive interface for the Personal Assistant platform, providing real-time streaming chat completions, system config panels, speech-to-text feedback bubbles, and an administrative telemetry dashboard.
+The frontend is a modern React application built on Vite and styled with Tailwind CSS. It acts as the interactive interface for the Personal Assistant platform, providing real-time streaming chat completions, active config settings, OAuth integrations, a system prompt editor, and an administrative telemetry suite.
 
 ---
 
@@ -70,39 +70,31 @@ graph TD
 
 ## 🎨 UI Sections & Modules
 
-The client interface (orchestrated inside [src/App.jsx](file:///Users/krishnakanth/Projects/PersonalAssisstent/frontend/src/App.jsx)) is divided into three key layouts:
+The client interface is modularly structured into dedicated layout panels managed via the root sidebar navigation:
 
-### 1. Chat & Reasoning Console
-* **User Input**: Text field supporting prompt entries and keyboard submission.
-* **Dual-Content Messages**: 
-  - **Speech Bubble**: Highlighted bubbles showing spoken, voice-friendly text (with a speaker icon representing text-to-speech output).
-  - **Action Block**: A markdown rendered block containing code sections, system statistics, file changes, and detailed logs.
-* **Reasoning Logs**: Intermediate status badges updating in real-time as the agent runs tools (e.g., `Running: active_window` ➔ `Running: take_screenshot` ➔ `Thinking...`).
+### 1. Chat Panel (`ChatPanel.jsx`)
+* **Interactive Chat Console**: Supports multi-turn reasoning conversations.
+* **Dual Rendering Speech & Actions**:
+  - **Speech Bubbles**: Displays voice-friendly spoken text with native web audio playback capabilities.
+  - **Action Panels**: Renders markdown containing system command results, code listings, system statistics, and text-to-speech toggles.
+* **Reasoning Logs**: Emits real-time agent execution status indicators (e.g. `Running: process_run`).
 
-### 2. Header & Configuration Sidebar
-* **Health Panel**: Displays connection status (Online/Offline) and operating system platform.
-* **Active Config View**: Connects to `/api/config` to display:
-  - LLM Provider (OpenAI/Ollama).
-  - Model Name.
-  - Custom Base URL and API Endpoint.
-  - Active express port.
+### 2. Settings Panel (`SettingsPanel.jsx`)
+* **Orchestrator Configs**: Adjusts active LLM providers (OpenAI, Ollama, Grok), models, and base API endpoints.
+* **Google OAuth Flow**: Toggles authorization links for Google Calendar and Gmail MCP servers, displaying connectivity status and disconnected handlers.
 
-### 3. Admin Telemetry & Metrics Dashboard
-Toggled from the header bar, this module fetches, aggregates, and visualizes performance data from the backend's `metrics.json` file:
-* **Sidebar Logs**: A vertical list of all executed requests, displaying prompt summaries, timestamps, durations, and success/failure badges.
-* **Performance Aggregate Cards**:
-  - **Total Requests**: Count of requests.
-  - **Success Rate**: Percentage of request execution loops completed without exceptions.
-  - **Average Latency**: Average request duration, split into RAG Retrieval Time, LLM Response Generation, and Context Processing Time.
-* **System Operations Counters**: Tracks system action metrics:
-  - Total screenshots captured.
-  - Total AppleScript executions.
-  - Screen annotation queries.
-* **Tool Usage Panel**: A tabular view listing each tool (e.g., `keystroke_action`, `annotate_screen`, `notion_mcp`) with:
-  - Execution counts.
-  - Success rates.
-  - Average execution latency (ms).
-* **Drill-down Inspector**: Clicking any request in the history displays the exact prompt, final outcome, step-by-step tool latency timeline, and raw vector database context fields passed into the model.
+### 3. System Prompt Panel (`SystemPromptPanel.jsx`)
+* **System Prompt Editor**: CRUD editor to write, view, rename, activate, or delete custom system prompts to instruct the orchestrator's behavior.
+
+### 4. Admin Dashboard (`AdminDashboard.jsx`)
+* **Live System Logs**: Connects to the backend log SSE stream, displaying real-time server runtime/debug output console in the UI.
+* **RAG Test Center**: Runs manual triggers for single tool execution test runs, starts/stops automated RAG suites, and reports evaluation scores.
+* **Performance Cards**: Aggregates average RAG retrieval latency, generation speeds, success metrics, and request details.
+* **Telemetry History**: Sidebar displaying all executed tasks, allowing developers to inspect system tokens, parameters, prompt contents, and execution metrics.
+* **Tool Aggregation Statistics**: Renders usage counts, failure details, and average processing latency in a clean table view.
+
+### 5. Main Sidebar Navigation (`Sidebar.jsx`)
+* Toggles workspace views between the Chat Console, Settings Console, System Prompt Manager, and the Admin Dashboard.
 
 ---
 

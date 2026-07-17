@@ -1,6 +1,6 @@
 # Personal Assistant Backend Engine
 
-The backend is a Node.js Express server acting as the orchestrator for the Personal Assistant. It coordinates LLM reasoning, registers local macOS and external Model Context Protocol (MCP) tools, ranks tools dynamically using an embedded vector database (RAG), collects system and runtime telemetry metrics, and streams reasoning logs and completions via Server-Sent Events (SSE).
+The backend is a Node.js Express server acting as the orchestrator for the Personal Assistant. It coordinates LLM reasoning, registers local macOS and external Model Context Protocol (MCP) tools, ranks tools and personal context dynamically using ChromaDB (RAG), collects system and runtime telemetry metrics, persists chat sessions in MongoDB, and streams reasoning logs and completions via Server-Sent Events (SSE).
 
 ---
 
@@ -14,8 +14,8 @@ sequenceDiagram
     actor User as Client Dashboard
     participant API as Express Server
     participant AGT as Agent Loop (agent.js)
-    participant RAG as RAG Pipeline (registry.js)
-    participant LLM as LLM Provider (OpenAI/Ollama)
+    participant RAG as RAG Pipeline (ChromaDB)
+    participant LLM as LLM Provider (OpenAI/Ollama/Grok)
     participant REG as Tool Registry
     participant SYS as macOS System / MCP
 
@@ -25,11 +25,12 @@ sequenceDiagram
     activate AGT
     AGT->>REG: registry.getRelevantTools(query)
     activate REG
-    REG->>RAG: Cosine Similarity Match (embeddings)
+    REG->>RAG: Query 'tools_db' (cosine similarity)
     RAG-->>REG: Ranked Top N Tools (cached)
     REG-->>AGT: Return Active LLM Schema
     deactivate REG
     
+    Note over AGT: Query 'personal_db' (personal memory RAG)
     Note over AGT: Initialize request telemetry stats
 
     loop Multi-Turn Reasoning Loop (Max 15 iterations)
@@ -65,10 +66,11 @@ sequenceDiagram
     Note over AGT: Parse tags: <speech> & <action>
     
     opt Speech content exists
-        AGT->>SYS: Execute saySpeechTool (macOS say)
+        AGT->>SYS: Execute say_speech (macOS say)
         Note over SYS: Native audio read-out
     end
     
+    Note over AGT: Save full tool logs & chat session to MongoDB
     Note over AGT: Finalize request metrics
     AGT-->>API: Return { speech, content }
     deactivate AGT
@@ -81,98 +83,132 @@ sequenceDiagram
 ## 📂 Backend Architecture & Components
 
 The codebase is organized into modular services:
-1. **HTTP Server** ([src/server.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/server.js)): Exposes API routes, sets up CORS, registers Server-Sent Events headers for chat, and starts the service.
-2. **MCP Manager** ([src/mcp/mcpManager.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/mcp/mcpManager.js)): Spawns and manages standard input/output (`stdio`) streams to external Model Context Protocol servers.
-3. **Tool Registry** ([src/orchestrator/registry.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/orchestrator/registry.js)): Maintains the catalog of native macOS tools and registers dynamically loaded MCP tools under a unified call dispatcher.
-4. **Agent Loop** ([src/orchestrator/agent.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/orchestrator/agent.js)): Drives the multi-turn agent conversation, injects system prompt constraints, handles fallback XML/JSON parsing, executes speech feedback, and tracks token evaluation speeds.
-5. **RAG Pipeline** ([src/rag/](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/rag)): Matches prompts against tool embeddings to filter candidates. Contains:
-   - `vectorDb.js`: Manages a local file-based database (`data/tool_embeddings.json`) and handles validation/expiration caches.
-   - `embedder.js`: Connects to OpenAI or Ollama to generate vector embeddings.
-   - `pipeline.js`: Ranks and filters active tools using cosine similarity thresholds.
-6. **Telemetry Service** ([src/utils/metrics.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/utils/metrics.js)): Captures runtime statistics (request logs, tool count/success rates, average generation speeds, screenshots, and UI fetch occurrences) and stores them in `data/metrics.json`.
+1. **HTTP Server** ([src/server.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/server.js)): Exposes API routes, sets up CORS, handles OAuth callbacks, serves downloads and screenshots, and boots services.
+2. **MCP Manager** ([src/mcp/mcpManager.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/mcp/mcpManager.js)): Configures, boots, and communicates with 9 different external `stdio` Model Context Protocol servers.
+3. **Tool Registry** ([src/orchestrator/registry.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/orchestrator/registry.js)): Registers, pre-warms, and routes execution payloads to local macOS scripts or external MCP clients.
+4. **Agent Loop** ([src/orchestrator/agent.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/orchestrator/agent.js)): Drives the multi-turn agent logic, formats prompt boundaries, queries memory collections, logs data to MongoDB, and handles SSE log emitters.
+5. **RAG Pipeline** ([src/rag/](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/rag)): Matches queries against embeddings. Contains:
+   - `vectorDb.js`: Connects to ChromaDB `tools_db` (collection `tools_nomic_embed`) and caches tool metadata.
+   - `personalDb.js`: Connects to ChromaDB `personal_db` (collection `personal_info_nomic_embed`) and syncs memories from `memory.json`.
+   - `embedder.js`: Connects to OpenAI (`text-embedding-3-small`) or Ollama (`/api/embed`) to fetch vectors.
+   - `pipeline.js`: Compares cosine similarities to rank relevant tools.
+6. **Telemetry & Logs** ([src/utils/metrics.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/utils/metrics.js)): Records execution speed, screenshots, errors, and system count records.
+7. **Database Drivers** ([src/config/](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/config)): Contains `mongodb.js` (Express-wide MongoDB client connectivity) and `env.js` (environment parser).
 
 ---
 
 ## 🛠️ Registered macOS Native Tools
 
-Local tools are registered in [src/tools/mac/index.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/tools/mac/index.js) and executed using shell scripts, native binary invocations, or AppleScript.
+Local tools are registered in [src/tools/mac/index.js](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend/src/tools/mac/index.js) and run natively via child shell processes, CLI programs, or AppleScript.
 
-### System & Workspace Control
-* **`list_applications`**: Indexes and returns GUI apps installed on macOS.
-* **`open_application`**: Launches target apps via standard shell execution (`open -a`).
-* **`close_application`**: Quits specific apps gracefully using AppleScript.
-* **`open_url`**: Opens URLs in the default browser.
-* **`get_active_window`**: Retrieves the frontmost focused application's name.
-* **`keystroke_action`**: Emulates keyboard key combinations or types safe text inputs (via clipboard staging to preserve layout formatting).
-* **`system_power`**: Sets macOS sleep states, display timeout limits, or locks screens.
-* **`lock_screen`**: Locks the display session instantly.
-* **`say_speech`**: Synthesizes spoken voice audio using macOS `say`.
-* **`empty_trash`**: Empties Finder trash folders.
-* **`run_applescript`**: Executes raw AppleScript scripts directly for generic automation.
+### 1. Process Management (`processTools.js`)
+* **`process_run`**: Runs an allow-listed process synchronously with a custom timeout limit.
+* **`process_start`**: Starts an allow-listed process asynchronously, returning a session ID.
+* **`process_read_output`**: Non-blocking read of stdout/stderr buffers from an active async process session.
+* **`process_write_input`**: Writes text input to an active async process session stdin.
+* **`process_terminate`**: Sends a SIGTERM (then SIGKILL) to an async process session.
+* **`process_list`**: Lists active running processes on the system (PID, command).
+* **`process_kill`**: Sends terminate signals directly to system process PIDs (excludes PID 1).
 
-### Audio & Playback Control
-* **`get_volume`**: Returns active master output volume levels (0-100).
-* **`volume_set`**: Adjusts system output speaker volumes.
-* **`media_control`**: Commands play/pause/skip events in Spotify and Apple Music.
+### 2. Advanced File System Utilities (`fsTools.js`)
+* **`fs_read`**: Reads files from disk.
+* **`fs_read_many`**: Reads multiple files in a single batch request.
+* **`fs_write`**: Overwrites or creates files on disk.
+* **`fs_edit`**: Performs precision find-and-replace text modifications on files.
+* **`fs_write_pdf`**: Translates text contents into a formatted PDF file.
+* **`fs_list`**: Lists directory structures with metadata flags.
+* **`fs_stat`**: Returns stat descriptors (size, updates) for target paths.
+* **`fs_copy`**: Copies files or directories.
+* **`fs_move`**: Renames or relocates filesystem elements.
+* **`fs_make_dir`**: Generates recursive directories.
+* **`fs_delete`**: Removes files or folders recursively.
+* **`fs_watch_once`**: Sets up temporary listeners for file modifications.
+* **`fs_xattr_get`**: Reads macOS extended attributes (`xattr`) on files.
+* **`fs_xattr_set`**: Writes custom extended attributes metadata onto files.
 
-### Network & Performance Diagnostics
-* **`get_system_stats`**: Retrieves battery metrics and primary disk space limits.
+### 3. Window & Space Management (`appWindowTools.js`)
+* **`list_apps`**: Lists open/running graphical applications on macOS.
+* **`list_windows`**: Lists open application window instances, including IDs and sizes.
+* **`focus_app`**: Raises all window instances of a target application.
+* **`focus_window`**: Brings a specific window ID to front focus.
+* **`move_window`**: Shifts a window's upper-left corner coordinates.
+* **`resize_window`**: Adjusts width and height configurations of a target window.
+* **`set_space`**: Changes macOS virtual desktop spaces.
 
-### Desktop Screen Automation
-* **`take_screenshot`**: Captures screen images and saves files inside `data/screenshots/`.
+### 4. Input & Automation Controls (`inputTools.js`, `keystroke.js`)
+* **`mouse_move`**: Moves the mouse cursor to absolute pixel coordinates.
+* **`mouse_click`**: Clicks left/right/double at target screen positions.
+* **`mouse_drag`**: Simulates cursor drag operations between coordinates.
+* **`mouse_scroll`**: Performs vertical or horizontal mouse wheel scroll events.
+* **`key_press`**: Emulates mechanical keyboard key taps.
+* **`type_text`**: Emulates safe layout text typing via clipboard backups.
+* **`keystroke_action`**: Runs customizable chord key combinations (e.g. `Cmd+Space`).
 
-### Task Utilities
-* **`timer`**: Emulates macOS clock operations to set alerts or count-down timers.
+### 5. Application Integrations (`reminders.js`, `iphoneMirrorTools.js`)
+* **`reminder_list`**: Retrieves custom lists from the native Apple Reminders app.
+* **`reminder_add`**: Appends new task items and due-dates to Apple Reminders.
+* **`reminder_complete`**: Marks Reminders items as completed.
+* **`mirror_start`**: Controls and launches native macOS iPhone Mirroring apps.
+
+### 6. Workspace Utilities & Diagnostics
+* **`list_applications`** (`listApplications.js`): Indexes and details all installed applications.
+* **`open_application`** (`openApplication.js`): Spawns target applications (`open -a`).
+* **`close_application`** (`closeApplication.js`): Gracefully terminates apps using AppleScript.
+* **`open_url`** (`openUrl.js`): Launches links in default web browsers.
+* **`get_active_window`** (`activeWindow.js`): Retrieves name of the frontmost focused app window.
+* **`system_power`** (`systemPower.js`): Adjusts macOS sleep timers, display lock screens, or powers down.
+* **`lock_screen`** (`lockScreen.js`): Instantly locks the display.
+* **`say_speech`** (`saySpeech.js`): Speaks text audio natively using macOS `say`.
+* **`empty_trash`** (`emptyTrash.js`): Clears Finder trash directories.
+* **`run_applescript`** (`runAppleScriptTool.js`): Compiles and runs raw AppleScript text strings.
+* **`get_volume`** (`getVolume.js`): Inspects master audio output levels (0-100).
+* **`volume_set`** (`volumeSet.js`): Changes system master speaker volumes.
+* **`media_control`** (`mediaControl.js`): Controls playback commands on Spotify and Apple Music.
+* **`get_system_stats`** (`getSystemStats.js`): Inspects macOS battery health and disk limits.
+* **`take_screenshot`** (`screenshot.js`): Captures full-screen images to `data/screenshots/`.
+* **`timer`** (`timer.js`): Starts countdown timers and creates alerts.
 
 ---
 
 ## 📡 API REST Endpoints
 
-### 1. Health Status
-* **Endpoint**: `GET /`
-* **Response**:
-  ```json
-  {
-    "status": true,
-    "os": "darwin",
-    "message": "Server is running"
-  }
-  ```
+### 1. General & Configuration
+* **`GET /`**: Returns system health, platform info (`darwin`), and server status.
+* **`GET /api/config`**: Fetches current LLM provider, models, bases, and port mappings.
+* **`POST /api/config`**: Updates server configuration variables dynamically.
+* **`GET /api/models`**: Lists available models from Ollama or OpenAI compatible profiles.
 
-### 2. Active Config
-* **Endpoint**: `GET /api/config`
-* **Response**:
-  ```json
-  {
-    "success": true,
-    "provider": "openai",
-    "model": "gpt-4o",
-    "openaiBaseUrl": "https://api.openai.com/v1/",
-    "port": 5001
-  }
-  ```
+### 2. Tools & RAG Testing
+* **`GET /api/tools`**: Fetches the structured schemas of all active macOS and MCP tools.
+* **`GET /api/tools/search`**: Vector searches the RAG registry using a semantic text query.
+* **`POST /api/tools/test`**: Directly fires a tool's execute function by name with arguments.
+* **`POST /api/tools/run-tests`**: Triggers the background RAG suite evaluation test.
+* **`POST /api/tools/stop-tests`**: Stops the running RAG suite evaluation test.
 
-### 3. Active Tools Schema
-* **Endpoint**: `GET /api/tools`
-* **Purpose**: Fetches the JSON schema of all registered macOS and active MCP tools formatted for LLM function calling.
+### 3. Google OAuth Flows
+* **`GET /api/auth/google/url`**: Generates a Google consent URL.
+* **`GET /api/auth/google/callback`**: OAuth callback endpoint that syncs calendar tokens.
+* **`GET /api/auth/google/status`**: Returns connection status and active email indicators.
+* **`POST /api/auth/google/disconnect`**: Clears saved Google tokens from MongoDB and memory.
 
-### 4. Telemetry Metrics
-* **Endpoint**: `GET /api/metrics`
-* **Response**: Returns full telemetry data structure including aggregates (success rates, average latencies) and detailed request execution arrays.
-* **Clear Metrics**: `DELETE /api/metrics`
-  Clears telemetry database records.
+### 4. MCP Servers Telemetry
+* **`GET /api/mcp/status`**: Lists all active MCP clients and their background progress updates.
+* **`POST /api/mcp/progress`**: Endpoint for long-running MCP scripts to update progress details.
 
-### 5. Chat Completion (SSE Stream)
-* **Endpoint**: `POST /api/chat`
-* **Headers**: `Content-Type: text/event-stream`
-* **Payload**:
-  ```json
-  {
-    "prompt": "Increase master volume to 50 percent",
-    "history": []
-  }
-  ```
-* **Event Data Chunks**:
-  - `type: "status"`: Reasoning steps (e.g. `{"type":"status","content":"Running: volume_set"}`)
-  - `type: "result"`: Final assistant response object (e.g. `{"type":"result","content":{"speech":"I've set the volume to 50 percent.","content":"### Volume updated to 50% successfully."}}`)
-  - `type: "error"`: Failure details.
+### 5. Chat Completion & Sessions
+* **`POST /api/chat`**: Standard chat handler. Streams LLM completions and reasoning logs via SSE.
+* **`POST /api/chat/stop`**: Cancels active streaming generation threads immediately.
+* **`GET /api/chats`**: Lists all saved chat sessions stored in MongoDB.
+* **`GET /api/chats/:sessionId`**: Retrieves full message logs for a target session.
+* **`DELETE /api/chats/:sessionId`**: Deletes a saved chat session from MongoDB.
+
+### 6. Logging & Performance Metrics
+* **`GET /api/metrics`**: Returns aggregated latencies, success rates, and tool records.
+* **`DELETE /api/metrics`**: Resets and clears the telemetry store.
+* **`GET /api/logs/stream`**: Server-Sent Events stream that emits raw console/file logs to the client UI.
+
+### 7. System Prompts Manager
+* **`GET /api/system-prompt`**: Retrieves system prompts (default and custom templates).
+* **`POST /api/system-prompt`**: Creates or updates a system prompt record.
+* **`POST /api/system-prompt/activate`**: Activates a specific system prompt configuration.
+* **`DELETE /api/system-prompt/:id`**: Removes a custom system prompt.
