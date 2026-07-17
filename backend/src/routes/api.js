@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getStatus, getConfig, updateConfig, getAvailableModels } from '../controllers/configController.js';
-import { getTools } from '../controllers/toolsController.js';
+import { getTools, searchTools } from '../controllers/toolsController.js';
 import { getMetrics, clearMetrics } from '../controllers/metricsController.js';
 import { getSystemPrompt, saveSystemPrompt, activateSystemPrompt, deleteSystemPrompt } from '../controllers/systemPromptController.js';
 import { handleChat, stopChat, getChats, getChatMessages, deleteChatSession } from '../controllers/chatController.js';
@@ -18,6 +18,7 @@ router.get("/api/config", getConfig);
 router.post("/api/config", updateConfig);
 router.get("/api/models", getAvailableModels);
 router.get("/api/tools", getTools);
+router.get("/api/tools/search", searchTools);
 
 // Google OAuth Flow
 router.get("/api/auth/google/url", getGoogleAuthUrl);

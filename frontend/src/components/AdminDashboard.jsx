@@ -76,6 +76,42 @@ export default function AdminDashboard() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [toolsSearchQuery, setToolsSearchQuery] = useState('');
+  const [selectedExplorerTool, setSelectedExplorerTool] = useState(null);
+  const [useSemanticSearch, setUseSemanticSearch] = useState(true);
+  const [semanticResults, setSemanticResults] = useState([]);
+  const [isSearchingTools, setIsSearchingTools] = useState(false);
+
+  // Debounced semantic search effect
+  useEffect(() => {
+    if (!useSemanticSearch || !toolsSearchQuery.trim()) {
+      setSemanticResults([]);
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      setIsSearchingTools(true);
+      try {
+        const res = await fetch(`http://localhost:3000/api/tools/search?q=${encodeURIComponent(toolsSearchQuery)}`);
+        const data = await res.json();
+        if (data.success) {
+          // Map backend schema matching OpenAI/Ollama tool call style
+          const mappedTools = (data.tools || []).map(t => ({
+            name: t.function?.name || t.name,
+            description: t.function?.description || t.description,
+            function: t.function || t
+          }));
+          setSemanticResults(mappedTools);
+        }
+      } catch (error) {
+        console.error('Failed to search tools semantically:', error);
+      } finally {
+        setIsSearchingTools(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [toolsSearchQuery, useSemanticSearch]);
 
   // Load request from navigation state if present
   useEffect(() => {
@@ -487,6 +523,17 @@ export default function AdminDashboard() {
                       connectionStatus === 'connected' ? 'bg-accent-emerald animate-pulse' : 'bg-red-500'
                     }`} />
                   </button>
+                  <button
+                    onClick={() => { setActiveView('tools'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'tools'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <Wrench size={13} />
+                    Tools Explorer
+                  </button>
                 </div>
               </div>
 
@@ -680,7 +727,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : activeView === 'logs' ? (
                 /* ================= LIVE LOGS VIEW ================= */
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
                   {/* Header / Toolbar */}
@@ -821,6 +868,123 @@ export default function AdminDashboard() {
                         [STREAM PAUSED - {logs.length - filteredLogs.length} updates buffered]
                       </div>
                     )}
+                  </div>
+                </div>
+              ) : (
+                /* ================= TOOLS EXPLORER VIEW ================= */
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                        Tools Explorer
+                      </h3>
+                      <p className="text-[11px] text-gray-500">Search and explore the assistant's capability registry in real-time.</p>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-gray-400 select-none">
+                        <input
+                          type="checkbox"
+                          checked={useSemanticSearch}
+                          onChange={(e) => setUseSemanticSearch(e.target.checked)}
+                          className="rounded border-white/10 text-accent-blue bg-black/40 focus:ring-0 cursor-pointer"
+                        />
+                        <span className={useSemanticSearch ? 'text-accent-blue font-bold' : ''}>Semantic Search (RAG)</span>
+                      </label>
+
+                      <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input
+                          type="text"
+                          placeholder={useSemanticSearch ? "Type a capability to search (e.g. 'capture screen')..." : "Search tools by name/description..."}
+                          value={toolsSearchQuery}
+                          onChange={(e) => setToolsSearchQuery(e.target.value)}
+                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-72 transition-all"
+                        />
+                        {toolsSearchQuery && (
+                          <button
+                            onClick={() => setToolsSearchQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-grow flex gap-6 overflow-hidden mt-4">
+                    {/* Left Pane: Tools list */}
+                    <div className="w-1/3 flex flex-col gap-2 overflow-y-auto pr-1">
+                      {isSearchingTools ? (
+                        <div className="text-gray-500 text-xs text-center py-8">
+                          <RefreshCw size={14} className="animate-spin inline mr-2 text-accent-blue" /> Searching ChromaDB...
+                        </div>
+                      ) : (
+                        (useSemanticSearch && toolsSearchQuery.trim() ? semanticResults : tools.filter(t => {
+                          const name = t.function?.name || t.name || '';
+                          const desc = t.function?.description || t.description || '';
+                          return name.toLowerCase().includes(toolsSearchQuery.toLowerCase()) || 
+                                 desc.toLowerCase().includes(toolsSearchQuery.toLowerCase());
+                        })).map((tool, idx) => {
+                          const toolName = tool.function?.name || tool.name;
+                          const toolDesc = tool.function?.description || tool.description || 'No description provided';
+                          const isSelected = selectedExplorerTool?.name === toolName;
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => setSelectedExplorerTool({
+                                name: toolName,
+                                description: toolDesc,
+                                parameters: tool.function?.parameters || tool.inputSchema || {}
+                              })}
+                              className={`p-3 text-left rounded-xl transition-all duration-200 border text-xs flex flex-col gap-1.5 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-accent-blue/10 border-accent-blue/30 text-white font-semibold'
+                                  : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="p-1 bg-white/5 rounded-lg">
+                                  {getToolIcon(toolName)}
+                                </span>
+                                <span className="font-mono font-bold">{toolName}</span>
+                              </div>
+                              <span className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{toolDesc}</span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Right Pane: Selected Tool Details */}
+                    <div className="w-2/3 bg-black/20 border border-white/5 rounded-xl p-5 overflow-y-auto flex flex-col gap-4">
+                      {selectedExplorerTool ? (
+                        <>
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="p-1.5 bg-white/5 rounded-lg">
+                                {getToolIcon(selectedExplorerTool.name)}
+                              </span>
+                              <h4 className="font-mono text-base font-bold text-white">{selectedExplorerTool.name}</h4>
+                            </div>
+                            <p className="text-xs text-gray-300 leading-relaxed font-sans">{selectedExplorerTool.description}</p>
+                          </div>
+
+                          <div className="border-t border-white/5 pt-4">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Parameters Schema</span>
+                            <pre className="text-[10px] bg-black/40 border border-white/5 p-3 rounded-lg text-accent-mono font-mono overflow-x-auto whitespace-pre leading-relaxed select-text">
+                              {JSON.stringify(selectedExplorerTool.parameters, null, 2)}
+                            </pre>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-grow flex flex-col items-center justify-center text-center text-gray-500 py-10">
+                          <Wrench className="w-8 h-8 text-white/10 mb-2" />
+                          <p className="text-xs">Select a tool from the list to view its parameters and description.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

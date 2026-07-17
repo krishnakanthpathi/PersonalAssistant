@@ -23,6 +23,81 @@ import { timerTool } from '../tools/mac/timer.js';
 import { remindersTool } from '../tools/mac/reminders.js';
 import { rdsQueryTool } from '../tools/rdsQuery.js';
 
+import {
+	listAppsTool,
+	listWindowsTool,
+	focusAppTool,
+	focusWindowTool,
+	moveWindowTool,
+	resizeWindowTool,
+	setSpaceTool
+} from '../tools/mac/appWindowTools.js';
+import {
+	fsReadTool,
+	fsReadManyTool,
+	fsWriteTool,
+	fsEditTool,
+	fsWritePdfTool,
+	fsListTool,
+	fsStatTool,
+	fsCopyTool,
+	fsMoveTool,
+	fsMakeDirTool,
+	fsDeleteTool,
+	fsWatchOnceTool,
+	fsXattrGetTool,
+	fsXattrSetTool
+} from '../tools/mac/fsTools.js';
+import {
+	processRunTool,
+	processStartTool,
+	processReadOutputTool,
+	processWriteInputTool,
+	processTerminateTool,
+	processListTool,
+	processKillTool
+} from '../tools/mac/processTools.js';
+import {
+	revealInFinderTool,
+	getFinderSelectionTool,
+	setFinderTagsTool,
+	quickLookTool,
+	moveToTrashTool,
+	spotlightSearchTool
+} from '../tools/mac/finderTools.js';
+import {
+	shortcutListTool,
+	shortcutRunTool,
+	waitMsTool
+} from '../tools/mac/shortcutTools.js';
+import {
+	mouseMoveTool,
+	mouseClickTool,
+	mouseDragTool,
+	mouseScrollTool,
+	keyPressTool,
+	typeTextTool
+} from '../tools/mac/inputTools.js';
+import {
+	clipboardReadTool,
+	clipboardWriteTool,
+	notifyTool,
+	promptUserTool,
+	screenshotScreenTool,
+	screenshotWindowTool
+} from '../tools/mac/systemInfoTools.js';
+import {
+	mailTool,
+	calendarTool,
+	messagesTool,
+	safariTool,
+	notesTool,
+	terminalTool
+} from '../tools/mac/appIntegrationTools.js';
+import {
+	iphoneMirrorTool
+} from '../tools/mac/iphoneMirrorTools.js';
+
 
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
@@ -61,6 +136,71 @@ class ToolRegistry {
 		this.tools.set(timerTool.definition.name, timerTool);
 		this.tools.set(remindersTool.definition.name, remindersTool);
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
+
+		this.tools.set(listAppsTool.definition.name, listAppsTool);
+		this.tools.set(listWindowsTool.definition.name, listWindowsTool);
+		this.tools.set(focusAppTool.definition.name, focusAppTool);
+		this.tools.set(focusWindowTool.definition.name, focusWindowTool);
+		this.tools.set(moveWindowTool.definition.name, moveWindowTool);
+		this.tools.set(resizeWindowTool.definition.name, resizeWindowTool);
+		this.tools.set(setSpaceTool.definition.name, setSpaceTool);
+
+		this.tools.set(fsReadTool.definition.name, fsReadTool);
+		this.tools.set(fsReadManyTool.definition.name, fsReadManyTool);
+		this.tools.set(fsWriteTool.definition.name, fsWriteTool);
+		this.tools.set(fsEditTool.definition.name, fsEditTool);
+		this.tools.set(fsWritePdfTool.definition.name, fsWritePdfTool);
+		this.tools.set(fsListTool.definition.name, fsListTool);
+		this.tools.set(fsStatTool.definition.name, fsStatTool);
+		this.tools.set(fsCopyTool.definition.name, fsCopyTool);
+		this.tools.set(fsMoveTool.definition.name, fsMoveTool);
+		this.tools.set(fsMakeDirTool.definition.name, fsMakeDirTool);
+		this.tools.set(fsDeleteTool.definition.name, fsDeleteTool);
+		this.tools.set(fsWatchOnceTool.definition.name, fsWatchOnceTool);
+		this.tools.set(fsXattrGetTool.definition.name, fsXattrGetTool);
+		this.tools.set(fsXattrSetTool.definition.name, fsXattrSetTool);
+
+		this.tools.set(processRunTool.definition.name, processRunTool);
+		this.tools.set(processStartTool.definition.name, processStartTool);
+		this.tools.set(processReadOutputTool.definition.name, processReadOutputTool);
+		this.tools.set(processWriteInputTool.definition.name, processWriteInputTool);
+		this.tools.set(processTerminateTool.definition.name, processTerminateTool);
+		this.tools.set(processListTool.definition.name, processListTool);
+		this.tools.set(processKillTool.definition.name, processKillTool);
+
+		this.tools.set(revealInFinderTool.definition.name, revealInFinderTool);
+		this.tools.set(getFinderSelectionTool.definition.name, getFinderSelectionTool);
+		this.tools.set(setFinderTagsTool.definition.name, setFinderTagsTool);
+		this.tools.set(quickLookTool.definition.name, quickLookTool);
+		this.tools.set(moveToTrashTool.definition.name, moveToTrashTool);
+		this.tools.set(spotlightSearchTool.definition.name, spotlightSearchTool);
+
+		this.tools.set(shortcutListTool.definition.name, shortcutListTool);
+		this.tools.set(shortcutRunTool.definition.name, shortcutRunTool);
+		this.tools.set(waitMsTool.definition.name, waitMsTool);
+
+		this.tools.set(mouseMoveTool.definition.name, mouseMoveTool);
+		this.tools.set(mouseClickTool.definition.name, mouseClickTool);
+		this.tools.set(mouseDragTool.definition.name, mouseDragTool);
+		this.tools.set(mouseScrollTool.definition.name, mouseScrollTool);
+		this.tools.set(keyPressTool.definition.name, keyPressTool);
+		this.tools.set(typeTextTool.definition.name, typeTextTool);
+
+		this.tools.set(clipboardReadTool.definition.name, clipboardReadTool);
+		this.tools.set(clipboardWriteTool.definition.name, clipboardWriteTool);
+		this.tools.set(notifyTool.definition.name, notifyTool);
+		this.tools.set(promptUserTool.definition.name, promptUserTool);
+		this.tools.set(screenshotScreenTool.definition.name, screenshotScreenTool);
+		this.tools.set(screenshotWindowTool.definition.name, screenshotWindowTool);
+
+		this.tools.set(mailTool.definition.name, mailTool);
+		this.tools.set(calendarTool.definition.name, calendarTool);
+		this.tools.set(messagesTool.definition.name, messagesTool);
+		this.tools.set(safariTool.definition.name, safariTool);
+		this.tools.set(notesTool.definition.name, notesTool);
+		this.tools.set(terminalTool.definition.name, terminalTool);
+
+		this.tools.set(iphoneMirrorTool.definition.name, iphoneMirrorTool);
 	}
 
 	// Ensure database connection is loaded
