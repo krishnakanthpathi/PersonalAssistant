@@ -45,6 +45,10 @@ export const env = {
 	MAX_RELEVANT_TOOLS: parseInt(process.env.MAX_RELEVANT_TOOLS || '20', 10),
 	TOOL_SIMILARITY_THRESHOLD: parseFloat(process.env.TOOL_SIMILARITY_THRESHOLD || '0.25'),
 
+	// personal rag db
+	RAG_PERSONAL_DB_LIMIT: parseInt(process.env.RAG_PERSONAL_DB_LIMIT || '8', 10),
+	RAG_PERSONAL_DB_THRESHOLD: parseFloat(process.env.RAG_PERSONAL_DB_THRESHOLD || '0.20'),
+
 	// mongodb
 	MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017',
 	MONGO_DB_NAME: process.env.MONGO_DB_NAME || 'assistant_platform',

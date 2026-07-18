@@ -45,7 +45,7 @@ export class Agent {
 			checkAborted();
 
 			// 1. Prepare message history and RAG search query
-			const { messages, cleanedHistory, combinedRAGQuery } = await prepareMessages(prompt, history);
+			const { messages, cleanedHistory, combinedRAGQuery, ragFacts } = await prepareMessages(prompt, history);
 
 			// 2. Fetch tool definitions using RAG selection
 			const retrievalStart = Date.now();
@@ -115,7 +115,15 @@ export class Agent {
 				});
 			}
 
-			return { ...parsed, logs };
+			return { 
+				...parsed, 
+				logs,
+				ragFacts: ragFacts || [],
+				relevantTools: tools ? tools.map(t => ({
+					name: t.name || t.function?.name,
+					description: t.description || t.function?.description
+				})) : []
+			};
 		} catch (error) {
 			metricsService.endRequest(requestId, false, error.message);
 			throw error;

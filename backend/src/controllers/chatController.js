@@ -80,9 +80,11 @@ export const handleChat = async (req, res) => {
 		// 4. Save assistant response
 		const assistantMessage = {
 			role: 'assistant',
-			content: response.content || response,
+			content: response.content || (typeof response === 'string' ? response : ''),
 			speech: response.speech || null,
 			logs: response.logs || [],
+			ragFacts: response.ragFacts || [],
+			relevantTools: response.relevantTools || [],
 			isError: false,
 			createdAt: new Date()
 		};
@@ -175,7 +177,9 @@ export const getChatMessages = async (req, res) => {
 			content: m.content,
 			speech: m.speech,
 			isError: m.isError === true,
-			logs: m.logs || []
+			logs: m.logs || [],
+			ragFacts: m.ragFacts || [],
+			relevantTools: m.relevantTools || []
 		}));
 
 		res.json({ success: true, messages });

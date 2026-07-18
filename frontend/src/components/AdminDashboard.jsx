@@ -22,7 +22,8 @@ import {
   Search,
   Pause,
   Play,
-  Save
+  Save,
+  Database
 } from 'lucide-react';
 
 // Helper to get tool icons dynamically
@@ -97,6 +98,11 @@ export default function AdminDashboard() {
   const [useSemanticSearch, setUseSemanticSearch] = useState(true);
   const [semanticResults, setSemanticResults] = useState([]);
   const [isSearchingTools, setIsSearchingTools] = useState(false);
+
+  // Personal DB RAG search state
+  const [personalSearchQuery, setPersonalSearchQuery] = useState('');
+  const [personalSearchResults, setPersonalSearchResults] = useState([]);
+  const [isSearchingPersonalDb, setIsSearchingPersonalDb] = useState(false);
 
   // States for Test Center
   const [isTestingRag, setIsTestingRag] = useState(false);
@@ -224,6 +230,31 @@ export default function AdminDashboard() {
 
     return () => clearTimeout(delayDebounce);
   }, [toolsSearchQuery, useSemanticSearch]);
+
+  // Debounced personal DB semantic search effect
+  useEffect(() => {
+    if (!personalSearchQuery.trim()) {
+      setPersonalSearchResults([]);
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      setIsSearchingPersonalDb(true);
+      try {
+        const res = await fetch(`http://localhost:3000/api/personal-db/search?q=${encodeURIComponent(personalSearchQuery)}`);
+        const data = await res.json();
+        if (data.success) {
+          setPersonalSearchResults(data.facts || []);
+        }
+      } catch (error) {
+        console.error('Failed to search personal DB semantically:', error);
+      } finally {
+        setIsSearchingPersonalDb(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [personalSearchQuery]);
 
   // Load request from navigation state if present
   useEffect(() => {
@@ -722,6 +753,17 @@ export default function AdminDashboard() {
                   >
                     <Wrench size={13} />
                     Tools Explorer
+                  </button>
+                  <button
+                    onClick={() => { setActiveView('personal-db'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'personal-db'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <Database size={13} />
+                    Personal DB Explorer
                   </button>
                   <button
                     onClick={() => { setActiveView('embeddings'); setSelectedRequest(null); }}
@@ -1258,6 +1300,81 @@ export default function AdminDashboard() {
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              ) : activeView === 'personal-db' ? (
+                /* ================= PERSONAL DB RAG EXPLORER VIEW ================= */
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <Database size={16} className="text-accent-emerald" />
+                        Personal DB Explorer (RAG)
+                      </h3>
+                      <p className="text-[11px] text-gray-500">Query and inspect facts retrieved from your local long-term memories in Chroma DB.</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input
+                          type="text"
+                          placeholder="Type a search query (e.g. 'Krishnakanth investments')..."
+                          value={personalSearchQuery}
+                          onChange={(e) => setPersonalSearchQuery(e.target.value)}
+                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-80 sm:w-96 transition-all"
+                        />
+                        {personalSearchQuery && (
+                          <button
+                            onClick={() => setPersonalSearchQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-grow overflow-y-auto mt-4 pr-1 flex flex-col gap-3">
+                    {isSearchingPersonalDb ? (
+                      <div className="text-gray-500 text-xs text-center py-12 m-auto">
+                        <RefreshCw size={18} className="animate-spin inline mr-2 text-accent-emerald" />
+                        Searching long-term memories...
+                      </div>
+                    ) : personalSearchQuery.trim() ? (
+                      personalSearchResults.length > 0 ? (
+                        personalSearchResults.map((fact, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.03] p-4 rounded-xl flex flex-col gap-2.5 transition-all shadow-sm"
+                          >
+                            <p className="text-xs sm:text-sm text-gray-200 leading-relaxed font-sans select-text">{fact.text}</p>
+                            <div className="flex flex-col gap-1.5 pt-2 border-t border-white/5 mt-1">
+                              <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
+                                <span>Similarity Score</span>
+                                <span className="text-accent-emerald font-bold">{(fact.similarity * 100).toFixed(1)}%</span>
+                              </div>
+                              <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                                <div 
+                                  className="bg-accent-emerald h-full rounded-full transition-all" 
+                                  style={{ width: `${Math.min(100, Math.max(0, fact.similarity * 100))}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-xs text-gray-500 text-center py-12 m-auto border border-dashed border-white/5 rounded-xl w-full max-w-md p-6">
+                          No matching memories or entities found in long-term memory for this query.
+                        </div>
+                      )
+                    ) : (
+                      <div className="text-xs text-gray-500 text-center py-12 m-auto max-w-sm flex flex-col items-center gap-3">
+                        <Database size={24} className="text-white/10" />
+                        <span>Type a query in the search bar above to test semantic vector retrieval from the Personal DB.</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : activeView === 'embeddings' ? (

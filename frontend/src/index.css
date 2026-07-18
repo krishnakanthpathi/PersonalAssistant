@@ -324,5 +324,18 @@ body {
   animation: micGlowPulse 1.6s infinite cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@keyframes slideLeft {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideLeft {
+  animation: slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 
 

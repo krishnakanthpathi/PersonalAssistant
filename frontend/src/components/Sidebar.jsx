@@ -1,12 +1,12 @@
 import React from 'react';
-import { 
-  Sparkles, 
-  MessageSquare, 
-  FileText, 
-  Settings, 
-  Loader2, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  Sparkles,
+  MessageSquare,
+  FileText,
+  Settings,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
   Trash2,
   X
 } from 'lucide-react';
@@ -77,14 +77,14 @@ export default function Sidebar({
 
         {/* Sidebar Navigation Tabs */}
         <div className="flex flex-col gap-1 mb-6">
-          <button 
+          <button
             onClick={() => handleTabChange('chat')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'chat' ? 'bg-accent-mono/10 text-accent-mono border border-accent-mono/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
           >
             <MessageSquare className="w-4 h-4" />
             Chat Assistant
           </button>
-          <button 
+          <button
             onClick={() => {
               handleTabChange('system-prompt');
               fetchSystemPrompt();
@@ -94,7 +94,7 @@ export default function Sidebar({
             <FileText className="w-4 h-4" />
             System Prompt
           </button>
-          <button 
+          <button
             onClick={() => handleTabChange('settings')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === 'settings' ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
           >
@@ -165,8 +165,8 @@ export default function Sidebar({
                     </div>
                     {pct !== null && isRunning && (
                       <div className="w-full bg-white/5 rounded-full h-1 overflow-hidden">
-                        <div 
-                          className="bg-accent-mono h-full transition-all duration-300 rounded-full" 
+                        <div
+                          className="bg-accent-mono h-full transition-all duration-300 rounded-full"
                           style={{ width: `${pct}%` }}
                         ></div>
                       </div>
@@ -206,11 +206,10 @@ export default function Sidebar({
                   <div
                     key={chat.id}
                     onClick={() => handleChatLoad(chat.id)}
-                    className={`p-3 text-left rounded-xl transition-all duration-200 border cursor-pointer group flex items-start justify-between gap-2 ${
-                      isActive 
-                        ? 'bg-accent-mono/10 border-accent-mono/20 text-white' 
+                    className={`p-3 text-left rounded-xl transition-all duration-200 border cursor-pointer group flex items-start justify-between gap-2 ${isActive
+                        ? 'bg-accent-mono/10 border-accent-mono/20 text-white'
                         : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <div className="min-w-0 flex-grow">
                       <p className="font-medium text-xs truncate text-gray-200" title={chat.title || 'Untitled Chat'}>{chat.title || 'Untitled Chat'}</p>

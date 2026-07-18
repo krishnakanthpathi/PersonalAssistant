@@ -22,7 +22,8 @@ import {
   Loader2,
   Mic,
   MicOff,
-  Menu
+  Menu,
+  Database
 } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -161,7 +162,7 @@ const parseMarkdown = (text) => {
   let html = cleanedText.replace(/```mermaid([\s\S]*?)```/g, (match, code) => {
     const id = `__MERMAID_BLOCK_${mermaidBlocks.length}__`;
     const escapedCode = code.trim();
-    
+
     // Check if we have a cached version of this diagram
     const cachedSvg = mermaidSvgCache.get(escapedCode);
     const content = cachedSvg
@@ -418,6 +419,21 @@ function MainApp() {
   const [promptError, setPromptError] = useState(null);
   const [promptSuccessMessage, setPromptSuccessMessage] = useState(null);
   const [selectedHistoryPrompt, setSelectedHistoryPrompt] = useState(null);
+  const [showInspector, setShowInspector] = useState(false);
+  const [inspectMessageIndex, setInspectMessageIndex] = useState(null);
+
+  const getInspectMessage = () => {
+    if (inspectMessageIndex !== null && messages[inspectMessageIndex]) {
+      return { msg: messages[inspectMessageIndex], index: inspectMessageIndex };
+    }
+    // Find last assistant message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i] && messages[i].role === 'assistant') {
+        return { msg: messages[i], index: i };
+      }
+    }
+    return { msg: null, index: null };
+  };
 
   // Dynamic LLM Settings state
   const [settingsForm, setSettingsForm] = useState({
@@ -514,7 +530,7 @@ function MainApp() {
             const renderResult = await mermaid.render(id, code);
             console.log(`[Mermaid] Render result for element ${i}:`, renderResult);
             const svgString = renderResult.svg || renderResult;
-            
+
             // Save to global cache
             mermaidSvgCache.set(code, svgString);
             renderedAny = true;
@@ -912,6 +928,7 @@ function MainApp() {
       if (data.success) {
         setMessages(data.messages || []);
         setCurrentSessionId(sessionId);
+        setInspectMessageIndex(null);
         setActiveTab('chat');
       }
     } catch (error) {
@@ -944,6 +961,7 @@ function MainApp() {
     if (isProcessing) return;
     setMessages([]);
     setCurrentSessionId(null);
+    setInspectMessageIndex(null);
     setActiveTab('chat');
   };
 
@@ -1185,6 +1203,8 @@ function MainApp() {
                     if (content && typeof content === 'object') {
                       updated[assistantMsgIndex].content = content.content || '';
                       updated[assistantMsgIndex].speech = content.speech || '';
+                      updated[assistantMsgIndex].ragFacts = content.ragFacts || [];
+                      updated[assistantMsgIndex].relevantTools = content.relevantTools || [];
                       speechText = content.speech || content.content || '';
                       if (content.sessionId) {
                         setCurrentSessionId(content.sessionId);
@@ -1373,13 +1393,24 @@ function MainApp() {
                 <button
                   onClick={() => setAutoTtsEnabled(prev => !prev)}
                   className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${autoTtsEnabled
-                      ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.15)] font-semibold'
-                      : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-400 hover:text-white'
+                    ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.15)] font-semibold'
+                    : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-400 hover:text-white'
                     }`}
                   title="Toggle automatic text-to-speech for assistant responses"
                 >
                   <Volume2 size={12} className={autoTtsEnabled ? 'animate-pulse' : ''} />
                   <span className="hidden sm:inline">Auto Speak</span>
+                </button>
+                <button
+                  onClick={() => setShowInspector(prev => !prev)}
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${showInspector
+                    ? 'bg-accent-emerald/10 border-accent-emerald/30 text-accent-emerald shadow-[0_0_8px_rgba(16,185,129,0.15)] font-semibold'
+                    : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-400 hover:text-white'
+                    }`}
+                  title="Inspect RAG long-term memories and selected tools"
+                >
+                  <Database size={12} />
+                  <span className="hidden sm:inline">Inspector</span>
                 </button>
                 <button className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium transition-all" onClick={fetchData} title="Sync backend connection state">
                   <RefreshCw size={12} />
@@ -1410,21 +1441,131 @@ function MainApp() {
         {/* Tab Switching Panel Content */}
         <div className="flex-grow overflow-hidden">
           {activeTab === 'chat' ? (
-            <ChatPanel
-              messages={messages}
-              isProcessing={isProcessing}
-              interimSpeech={interimSpeech}
-              currentStatusLog={currentStatusLog}
-              currentlySpeakingId={currentlySpeakingId}
-              speakText={speakText}
-              prompt={prompt}
-              setPrompt={setPrompt}
-              handleSend={handleSend}
-              handleStop={handleStop}
-              isListening={isListening}
-              toggleListening={toggleListening}
-              parseMarkdown={parseMarkdown}
-            />
+            <div className="flex flex-row h-full w-full overflow-hidden">
+              <div className="flex-grow h-full overflow-hidden">
+                <ChatPanel
+                  messages={messages}
+                  isProcessing={isProcessing}
+                  interimSpeech={interimSpeech}
+                  currentStatusLog={currentStatusLog}
+                  currentlySpeakingId={currentlySpeakingId}
+                  speakText={speakText}
+                  prompt={prompt}
+                  setPrompt={setPrompt}
+                  handleSend={handleSend}
+                  handleStop={handleStop}
+                  isListening={isListening}
+                  toggleListening={toggleListening}
+                  parseMarkdown={parseMarkdown}
+                  onInspectMessage={(index) => {
+                    setInspectMessageIndex(index);
+                    setShowInspector(true);
+                  }}
+                  activeInspectIndex={getInspectMessage().index}
+                  showInspector={showInspector}
+                />
+              </div>
+              {showInspector && (() => {
+                const { msg, index } = getInspectMessage();
+                return (
+                  <div className="w-80 sm:w-96 border-l border-border-color bg-bg-secondary/70 backdrop-blur-xl flex flex-col flex-shrink-0 h-full overflow-hidden animate-slideLeft">
+                    {/* Header */}
+                    <div className="h-14 sm:h-16 px-4 border-b border-border-color flex items-center justify-between flex-shrink-0">
+                      <div className="flex items-center gap-2">
+                        <Database size={14} className="text-accent-emerald" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-white">RAG & Tools Inspector</h3>
+                      </div>
+                      <button 
+                        onClick={() => setShowInspector(false)}
+                        className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                        title="Close Inspector"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-6 select-text">
+                      {msg ? (
+                        <>
+                          {/* Query Info */}
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Inspecting Assistant Message #{index + 1}</span>
+                            <div className="p-3 bg-white/5 border border-white/5 rounded-xl text-xs text-gray-300">
+                              <span className="font-semibold text-white block mb-0.5">User Prompt:</span>
+                              <span className="italic break-words">
+                                {messages[index - 1]?.content || 'Prompt not found'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Personal DB RAG section */}
+                          <div className="flex flex-col gap-2.5">
+                            <div className="flex items-center justify-between border-b border-white/5 pb-1">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Personal RAG DB (Chroma)</span>
+                              <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-emerald/10 text-accent-emerald font-bold font-mono">
+                                {msg.ragFacts?.length || 0} MATCHES
+                              </span>
+                            </div>
+
+                            {msg.ragFacts && msg.ragFacts.length > 0 ? (
+                              <div className="flex flex-col gap-2">
+                                {msg.ragFacts.map((fact, fIdx) => (
+                                  <div key={fIdx} className="bg-white/[0.02] border border-white/5 rounded-xl p-3 text-xs leading-relaxed flex flex-col gap-2 shadow-sm hover:border-white/10 transition-all">
+                                    <p className="text-gray-200">{fact.text}</p>
+                                    <div className="flex items-center justify-between border-t border-white/5 pt-1.5 mt-0.5 text-[10px]">
+                                      <span className="text-gray-500 font-mono">Fact #{fIdx + 1}</span>
+                                      <span className="font-semibold font-mono text-accent-emerald bg-accent-emerald/5 px-1.5 py-0.5 rounded">
+                                        Similarity: {(fact.similarity * 100).toFixed(1)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                                No personal long-term memories retrieved for this query.
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tools selection registry section */}
+                          <div className="flex flex-col gap-2.5">
+                            <div className="flex items-center justify-between border-b border-white/5 pb-1">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Available Tools (Registry)</span>
+                              <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/10 text-accent-blue font-bold font-mono">
+                                {msg.relevantTools?.length || 0} TOOLS
+                              </span>
+                            </div>
+
+                            {msg.relevantTools && msg.relevantTools.length > 0 ? (
+                              <div className="flex flex-col gap-2">
+                                {msg.relevantTools.map((tool, tIdx) => (
+                                  <div key={tIdx} className="bg-white/[0.02] border border-white/5 rounded-xl p-3 text-xs shadow-sm hover:border-white/10 transition-all flex flex-col gap-1">
+                                    <span className="font-bold font-mono text-accent-blue text-[11px] block">{tool.name}</span>
+                                    <p className="text-gray-400 text-[11px] leading-normal">{tool.description}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                                No tools loaded for this assistant step.
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="m-auto text-center py-8 px-4 text-gray-500 text-xs">
+                          Send a query to inspect its long-term memory retrieval and tool selection metadata.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           ) : activeTab === 'system-prompt' ? (
             <SystemPromptPanel
               systemPrompts={systemPrompts}

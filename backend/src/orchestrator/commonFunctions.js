@@ -51,38 +51,43 @@ export async function loadMemoryContext(query) {
 		const embedder = new Embedder();
 		const queryEmbedding = await embedder.embed(query);
 
-		// Get top 8 matching facts/entities from Chroma
-		const results = await personalDb.query(queryEmbedding, 8);
+		// Get top matching facts/entities from Chroma using configured limit
+		const results = await personalDb.query(queryEmbedding, env.RAG_PERSONAL_DB_LIMIT || 8);
 
 		if (!results || !results.documents || !results.documents[0] || results.documents[0].length === 0) {
-			return '';
+			return { contextBlock: '', ragFacts: [] };
 		}
 
 		let contextBlock = '\n\n## User Long-Term Memory (Relevant Facts Found)\n';
 		contextBlock += 'The following relevant facts about the user (Krishnakanth) were found in local long-term memory:\n';
 
 		let matchCount = 0;
+		const ragFacts = [];
 		for (let i = 0; i < results.documents[0].length; i++) {
 			const doc = results.documents[0][i];
 			const distance = results.distances[0][i];
 			const similarity = 1 - distance; // in cosine space: similarity = 1 - distance
 
-			// Filter out facts with similarity score < 0.2
-			if (similarity >= 0.20) {
+			// Filter out facts based on configured similarity threshold
+			if (similarity >= (env.RAG_PERSONAL_DB_THRESHOLD !== undefined ? env.RAG_PERSONAL_DB_THRESHOLD : 0.20)) {
 				contextBlock += doc + '\n\n';
 				matchCount++;
+				ragFacts.push({
+					text: doc,
+					similarity: parseFloat(similarity.toFixed(4))
+				});
 			}
 		}
 
 		if (matchCount === 0) {
-			return '';
+			return { contextBlock: '', ragFacts: [] };
 		}
 
 		logger.info(`Injected ${matchCount} relevant memory entities into system prompt using Chroma vector search.`);
-		return contextBlock;
+		return { contextBlock, ragFacts };
 	} catch (error) {
 		logger.error(`Failed to load memory context from Chroma: ${error.message}`);
-		return '';
+		return { contextBlock: '', ragFacts: [] };
 	}
 }
 
@@ -164,9 +169,9 @@ export async function prepareMessages(prompt, history) {
 	}
 
 	// Inject matching memory context directly into the system prompt using Chroma
-	const memoryContext = await loadMemoryContext(prompt);
-	if (memoryContext) {
-		systemPromptText = `${systemPromptText}${memoryContext}`;
+	const { contextBlock, ragFacts } = await loadMemoryContext(prompt);
+	if (contextBlock) {
+		systemPromptText = `${systemPromptText}${contextBlock}`;
 	}
 
 	const messages = [
@@ -184,7 +189,8 @@ export async function prepareMessages(prompt, history) {
 	return {
 		messages,
 		cleanedHistory,
-		combinedRAGQuery
+		combinedRAGQuery,
+		ragFacts: ragFacts || []
 	};
 }
 

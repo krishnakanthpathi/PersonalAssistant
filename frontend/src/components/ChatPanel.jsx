@@ -11,7 +11,8 @@ import {
   Send,
   Square,
   Copy,
-  Check
+  Check,
+  Database
 } from 'lucide-react';
 
 const getToolNameFromLog = (log) => {
@@ -41,7 +42,10 @@ export default function ChatPanel({
   handleStop,
   isListening,
   toggleListening,
-  parseMarkdown
+  parseMarkdown,
+  onInspectMessage = () => {},
+  activeInspectIndex = null,
+  showInspector = false
 }) {
   const chatEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -213,6 +217,13 @@ export default function ChatPanel({
                       title={currentlySpeakingId === idx ? "Stop speaking" : "Read response out loud"}
                     >
                       <Volume2 size={12} className={currentlySpeakingId === idx ? 'animate-pulse' : ''} />
+                    </button>
+                    <button
+                      onClick={() => onInspectMessage(idx)}
+                      className={`p-1 rounded-md transition-all ${activeInspectIndex === idx && showInspector ? 'text-accent-mono bg-white/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
+                      title="Inspect RAG & tools metadata"
+                    >
+                      <Database size={12} />
                     </button>
                     {msg.content && (
                       <button
