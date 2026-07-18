@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Sparkles, 
-  Wrench, 
-  Send, 
-  Trash2, 
-  RefreshCw, 
-  Volume2, 
-  FileText, 
-  Calendar, 
+import {
+  Sparkles,
+  Wrench,
+  Send,
+  Trash2,
+  RefreshCw,
+  Volume2,
+  FileText,
+  Calendar,
   Globe,
   AlertCircle,
   LayoutDashboard,
@@ -39,11 +39,11 @@ import atomOneDarkCss from 'highlight.js/styles/atom-one-dark.css?inline';
 import tokyoNightCss from 'highlight.js/styles/tokyo-night-dark.css?inline';
 
 export const CODE_THEMES = [
-  { id: 'monokai',       label: 'Monokai',       bg: '#272822', accent: '#f92672', css: monokaiCss },
-  { id: 'github-dark',   label: 'GitHub Dark',   bg: '#0d1117', accent: '#79c0ff', css: githubDarkCss },
-  { id: 'dracula',       label: 'Dracula',       bg: '#282a36', accent: '#bd93f9', css: draculaCss },
+  { id: 'monokai', label: 'Monokai', bg: '#272822', accent: '#f92672', css: monokaiCss },
+  { id: 'github-dark', label: 'GitHub Dark', bg: '#0d1117', accent: '#79c0ff', css: githubDarkCss },
+  { id: 'dracula', label: 'Dracula', bg: '#282a36', accent: '#bd93f9', css: draculaCss },
   { id: 'atom-one-dark', label: 'Atom One Dark', bg: '#282c34', accent: '#e06c75', css: atomOneDarkCss },
-  { id: 'tokyo-night',   label: 'Tokyo Night',   bg: '#1a1b26', accent: '#7aa2f7', css: tokyoNightCss },
+  { id: 'tokyo-night', label: 'Tokyo Night', bg: '#1a1b26', accent: '#7aa2f7', css: tokyoNightCss },
 ];
 
 // Helper to parse markdown tables into premium HTML tables
@@ -58,7 +58,7 @@ const parseTables = (text) => {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    
+
     // A table separator line matches pattern of dashes, colons, pipes, and whitespace
     const isSeparator = line.includes('|') && line.match(/^[\s:\-|]+$/);
     // A table content line has at least one pipe
@@ -73,20 +73,20 @@ const parseTables = (text) => {
         // Look ahead to see if the next line is a separator row
         const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
         const nextIsSeparator = nextLine.includes('|') && nextLine.match(/^[\s:\-|]+$/);
-        
+
         if (nextIsSeparator) {
           inTable = true;
           headers = cells;
           columnAlignments = [];
-          
+
           // Skip the next line since it is the separator
-          i++; 
-          
+          i++;
+
           // Parse alignments from separator line
           let sepCells = nextLine.split('|').map(c => c.trim());
           if (nextLine.startsWith('|') && sepCells[0] === '') sepCells.shift();
           if (nextLine.endsWith('|') && sepCells[sepCells.length - 1] === '') sepCells.pop();
-          
+
           columnAlignments = sepCells.map(cell => {
             if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
             if (cell.endsWith(':')) return 'right';
@@ -142,12 +142,15 @@ const parseTables = (text) => {
   return outputLines.join('\n');
 };
 
+// Global cache for rendered Mermaid SVGs to prevent them from being lost on React re-renders
+const mermaidSvgCache = new Map();
+
 // Markdown parser with simple regex
 const parseMarkdown = (text) => {
   if (!text) return '';
   // Ensure text is always a string — msg.content can sometimes be an object
   if (typeof text !== 'string') text = JSON.stringify(text);
-  
+
   // Strip XML tags like <action>, </action>, <speech>, </speech>
   const cleanedText = text
     .replace(/<\/?action>/gi, '')
@@ -158,6 +161,13 @@ const parseMarkdown = (text) => {
   let html = cleanedText.replace(/```mermaid([\s\S]*?)```/g, (match, code) => {
     const id = `__MERMAID_BLOCK_${mermaidBlocks.length}__`;
     const escapedCode = code.trim();
+    
+    // Check if we have a cached version of this diagram
+    const cachedSvg = mermaidSvgCache.get(escapedCode);
+    const content = cachedSvg
+      ? `<div class="mermaid-chart flex justify-center p-4 overflow-x-auto" data-processed="true" data-code="${encodeURIComponent(escapedCode)}">${cachedSvg}</div>`
+      : `<div class="mermaid-chart flex justify-center p-4 overflow-x-auto" data-code="${encodeURIComponent(escapedCode)}"></div>`;
+
     mermaidBlocks.push(
       `<div class="mermaid-block-wrapper my-4 border border-white/5 rounded-xl bg-black/10 overflow-hidden">
         <div class="mermaid-block-header flex items-center justify-between px-3 py-1.5 bg-white/[0.02] border-b border-white/5 text-[10px] text-gray-400 font-mono">
@@ -167,7 +177,7 @@ const parseMarkdown = (text) => {
             Copy Code
           </button>
         </div>
-        <div class="mermaid-chart flex justify-center p-4 overflow-x-auto" data-code="${encodeURIComponent(escapedCode)}"></div>
+        ${content}
       </div>`
     );
     return id;
@@ -216,7 +226,7 @@ const parseMarkdown = (text) => {
     );
     return id;
   });
-  
+
   // Extract and stash inline code blocks
   const inlineCodes = [];
   html = html.replace(/`([^`]+)`/g, (match, code) => {
@@ -231,7 +241,7 @@ const parseMarkdown = (text) => {
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>');
-    
+
     unescaped = unescaped.replace(/<table([^>]*)>/gi, '<div class="overflow-x-auto my-4 shadow-md rounded-xl border border-white/10"><table class="w-full text-left border-collapse overflow-hidden"$1>');
     unescaped = unescaped.replace(/<\/table>/gi, '</table></div>');
     unescaped = unescaped.replace(/<thead([^>]*)>/gi, '<thead class="bg-white/[0.04] border-b border-white/10 text-white font-medium text-xs tracking-wider uppercase"$1>');
@@ -239,7 +249,7 @@ const parseMarkdown = (text) => {
     unescaped = unescaped.replace(/<tr([^>]*)>/gi, '<tr class="hover:bg-white/[0.03] border-b border-white/5 transition-all"$1>');
     unescaped = unescaped.replace(/<th([^>]*)>/gi, '<th class="py-3.5 px-4 font-semibold text-left text-white/90"$1>');
     unescaped = unescaped.replace(/<td([^>]*)>/gi, '<td class="py-3 px-4 text-sm text-gray-200 text-left"$1>');
-    
+
     return '\n\n' + unescaped + '\n\n';
   });
 
@@ -251,7 +261,7 @@ const parseMarkdown = (text) => {
       .replace(/&gt;/g, '>');
     return '\n\n' + parseTables(decodedText) + '\n\n';
   });
-  
+
   // Also parse standard markdown tables globally (fallback)
   html = parseTables(html);
 
@@ -259,7 +269,7 @@ const parseMarkdown = (text) => {
   html = html.replace(/^\s*&gt;\s+(.+)$/gm, '<blockquote>$1</blockquote>');
   html = html.replace(/<\/blockquote>\s*<blockquote>/g, '<br/>');
   html = html.replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, '<blockquote class="border border-white/10 bg-white/[0.02] p-4 my-4 rounded-xl text-gray-200 font-sans">$1</blockquote>');
-    
+
   // Headers
   html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
@@ -267,7 +277,7 @@ const parseMarkdown = (text) => {
 
   // Bold
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  
+
   // Bullet lists
   html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
@@ -319,17 +329,17 @@ const parseMarkdown = (text) => {
   mermaidBlocks.forEach((code, idx) => {
     html = html.replace(`__MERMAID_BLOCK_${idx}__`, code);
   });
-  
+
   // Paragraphs and Line Breaks
   const paragraphs = html.split(/\n\n+/);
   return paragraphs.map(p => {
     const trimmed = p.trim();
     if (!trimmed) return '';
     if (
-      trimmed.startsWith('<pre>') || 
-      trimmed.startsWith('<ul>') || 
-      trimmed.startsWith('<h3>') || 
-      trimmed.startsWith('<h2>') || 
+      trimmed.startsWith('<pre>') ||
+      trimmed.startsWith('<ul>') ||
+      trimmed.startsWith('<h3>') ||
+      trimmed.startsWith('<h2>') ||
       trimmed.startsWith('<h1>') ||
       trimmed.startsWith('<div') ||
       trimmed.startsWith('<table') ||
@@ -356,6 +366,7 @@ function MainApp() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'system-prompt' | 'settings'
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mermaidRenderTrigger, setMermaidRenderTrigger] = useState(0);
 
   useEffect(() => {
     if (location.state?.activeTab) {
@@ -464,40 +475,73 @@ function MainApp() {
     let active = true;
     const renderMermaid = async () => {
       const elements = document.querySelectorAll('.mermaid-chart');
+      console.log('[Mermaid] Found elements:', elements.length);
       if (elements.length === 0) return;
 
       try {
+        console.log('[Mermaid] Importing library...');
         const { default: mermaid } = await import('mermaid');
+        console.log('[Mermaid] Initializing...');
         mermaid.initialize({
           startOnLoad: false,
           theme: 'dark',
           securityLevel: 'loose',
         });
 
+        let renderedAny = false;
         for (let i = 0; i < elements.length; i++) {
           const el = elements[i];
           if (!active) break;
           // If already rendered, skip
-          if (el.getAttribute('data-processed')) continue;
-          
+          console.log(`[Mermaid] Processing element ${i}, data-processed:`, el.getAttribute('data-processed'));
+          if (el.getAttribute('data-processed') === 'true') continue;
+
           const code = decodeURIComponent(el.getAttribute('data-code'));
-          const id = `mermaid-svg-${Math.random().toString(36).substring(2, 9)}`;
-          try {
-            const { svg } = await mermaid.render(id, code);
+
+          // Check if already in cache
+          if (mermaidSvgCache.has(code)) {
             if (active) {
-              el.innerHTML = svg;
+              el.innerHTML = mermaidSvgCache.get(code);
               el.setAttribute('data-processed', 'true');
+              console.log(`[Mermaid] Element ${i} populated from cache`);
+            }
+            continue;
+          }
+
+          const id = `mermaid-svg-${Math.random().toString(36).substring(2, 9)}`;
+          console.log(`[Mermaid] Rendering element ${i} with ID ${id}, code:`, code);
+          try {
+            const renderResult = await mermaid.render(id, code);
+            console.log(`[Mermaid] Render result for element ${i}:`, renderResult);
+            const svgString = renderResult.svg || renderResult;
+            
+            // Save to global cache
+            mermaidSvgCache.set(code, svgString);
+            renderedAny = true;
+
+            if (active) {
+              el.innerHTML = svgString;
+              el.setAttribute('data-processed', 'true');
+              console.log(`[Mermaid] Element ${i} innerHTML set successfully`);
             }
           } catch (err) {
-            console.error('Failed to render mermaid chart:', err);
+            console.error('[Mermaid] Failed to render mermaid chart:', err);
             if (active) {
               el.innerHTML = `<div class="text-xs text-red-400 p-2 border border-red-500/20 bg-red-500/5 rounded">Error rendering chart: ${err.message}</div>`;
               el.setAttribute('data-processed', 'true');
             }
           }
         }
+
+        if (renderedAny && active) {
+          console.log('[Mermaid] New charts rendered, triggering re-render to persist SVGs in dangerouslySetInnerHTML');
+          setMermaidRenderTrigger(c => c + 1);
+        }
       } catch (err) {
-        console.error('Failed to load mermaid:', err);
+        console.error('[Mermaid] Failed to load mermaid:', err);
+        elements.forEach(el => {
+          el.innerHTML = `<div class="text-xs text-red-400 p-2 border border-red-500/20 bg-red-500/5 rounded">Failed to load mermaid: ${err.message}</div>`;
+        });
       }
     };
 
@@ -505,7 +549,7 @@ function MainApp() {
     return () => {
       active = false;
     };
-  }, [messages, activeTab]);
+  }, [messages, activeTab, mermaidRenderTrigger]);
 
   // Speech Recognition (Speech-to-Text) States
   const [isListening, setIsListening] = useState(false);
@@ -559,10 +603,10 @@ function MainApp() {
       alert('Speech recognition is not supported in this browser. Please use Google Chrome.');
       return;
     }
-    
+
     // Stop any active TTS before listening
     stopSpeaking();
-    
+
     if (!recognitionRef.current) {
       const rec = new SpeechRecognition();
       rec.continuous = true;
@@ -580,7 +624,7 @@ function MainApp() {
             interim += transcript;
           }
         }
-        
+
         const text = (baseTextRef.current + ' ' + accumulatedFinal).trim();
         setPrompt(text);
         setInterimSpeech(interim);
@@ -745,7 +789,7 @@ function MainApp() {
     try {
       const updatedConfig = { ...config, model: newModelName };
       setConfig(updatedConfig);
-      
+
       const payload = {
         ...settingsForm,
         provider: config.provider,
@@ -1326,13 +1370,12 @@ function MainApp() {
             {/* Context-specific Top Bar buttons */}
             {activeTab === 'chat' && (
               <div className="flex gap-1 sm:gap-2">
-                <button 
+                <button
                   onClick={() => setAutoTtsEnabled(prev => !prev)}
-                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                    autoTtsEnabled 
-                      ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.15)] font-semibold' 
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${autoTtsEnabled
+                      ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.15)] font-semibold'
                       : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-400 hover:text-white'
-                  }`}
+                    }`}
                   title="Toggle automatic text-to-speech for assistant responses"
                 >
                   <Volume2 size={12} className={autoTtsEnabled ? 'animate-pulse' : ''} />
@@ -1352,7 +1395,7 @@ function MainApp() {
             <div className="h-4 w-px bg-white/10 hidden sm:block" />
 
             {/* Global Prominent Telemetry Chart Button */}
-            <Link 
+            <Link
               to="/admin"
               state={{ fromTab: activeTab }}
               className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1.5 bg-accent-blue text-white rounded-lg text-xs font-semibold shadow-glow transition-all hover:bg-accent-blue/80"
