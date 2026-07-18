@@ -282,9 +282,9 @@ export default function ChatPanel({
               {/* Active loop status display */}
               {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (() => {
                 const toolNames = msg.logs
+                  .filter(log => log.startsWith('Calling tool:'))
                   .map(getToolNameFromLog)
-                  .filter(Boolean)
-                  .filter((val, idx, arr) => arr.indexOf(val) === idx);
+                  .filter(Boolean);
                 
                 if (toolNames.length === 0) return null;
 
