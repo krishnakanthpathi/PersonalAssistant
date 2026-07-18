@@ -40,8 +40,14 @@ export const mailTool = {
 					set outputText to ""
 					try
 						set unreadMsgs to every message of inbox whose read status is false
-						repeat with msg in unreadMsgs
-							set outputText to outputText & (sender of msg) & ";" & (subject of msg) & ";" & (date received of msg as string) & "\\n"
+						set senders to sender of unreadMsgs
+						set subjects to subject of unreadMsgs
+						set dates to date received of unreadMsgs
+						
+						set itemCount to count of senders
+						repeat with i from 1 to itemCount
+							set d to item i of dates
+							set outputText to outputText & (item i of senders) & ";" & (item i of subjects) & ";" & (d as string) & "\\n"
 						end repeat
 					end try
 					return outputText
@@ -61,8 +67,14 @@ export const mailTool = {
 					set outputText to ""
 					try
 						set msgs to every message of inbox whose (subject contains "${query.replace(/"/g, '\\"')}") or (content contains "${query.replace(/"/g, '\\"')}") or (sender contains "${query.replace(/"/g, '\\"')}")
-						repeat with msg in msgs
-							set outputText to outputText & (sender of msg) & ";" & (subject of msg) & ";" & (date received of msg as string) & "\\n"
+						set senders to sender of msgs
+						set subjects to subject of msgs
+						set dates to date received of msgs
+						
+						set itemCount to count of senders
+						repeat with i from 1 to itemCount
+							set d to item i of dates
+							set outputText to outputText & (item i of senders) & ";" & (item i of subjects) & ";" & (d as string) & "\\n"
 						end repeat
 					end try
 					return outputText
@@ -121,8 +133,13 @@ export const calendarTool = {
 						
 						tell calendar 1
 							set todayEvents to (every event whose start date is greater than or equal to todayStart and start date is less than todayEnd)
-							repeat with ev in todayEvents
-								set outputText to outputText & (summary of ev) & ";" & (start date of ev as string) & ";" & (end date of ev as string) & "\\n"
+							set summaries to summary of todayEvents
+							set startDates to start date of todayEvents
+							set endDates to end date of todayEvents
+							
+							set itemCount to count of summaries
+							repeat with i from 1 to itemCount
+								set outputText to outputText & (item i of summaries) & ";" & (item i of startDates as string) & ";" & (item i of endDates as string) & "\\n"
 							end repeat
 						end tell
 					end try
@@ -173,8 +190,12 @@ export const messagesTool = {
 				tell application "Messages"
 					set outputText to ""
 					try
-						repeat with c in chats
-							set outputText to outputText & (name of c) & ";" & (id of c) & "\\n"
+						set chatNames to name of chats
+						set chatIds to id of chats
+						
+						set itemCount to count of chatNames
+						repeat with i from 1 to itemCount
+							set outputText to outputText & (item i of chatNames) & ";" & (item i of chatIds) & "\\n"
 						end repeat
 					end try
 					return outputText
@@ -221,10 +242,14 @@ export const safariTool = {
 		} else if (action === 'get-tabs') {
 			const script = `
 				tell application "Safari"
+					set tabNames to name of tabs of every window
+					set tabURLs to URL of tabs of every window
 					set tabList to ""
-					repeat with w in windows
-						repeat with t in tabs of w
-							set tabList to tabList & (name of t) & ";" & (URL of t) & "\\n"
+					repeat with wIdx from 1 to count of tabNames
+						set windowNames to item wIdx of tabNames
+						set windowURLs to item wIdx of tabURLs
+						repeat with tIdx from 1 to count of windowNames
+							set tabList to tabList & (item tIdx of windowNames) & ";" & (item tIdx of windowURLs) & "\\n"
 						end repeat
 					end repeat
 					return tabList
@@ -287,8 +312,12 @@ export const notesTool = {
 					set outputText to ""
 					try
 						set noteList to every note whose name contains "${query.replace(/"/g, '\\"')}" or body contains "${query.replace(/"/g, '\\"')}"
-						repeat with n in noteList
-							set outputText to outputText & (name of n) & ";" & (id of n) & "\\n"
+						set noteNames to name of noteList
+						set noteIds to id of noteList
+						
+						set itemCount to count of noteNames
+						repeat with i from 1 to itemCount
+							set outputText to outputText & (item i of noteNames) & ";" & (item i of noteIds) & "\\n"
 						end repeat
 					end try
 					return outputText
