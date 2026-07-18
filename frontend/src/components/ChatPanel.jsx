@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   Volume2,
   Sparkles,
@@ -9,7 +9,9 @@ import {
   Mic,
   MicOff,
   Send,
-  Square
+  Square,
+  Copy,
+  Check
 } from 'lucide-react';
 
 const getToolNameFromLog = (log) => {
@@ -42,6 +44,7 @@ export default function ChatPanel({
   parseMarkdown
 }) {
   const chatEndRef = useRef(null);
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -56,27 +59,37 @@ export default function ChatPanel({
     }
   };
 
-  const starterPrompts = [];
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => {
+        setCopiedId(null);
+      }, 2000);
+    }).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopiedId(id);
+      setTimeout(() => {
+        setCopiedId(null);
+      }, 2000);
+    });
+  };
 
-  const handleMarkdownClick = (e) => {
-    // Event delegation: handle copy button clicks inside dangerouslySetInnerHTML
-    const btn = e.target.closest('[data-copy-btn]');
-    if (!btn) return;
-    const wrapper = btn.closest('.code-block-wrapper');
-    const codeEl = wrapper?.querySelector('code');
-    if (!codeEl) return;
-
-    navigator.clipboard.writeText(codeEl.innerText).then(() => {
+  const copyToClipboard = (text, btn, originalLabel) => {
+    navigator.clipboard.writeText(text).then(() => {
       btn.classList.add('copied');
       btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!`;
       setTimeout(() => {
         btn.classList.remove('copied');
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy code`;
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> ${originalLabel}`;
       }, 2000);
     }).catch(() => {
-      // Fallback for non-HTTPS
       const ta = document.createElement('textarea');
-      ta.value = codeEl.innerText;
+      ta.value = text;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
@@ -85,9 +98,30 @@ export default function ChatPanel({
       btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!`;
       setTimeout(() => {
         btn.classList.remove('copied');
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy code`;
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> ${originalLabel}`;
       }, 2000);
     });
+  };
+
+  const starterPrompts = [];
+
+  const handleMarkdownClick = (e) => {
+    // Event delegation: handle copy button clicks inside dangerouslySetInnerHTML
+    const btn = e.target.closest('[data-copy-btn]');
+    if (btn) {
+      const wrapper = btn.closest('.code-block-wrapper');
+      const codeEl = wrapper?.querySelector('code');
+      if (!codeEl) return;
+      copyToClipboard(codeEl.innerText, btn, 'Copy code');
+      return;
+    }
+
+    const chartBtn = e.target.closest('[data-copy-chart-btn]');
+    if (chartBtn) {
+      const code = decodeURIComponent(chartBtn.getAttribute('data-code'));
+      copyToClipboard(code, chartBtn, 'Copy Code');
+      return;
+    }
   };
 
   return (
@@ -153,14 +187,53 @@ export default function ChatPanel({
             <div key={idx} className={`flex flex-col gap-1 w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
               <div className="text-[10px] text-gray-500 font-semibold tracking-wider px-1 flex items-center justify-between w-full gap-2">
                 <span>{msg.role === 'user' ? 'YOU' : 'ASSISTANT'}</span>
-                {msg.role === 'assistant' && (
+                {msg.role === 'user' ? (
                   <button
-                    onClick={() => speakText(msg.content, idx)}
-                    className={`p-1 rounded-md transition-all ${currentlySpeakingId === idx ? 'text-accent-blue bg-accent-blue/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-                    title={currentlySpeakingId === idx ? "Stop speaking" : "Read response out loud"}
+                    onClick={() => handleCopy(msg.content, `user-${idx}`)}
+                    className="p-1 rounded-md transition-all text-gray-500 hover:text-gray-300 hover:bg-white/5 flex items-center gap-1"
+                    title="Copy input text"
                   >
-                    <Volume2 size={12} className={currentlySpeakingId === idx ? 'animate-pulse' : ''} />
+                    {copiedId === `user-${idx}` ? (
+                      <>
+                        <Check size={10} className="text-accent-emerald" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={10} />
+                        <span>Copy</span>
+                      </>
+                    )}
                   </button>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => speakText(msg.content, idx)}
+                      className={`p-1 rounded-md transition-all ${currentlySpeakingId === idx ? 'text-accent-blue bg-accent-blue/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
+                      title={currentlySpeakingId === idx ? "Stop speaking" : "Read response out loud"}
+                    >
+                      <Volume2 size={12} className={currentlySpeakingId === idx ? 'animate-pulse' : ''} />
+                    </button>
+                    {msg.content && (
+                      <button
+                        onClick={() => handleCopy(msg.content, `assistant-${idx}`)}
+                        className="p-1 rounded-md transition-all text-gray-500 hover:text-gray-300 hover:bg-white/5 flex items-center gap-1"
+                        title="Copy full response (including charts/code)"
+                      >
+                        {copiedId === `assistant-${idx}` ? (
+                          <>
+                            <Check size={10} className="text-accent-emerald" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={10} />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className={`max-w-[92%] sm:max-w-[85%] p-3 sm:p-4 rounded-2xl border text-sm leading-relaxed ${msg.role === 'user' ? 'bg-accent-mono/10 border-accent-mono/20 text-white rounded-tr-none' : 'bg-bg-secondary/40 border-white/5 rounded-tl-none'}`}>
