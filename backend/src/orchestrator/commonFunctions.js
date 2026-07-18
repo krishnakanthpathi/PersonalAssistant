@@ -93,10 +93,25 @@ export async function loadMemoryContext(query) {
 
 export async function prepareMessages(prompt, history) {
 	const cleanedHistory = history
-		.map(m => ({
-			role: m.role,
-			content: m.content
-		}))
+		.map(m => {
+			if (m.role === 'assistant') {
+				let content = '';
+				if (m.speech) {
+					content += `<speech>\n${m.speech}\n</speech>\n`;
+				}
+				if (m.content) {
+					content += `<action>\n${m.content}\n</action>`;
+				}
+				return {
+					role: m.role,
+					content: content || m.content
+				};
+			}
+			return {
+				role: m.role,
+				content: m.content
+			};
+		})
 		.filter(m => m.role && m.content);
 
 	const SLIDING_WINDOW_SIZE = 6;
@@ -859,8 +874,11 @@ export function appendToolErrorMessage(messages, call, errorMsg, toolName) {
 // ==========================================
 
 export function parseAgentResponse(rawContent) {
-	const speechMatch = rawContent.match(/<speech>([\s\S]*?)<\/speech>/i);
-	const actionMatch = rawContent.match(/<action>([\s\S]*?)<\/action>/i);
+	// Strip thinking/reasoning tags first so they don't pollute final output or text-to-speech
+	const cleaned = stripThinkingTags(rawContent);
+
+	const speechMatch = cleaned.match(/<speech>([\s\S]*?)<\/speech>/i);
+	const actionMatch = cleaned.match(/<action>([\s\S]*?)<\/action>/i);
 
 	let speech = '';
 	let action = '';
@@ -873,10 +891,10 @@ export function parseAgentResponse(rawContent) {
 	}
 
 	if (!speechMatch && !actionMatch) {
-		action = rawContent.trim();
+		action = cleaned.trim();
 		speech = cleanTextForSpeech(action);
 	} else if (speechMatch && !actionMatch) {
-		action = rawContent.replace(/<speech>[\s\S]*?<\/speech>/gi, '').trim();
+		action = cleaned.replace(/<speech>[\s\S]*?<\/speech>/gi, '').trim();
 	} else if (!speechMatch && actionMatch) {
 		action = actionMatch[1].trim();
 		speech = cleanTextForSpeech(action);

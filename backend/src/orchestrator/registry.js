@@ -386,6 +386,62 @@ class ToolRegistry {
 				}
 			}
 
+			// Group-based tool expansion: if at least one tool from a group is retrieved, include other essential tools from that group.
+			const groups = [
+				{
+					name: 'filesystem',
+					match: (t, name) => name.startsWith('fs_') || t.serverName === 'filesystem',
+					essential: new Set([
+						'fs_list', 'fs_read', 'fs_write', 'fs_make_dir', 'fs_move', 'fs_delete',
+						'list_directory', 'read_file', 'write_file', 'create_directory', 'move_file', 'remove_file'
+					])
+				},
+				{
+					name: 'notion',
+					match: (t, name) => name.startsWith('notion_') || t.serverName === 'notion',
+					essential: new Set([
+						'notion_search', 'notion_get_page', 'notion_create_page', 'notion_update_page', 'notion_append_block'
+					])
+				},
+				{
+					name: 'gmail',
+					match: (t, name) => name.startsWith('gmail_') || t.serverName === 'gmail' || name.includes('mail'),
+					essential: new Set([
+						'search_threads', 'get_thread', 'send_draft', 'create_draft', 'reply_to_thread'
+					])
+				},
+				{
+					name: 'calendar',
+					match: (t, name) => name.startsWith('calendar_') || t.serverName === 'google-calendar',
+					essential: new Set([
+						'list_events', 'get_event', 'create_event', 'update_event', 'delete_event'
+					])
+				}
+			];
+
+			const activeGroups = new Set();
+			for (const tool of selectedTools) {
+				const toolName = tool.function?.name || tool.name;
+				for (const group of groups) {
+					if (group.match(tool, toolName)) {
+						activeGroups.add(group.name);
+					}
+				}
+			}
+
+			for (const groupName of activeGroups) {
+				const group = groups.find(g => g.name === groupName);
+				for (const tool of allTools) {
+					const toolName = tool.function?.name || tool.name;
+					if (group.essential.has(toolName)) {
+						const alreadyIncluded = selectedTools.some(t => (t.function?.name || t.name) === toolName);
+						if (!alreadyIncluded) {
+							selectedTools.push(tool);
+						}
+					}
+				}
+			}
+
 			return selectedTools;
 		} catch (error) {
 			return allTools;
