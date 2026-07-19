@@ -461,7 +461,7 @@ function MainApp() {
   const [isAttaching, setIsAttaching] = useState(false);
 
   const onAttachFiles = async (files) => {
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 1000 * 1024 * 1024; // 1000MB
     setIsAttaching(true);
     try {
       const loadPromises = Array.from(files).map(file => {
@@ -1193,9 +1193,9 @@ function MainApp() {
     setSelectedFiles([]);
 
     // Append user message (with local preview attachment meta)
-    const userMessage = { 
-      role: 'user', 
-      content: inputMsg, 
+    const userMessage = {
+      role: 'user',
+      content: inputMsg,
       attachments: attachmentsToSend.map(file => ({
         name: file.name,
         type: file.type,
@@ -1215,9 +1215,9 @@ function MainApp() {
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: inputMsg, 
-          history: messages, 
+        body: JSON.stringify({
+          prompt: inputMsg,
+          history: messages,
           sessionId: currentSessionId,
           attachments: attachmentsToSend
         }),
@@ -1552,7 +1552,7 @@ function MainApp() {
                         <Database size={14} className="text-accent-emerald" />
                         <h3 className="text-xs font-bold uppercase tracking-wider text-white">RAG & Tools Inspector</h3>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setShowInspector(false)}
                         className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
                         title="Close Inspector"
