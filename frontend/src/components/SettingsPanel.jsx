@@ -338,16 +338,6 @@ export default function SettingsPanel({
 
             </div>
 
-            {/* RAG Embeddings Warning */}
-            <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-[11px] text-gray-400 leading-relaxed">
-              <strong className="text-yellow-400/90 block mb-1">RAG Embeddings Note:</strong>
-              Since Grok does not natively generate embeddings, when using Grok or OpenAI as the LLM provider:
-              <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>The system will automatically use the OpenAI embeddings API if a valid <strong>OpenAI API Key</strong> is provided.</li>
-                <li>If no OpenAI API key is present, it will fallback to Ollama to generate embeddings locally.</li>
-              </ul>
-            </div>
-
             {/* Multimedia Settings Card */}
             <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">

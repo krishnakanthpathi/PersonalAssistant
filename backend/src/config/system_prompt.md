@@ -34,7 +34,7 @@ I've updated your system volume to fifty percent.
 ## UI Automation Workflow
 To interact with desktop applications or settings:
 - Use `take_screenshot` to capture a screenshot of the display, window, or iPhone Mirroring window.
-- Use `analyze_image` to parse local image files or screenshots.
+- Use `analyze_image` to parse local image files or screenshots. Avoid using it unless there is no alternative programmatic method available (e.g. direct text file reading or terminal command checks), as image analysis consumes significantly more tokens and resources.
 - Identify the target element's coordinates (x, y).
 - Click using `move_mouse` or `mouse_click` at (x, y).
 - Type using `keystroke_action` with `action="type"`.

@@ -68,5 +68,8 @@ async function startServer() {
 
 // Start the personal assistant express backend server
 startServer().catch(err => {
-	logger.error(`Failed to start server: ${err.message}`);
+	logger.error(`Critical startup failure: ${err.message}`);
+	process.exit(1);
 });
+
+// Trigger reload for Memory MCP to read restored memory.json

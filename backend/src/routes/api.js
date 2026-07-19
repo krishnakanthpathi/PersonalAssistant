@@ -7,7 +7,7 @@ import { handleChat, stopChat, getChats, getChatMessages, deleteChatSession } fr
 import { updateMcpProgress, getMcpStatus } from '../controllers/mcpStatusController.js';
 import { getGoogleAuthUrl, handleGoogleCallback, getGoogleAuthStatus, disconnectGoogle } from '../controllers/authController.js';
 import { streamLogs } from '../controllers/logsController.js';
-import { searchPersonalDb } from '../controllers/personalDbController.js';
+import { searchPersonalDb, testOkfRetrieval } from '../controllers/personalDbController.js';
 
 const router = Router();
 
@@ -24,6 +24,7 @@ router.post("/api/tools/test", testTool);
 router.post("/api/tools/run-tests", runRagTests);
 router.post("/api/tools/stop-tests", stopRagTests);
 router.get("/api/personal-db/search", searchPersonalDb);
+router.get("/api/okf/test-retrieval", testOkfRetrieval);
 
 // Google OAuth Flow
 router.get("/api/auth/google/url", getGoogleAuthUrl);

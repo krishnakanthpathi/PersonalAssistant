@@ -57,7 +57,7 @@ export class Agent {
 			const givenContextText = `[System Prompt]\n${messages[0].content}\n\n[Chat History]\n${JSON.stringify(cleanedHistory, null, 2)}\n\n[Prompt]\n${prompt}\n\n[Relevant Tools from RAG]\n${tools.map(t => `- ${t.function?.name || t.name}: ${t.function?.description || t.description}`).join('\n')}`;
 			metricsService.recordGivenContext(requestId, givenContextText);
 
-			const MAX_ITERATIONS = 50;
+			const MAX_ITERATIONS = 150;
 			let iteration = 0;
 
 			// 3. First call to LLM including the tools list
@@ -115,8 +115,8 @@ export class Agent {
 				});
 			}
 
-			return { 
-				...parsed, 
+			return {
+				...parsed,
 				logs,
 				ragFacts: ragFacts || [],
 				relevantTools: tools ? tools.map(t => ({

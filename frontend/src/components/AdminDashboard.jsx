@@ -99,10 +99,12 @@ export default function AdminDashboard() {
   const [semanticResults, setSemanticResults] = useState([]);
   const [isSearchingTools, setIsSearchingTools] = useState(false);
 
-  // Personal DB RAG search state
-  const [personalSearchQuery, setPersonalSearchQuery] = useState('');
-  const [personalSearchResults, setPersonalSearchResults] = useState([]);
-  const [isSearchingPersonalDb, setIsSearchingPersonalDb] = useState(false);
+  // OKF Retrieval Tester state
+  const [okfTestQuery, setOkfTestQuery] = useState('');
+  const [okfMatchedDocs, setOkfMatchedDocs] = useState([]);
+  const [okfSelectedTools, setOkfSelectedTools] = useState([]);
+  const [isTestingOkf, setIsTestingOkf] = useState(false);
+  const [okfTestError, setOkfTestError] = useState('');
 
   // States for Test Center
   const [isTestingRag, setIsTestingRag] = useState(false);
@@ -231,30 +233,28 @@ export default function AdminDashboard() {
     return () => clearTimeout(delayDebounce);
   }, [toolsSearchQuery, useSemanticSearch]);
 
-  // Debounced personal DB semantic search effect
-  useEffect(() => {
-    if (!personalSearchQuery.trim()) {
-      setPersonalSearchResults([]);
-      return;
-    }
-
-    const delayDebounce = setTimeout(async () => {
-      setIsSearchingPersonalDb(true);
-      try {
-        const res = await fetch(`http://localhost:3000/api/personal-db/search?q=${encodeURIComponent(personalSearchQuery)}`);
-        const data = await res.json();
-        if (data.success) {
-          setPersonalSearchResults(data.facts || []);
-        }
-      } catch (error) {
-        console.error('Failed to search personal DB semantically:', error);
-      } finally {
-        setIsSearchingPersonalDb(false);
+  const handleTestOkf = async (e) => {
+    if (e) e.preventDefault();
+    if (!okfTestQuery.trim()) return;
+    
+    setIsTestingOkf(true);
+    setOkfTestError('');
+    try {
+      const res = await fetch(`http://localhost:3000/api/okf/test-retrieval?q=${encodeURIComponent(okfTestQuery)}`);
+      const data = await res.json();
+      if (data.success) {
+        setOkfMatchedDocs(data.matchedDocs || []);
+        setOkfSelectedTools(data.selectedTools || []);
+      } else {
+        setOkfTestError(data.error || 'Failed to retrieve OKF data');
       }
-    }, 400);
-
-    return () => clearTimeout(delayDebounce);
-  }, [personalSearchQuery]);
+    } catch (err) {
+      console.error('Failed to run OKF retrieval test:', err);
+      setOkfTestError(`Error: ${err.message}`);
+    } finally {
+      setIsTestingOkf(false);
+    }
+  };
 
   // Load request from navigation state if present
   useEffect(() => {
@@ -647,7 +647,7 @@ export default function AdminDashboard() {
                   <span className="font-mono text-sm font-bold text-white">{selectedRequest.totalDuration} ms</span>
                 </div>
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                  <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">RAG Retrieval</span>
+                  <span className="text-[9px] font-semibold text-gray-500 uppercase block mb-1">OKF Retrieval</span>
                   <span className="font-mono text-sm font-bold text-accent-mono">{selectedRequest.retrievalTime || 0} ms</span>
                 </div>
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
@@ -718,7 +718,7 @@ export default function AdminDashboard() {
               {/* Given Context & Generated Context */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-72 overflow-hidden">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-3 flex-shrink-0">RAG Context Given</span>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-3 flex-shrink-0">OKF Context Given</span>
                   <div className="flex-grow bg-black/20 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
                     {selectedRequest.givenContext || 'No additional context loaded.'}
                   </div>
@@ -782,18 +782,7 @@ export default function AdminDashboard() {
                     }`}
                   >
                     <Database size={13} />
-                    Personal DB Explorer
-                  </button>
-                  <button
-                    onClick={() => { setActiveView('embeddings'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
-                      activeView === 'embeddings'
-                        ? 'border-accent-blue text-white font-bold'
-                        : 'border-transparent text-gray-500 hover:text-gray-300'
-                    }`}
-                  >
-                    <Cpu size={13} />
-                    Embedding Config
+                    OKF Retrieval Tester
                   </button>
                   <button
                     onClick={() => { setActiveView('test'); setSelectedRequest(null); }}
@@ -862,7 +851,7 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                         <div className="flex justify-between items-center text-xs border-t border-white/5 pt-2">
-                          <span className="text-gray-400">Avg RAG Duration:</span>
+                          <span className="text-gray-400">Avg OKF Duration:</span>
                           <span className="font-semibold text-accent-mono">{metrics.aggregates?.averageRetrievalTime || 0} ms</span>
                         </div>
                       </div>
@@ -1161,7 +1150,7 @@ export default function AdminDashboard() {
                           onChange={(e) => setUseSemanticSearch(e.target.checked)}
                           className="rounded border-white/10 text-accent-blue bg-black/40 focus:ring-0 cursor-pointer"
                         />
-                        <span className={useSemanticSearch ? 'text-accent-blue font-bold' : ''}>Semantic Search (RAG)</span>
+                        <span className={useSemanticSearch ? 'text-accent-blue font-bold' : ''}>Smart Tool Selection (OKF)</span>
                       </label>
 
                       <div className="relative">
@@ -1357,224 +1346,141 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ) : activeView === 'personal-db' ? (
-                /* ================= PERSONAL DB RAG EXPLORER VIEW ================= */
+                /* ================= OKF RETRIEVAL TESTER VIEW ================= */
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
                     <div>
                       <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <Database size={16} className="text-accent-emerald" />
-                        Personal DB Explorer (RAG)
+                        <Database size={16} className="text-accent-blue" />
+                        OKF Retrieval & Memory Tester
                       </h3>
-                      <p className="text-[11px] text-gray-500">Query and inspect facts retrieved from your local long-term memories in Chroma DB.</p>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="relative">
-                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <input
-                          type="text"
-                          placeholder="Type a search query (e.g. 'Krishnakanth investments')..."
-                          value={personalSearchQuery}
-                          onChange={(e) => setPersonalSearchQuery(e.target.value)}
-                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-80 sm:w-96 transition-all"
-                        />
-                        {personalSearchQuery && (
-                          <button
-                            onClick={() => setPersonalSearchQuery('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
+                      <p className="text-[11px] text-gray-500">Test how the OKF Engine retrieves matching user profiles and active tools for any given user prompt.</p>
                     </div>
                   </div>
 
-                  <div className="flex-grow overflow-y-auto mt-4 pr-1 flex flex-col gap-3">
-                    {isSearchingPersonalDb ? (
-                      <div className="text-gray-500 text-xs text-center py-12 m-auto">
-                        <RefreshCw size={18} className="animate-spin inline mr-2 text-accent-emerald" />
-                        Searching long-term memories...
-                      </div>
-                    ) : personalSearchQuery.trim() ? (
-                      personalSearchResults.length > 0 ? (
-                        personalSearchResults.map((fact, idx) => (
-                          <div
-                            key={idx}
-                            className="bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.03] p-4 rounded-xl flex flex-col gap-2.5 transition-all shadow-sm"
-                          >
-                            <p className="text-xs sm:text-sm text-gray-200 leading-relaxed font-sans select-text">{fact.text}</p>
-                            <div className="flex flex-col gap-1.5 pt-2 border-t border-white/5 mt-1">
-                              <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
-                                <span>Similarity Score</span>
-                                <span className="text-accent-emerald font-bold">{(fact.similarity * 100).toFixed(1)}%</span>
-                              </div>
-                              <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                                <div 
-                                  className="bg-accent-emerald h-full rounded-full transition-all" 
-                                  style={{ width: `${Math.min(100, Math.max(0, fact.similarity * 100))}%` }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-xs text-gray-500 text-center py-12 m-auto border border-dashed border-white/5 rounded-xl w-full max-w-md p-6">
-                          No matching memories or entities found in long-term memory for this query.
-                        </div>
-                      )
-                    ) : (
-                      <div className="text-xs text-gray-500 text-center py-12 m-auto max-w-sm flex flex-col items-center gap-3">
-                        <Database size={24} className="text-white/10" />
-                        <span>Type a query in the search bar above to test semantic vector retrieval from the Personal DB.</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : activeView === 'embeddings' ? (
-                /* ================= EMBEDDING CONFIG VIEW ================= */
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-6 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-y-auto">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0 mb-6">
-                    <div>
-                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                        Embedding Config Panel
-                      </h3>
-                      <p className="text-[11px] text-gray-400">Configure model configurations, custom endpoints, and providers for generating vector embeddings.</p>
+                  {/* Input Form */}
+                  <form onSubmit={handleTestOkf} className="flex gap-3 mt-4 flex-shrink-0">
+                    <div className="relative flex-grow">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                      <input
+                        type="text"
+                        placeholder="Type a test prompt (e.g. 'go to my files and view everything' or 'what is my car model?')..."
+                        value={okfTestQuery}
+                        onChange={(e) => setOkfTestQuery(e.target.value)}
+                        className="w-full pl-9 pr-7 py-2.5 bg-black/40 border border-white/5 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 transition-all"
+                      />
+                      {okfTestQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setOkfTestQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
-                  </div>
-
-                  {embeddingError && (
-                    <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
-                      <AlertCircle size={14} className="flex-shrink-0" />
-                      <span>{embeddingError}</span>
-                    </div>
-                  )}
-                  {embeddingSuccess && (
-                    <div className="mb-4 p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
-                      <CheckCircle2 size={14} className="flex-shrink-0" />
-                      <span>{embeddingSuccess}</span>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleSaveEmbedding} className="space-y-6 max-w-3xl">
-                    {/* Active Provider Selector */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Active Embedding Provider</label>
-                      <select
-                        value={embeddingForm.embeddingProvider}
-                        onChange={(e) => setEmbeddingForm(prev => ({ ...prev, embeddingProvider: e.target.value }))}
-                        className="w-full md:w-1/2 p-3 bg-black/40 border border-white/10 rounded-xl text-xs text-gray-200 outline-none focus:border-accent-blue/50 cursor-pointer"
-                      >
-                        <option value="ollama">Ollama (Local Embeddings)</option>
-                        <option value="openai">OpenAI (Cloud / API Compatible Embeddings)</option>
-                      </select>
-                      <p className="text-[10px] text-gray-500 mt-2">
-                        OpenAI embeddings offer higher semantic accuracy but require cloud API keys and active internet. Ollama runs fully local and offline.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* OpenAI Embeddings Card */}
-                      <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all duration-200 ${
-                        embeddingForm.embeddingProvider === 'openai' 
-                          ? 'border-accent-blue/40 bg-accent-blue/[0.02] shadow-[0_0_15px_rgba(59,130,246,0.05)]' 
-                          : 'border-white/5 opacity-60'
-                      }`}>
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs font-bold uppercase tracking-wider text-white">OpenAI embedding settings</span>
-                          {embeddingForm.embeddingProvider === 'openai' && (
-                            <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>
-                          )}
-                        </div>
-                        <div className="space-y-4 text-xs">
-                          <div>
-                            <label className="block text-gray-400 mb-1.5 text-[10px]">API KEY</label>
-                            <input
-                              type="password"
-                              placeholder="sk-..."
-                              value={embeddingForm.embeddingApiKey}
-                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, embeddingApiKey: e.target.value }))}
-                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                            />
-                            <p className="text-[9px] text-gray-500 mt-1">Falls back to the global OpenAI API Key if empty.</p>
-                          </div>
-                          <div>
-                            <label className="block text-gray-400 mb-1.5 text-[10px]">BASE URL</label>
-                            <input
-                              type="text"
-                              placeholder="https://api.openai.com/v1"
-                              value={embeddingForm.embeddingBaseUrl}
-                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, embeddingBaseUrl: e.target.value }))}
-                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-gray-400 mb-1.5 text-[10px]">MODEL NAME</label>
-                            <input
-                              type="text"
-                              placeholder="text-embedding-3-small"
-                              value={embeddingForm.openaiEmbeddingModel}
-                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, openaiEmbeddingModel: e.target.value }))}
-                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Ollama Embeddings Card */}
-                      <div className={`bg-white/[0.02] border rounded-2xl p-5 transition-all duration-200 ${
-                        embeddingForm.embeddingProvider === 'ollama' 
-                          ? 'border-accent-blue/40 bg-accent-blue/[0.02] shadow-[0_0_15px_rgba(59,130,246,0.05)]' 
-                          : 'border-white/5 opacity-60'
-                      }`}>
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs font-bold uppercase tracking-wider text-white">Ollama embedding settings</span>
-                          {embeddingForm.embeddingProvider === 'ollama' && (
-                            <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>
-                          )}
-                        </div>
-                        <div className="space-y-4 text-xs">
-                          <div>
-                            <label className="block text-gray-400 mb-1.5 text-[10px]">OLLAMA MODEL NAME</label>
-                            <input
-                              type="text"
-                              placeholder="nomic-embed-text"
-                              value={embeddingForm.ollamaEmbeddingModel}
-                              onChange={(e) => setEmbeddingForm(prev => ({ ...prev, ollamaEmbeddingModel: e.target.value }))}
-                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200"
-                            />
-                            <p className="text-[9px] text-gray-500 mt-1">Make sure you run `ollama pull &lt;model-name&gt;` locally.</p>
-                          </div>
-                          <div className="pt-2 border-t border-white/5">
-                            <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Ollama Status Information</span>
-                            <p className="text-[10px] text-gray-500 leading-relaxed">
-                              Ollama embeddings will connect to your local server at <span className="font-mono text-gray-300">{config.ollamaUrl || 'http://localhost:11434'}</span>. You can change this local host URL in the primary LLM Settings panel.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-6 border-t border-white/5">
-                      <button
-                        type="submit"
-                        disabled={isSavingEmbedding}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all disabled:opacity-50 shadow-glow cursor-pointer"
-                      >
-                        {isSavingEmbedding ? (
-                          <>
-                            <RefreshCw size={13} className="animate-spin" />
-                            Saving Settings...
-                          </>
-                        ) : (
-                          <>
-                            <Save size={13} />
-                            Save Configuration
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      type="submit"
+                      disabled={isTestingOkf || !okfTestQuery.trim()}
+                      className="px-5 py-2.5 bg-accent-blue hover:bg-accent-blue/90 disabled:bg-accent-blue/40 disabled:text-white/40 text-white font-semibold rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer"
+                    >
+                      {isTestingOkf ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}
+                      Test OKF Retrieval
+                    </button>
                   </form>
+
+                  {okfTestError && (
+                    <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex-shrink-0 animate-fadeIn">
+                      {okfTestError}
+                    </div>
+                  )}
+
+                  {/* Results Panel */}
+                  <div className="flex-grow flex gap-4 overflow-hidden mt-4">
+                    {/* Left Panel: Profile / Memory Documents */}
+                    <div className="w-1/2 flex flex-col bg-black/20 border border-white/5 rounded-xl p-4 overflow-hidden">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 flex-shrink-0">
+                        <span>Profile & Memories Retrieved</span>
+                        {okfMatchedDocs.length > 0 && (
+                          <span className="bg-accent-blue/10 text-accent-blue px-2 py-0.5 rounded-full text-[9px] font-bold font-mono">
+                            {okfMatchedDocs.length}
+                          </span>
+                        )}
+                      </h4>
+                      
+                      <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-2.5">
+                        {isTestingOkf ? (
+                          <div className="text-gray-500 text-xs text-center py-12 m-auto">
+                            <RefreshCw size={14} className="animate-spin inline mr-2 text-accent-blue" />
+                            Matching profiles...
+                          </div>
+                        ) : okfMatchedDocs.length > 0 ? (
+                          okfMatchedDocs.map((doc, idx) => (
+                            <div key={idx} className="bg-white/[0.02] border border-white/5 p-3 rounded-lg flex flex-col gap-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold text-xs text-white truncate">{doc.title}</span>
+                                <span className="bg-white/5 text-gray-400 px-1.5 py-0.5 rounded text-[9px] uppercase font-mono flex-shrink-0">
+                                  {doc.type}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {doc.tags.map((tag, tagIdx) => (
+                                  <span key={tagIdx} className="bg-accent-blue/5 text-accent-blue/70 border border-accent-blue/10 px-1.5 py-0.2 rounded text-[8px] font-mono">
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                              <pre className="text-[10px] text-gray-400 bg-black/30 border border-white/5 p-2 rounded max-h-36 overflow-y-auto font-mono whitespace-pre-wrap leading-relaxed select-text mt-1">
+                                {doc.content}
+                              </pre>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-[11px] text-gray-500 text-center py-12 m-auto max-w-[200px]">
+                            {okfTestQuery.trim() ? "No matched profile documents for this prompt." : "Run a test prompt to see matched OKF profiles."}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Panel: Tools Loaded */}
+                    <div className="w-1/2 flex flex-col bg-black/20 border border-white/5 rounded-xl p-4 overflow-hidden">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 flex-shrink-0">
+                        <span>Tools retrieved for prompt</span>
+                        {okfSelectedTools.length > 0 && (
+                          <span className="bg-accent-emerald/10 text-accent-emerald px-2 py-0.5 rounded-full text-[9px] font-bold font-mono">
+                            {okfSelectedTools.length}
+                          </span>
+                        )}
+                      </h4>
+
+                      <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-2">
+                        {isTestingOkf ? (
+                          <div className="text-gray-500 text-xs text-center py-12 m-auto">
+                            <RefreshCw size={14} className="animate-spin inline mr-2 text-accent-emerald" />
+                            Loading tools...
+                          </div>
+                        ) : okfSelectedTools.length > 0 ? (
+                          okfSelectedTools.map((tool, idx) => (
+                            <div key={idx} className="bg-white/[0.02] border border-white/5 p-2.5 rounded-lg flex flex-col gap-1 hover:border-white/10 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <span className="px-1.5 py-0.5 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded text-[10px] font-mono font-bold">
+                                  {tool.name}
+                                </span>
+                              </div>
+                              {tool.description && (
+                                <p className="text-[10px] text-gray-400 leading-normal line-clamp-2 mt-0.5">{tool.description}</p>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-[11px] text-gray-500 text-center py-12 m-auto max-w-[200px]">
+                            {okfTestQuery.trim() ? "No tools selected for this prompt." : "Run a test prompt to see active toolset."}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 /* ================= TEST CENTER VIEW ================= */
@@ -1584,15 +1490,15 @@ export default function AdminDashboard() {
                       <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                         Test Center
                       </h3>
-                      <p className="text-[11px] text-gray-500">Run the RAG tool selection test suite or test-execute individual tools manually.</p>
+                      <p className="text-[11px] text-gray-500">Run the OKF tool selection test suite or test-execute individual tools manually.</p>
                     </div>
                   </div>
 
                   <div className="flex-grow flex gap-6 overflow-hidden mt-4">
-                    {/* Left Pane: RAG Test suite */}
+                    {/* Left Pane: OKF Test suite */}
                     <div className="w-1/2 flex flex-col gap-4 border-r border-white/5 pr-6 h-full overflow-hidden">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">RAG Test Runner</span>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">OKF Test Runner</span>
                         <div className="flex gap-2">
                           <button
                             onClick={handleRunRagTests}
@@ -1600,7 +1506,7 @@ export default function AdminDashboard() {
                             className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue/15 hover:bg-accent-blue/35 text-accent-blue font-bold rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
                           >
                             <Activity size={12} className={isTestingRag ? 'animate-spin' : ''} />
-                            {isTestingRag ? 'Running Tests...' : 'Run RAG Test Suite'}
+                            {isTestingRag ? 'Running Tests...' : 'Run OKF Test Suite'}
                           </button>
                           {isTestingRag && (
                             <button
@@ -1614,7 +1520,7 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="flex-grow bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap select-text">
-                        {ragTestOutput || 'Click "Run RAG Test Suite" to verify tool RAG indexes and execute automated tests.'}
+                        {ragTestOutput || 'Click "Run OKF Test Suite" to verify tool OKF indexes and execute automated tests.'}
                       </div>
                     </div>
 

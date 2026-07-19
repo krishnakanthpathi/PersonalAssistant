@@ -241,7 +241,7 @@ export default function ChatPanel({
                     <button
                       onClick={() => onInspectMessage(idx)}
                       className={`p-1 rounded-md transition-all ${activeInspectIndex === idx && showInspector ? 'text-accent-mono bg-white/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-                      title="Inspect RAG & tools metadata"
+                      title="Inspect OKF & tools metadata"
                     >
                       <Database size={12} />
                     </button>

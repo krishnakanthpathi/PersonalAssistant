@@ -3,7 +3,6 @@ node_modules/
 
 # Production / Build
 data/*
-!data/knowledge_catalog/
 data/screenshots/
 data/downloads/
 dist/

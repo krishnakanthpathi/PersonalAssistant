@@ -135,7 +135,7 @@ class OKFEngineClass {
 		}
 
 		// Only return docs that have a score close to the maximum matched score
-		const threshold = Math.max(1, maxScore - 1);
+		const threshold = Math.max(1, maxScore - 2);
 		const matches = scoredDocs
 			.filter(item => item.score >= threshold)
 			.map(item => item.doc);

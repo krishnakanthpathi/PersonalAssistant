@@ -1480,7 +1480,7 @@ function MainApp() {
                     ? 'bg-accent-emerald/10 border-accent-emerald/30 text-accent-emerald shadow-[0_0_8px_rgba(16,185,129,0.15)] font-semibold'
                     : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-400 hover:text-white'
                     }`}
-                  title="Inspect RAG long-term memories and selected tools"
+                  title="Inspect OKF profile documents and selected tools"
                 >
                   <Database size={12} />
                   <span className="hidden sm:inline">Inspector</span>
@@ -1550,7 +1550,7 @@ function MainApp() {
                     <div className="h-14 sm:h-16 px-4 border-b border-border-color flex items-center justify-between flex-shrink-0">
                       <div className="flex items-center gap-2">
                         <Database size={14} className="text-accent-emerald" />
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-white">RAG & Tools Inspector</h3>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-white">OKF & Tools Inspector</h3>
                       </div>
                       <button
                         onClick={() => setShowInspector(false)}
@@ -1578,32 +1578,27 @@ function MainApp() {
                             </div>
                           </div>
 
-                          {/* Personal DB RAG section */}
+                          {/* OKF Profile Retrieval Section */}
                           <div className="flex flex-col gap-2.5">
                             <div className="flex items-center justify-between border-b border-white/5 pb-1">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Personal RAG DB (Chroma)</span>
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Matched Profile & Memory (OKF)</span>
                               <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-emerald/10 text-accent-emerald font-bold font-mono">
-                                {msg.ragFacts?.length || 0} MATCHES
+                                {msg.ragFacts?.length || 0} MATCHED DOCS
                               </span>
                             </div>
 
                             {msg.ragFacts && msg.ragFacts.length > 0 ? (
-                              <div className="flex flex-col gap-2">
-                                {msg.ragFacts.map((fact, fIdx) => (
-                                  <div key={fIdx} className="bg-white/[0.02] border border-white/5 rounded-xl p-3 text-xs leading-relaxed flex flex-col gap-2 shadow-sm hover:border-white/10 transition-all">
-                                    <p className="text-gray-200">{fact.text}</p>
-                                    <div className="flex items-center justify-between border-t border-white/5 pt-1.5 mt-0.5 text-[10px]">
-                                      <span className="text-gray-500 font-mono">Fact #{fIdx + 1}</span>
-                                      <span className="font-semibold font-mono text-accent-emerald bg-accent-emerald/5 px-1.5 py-0.5 rounded">
-                                        Similarity: {(fact.similarity * 100).toFixed(1)}%
-                                      </span>
-                                    </div>
+                              <div className="flex flex-wrap gap-2">
+                                {msg.ragFacts.map((docFilename, dIdx) => (
+                                  <div key={dIdx} className="bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono flex items-center gap-1.5 shadow-sm hover:border-white/20 transition-all">
+                                    <FileText size={12} className="text-accent-emerald" />
+                                    <span>{docFilename}</span>
                                   </div>
                                 ))}
                               </div>
                             ) : (
                               <div className="text-xs text-gray-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
-                                No personal long-term memories retrieved for this query.
+                                No OKF profile documents retrieved for this query.
                               </div>
                             )}
                           </div>
@@ -1635,7 +1630,7 @@ function MainApp() {
                         </>
                       ) : (
                         <div className="m-auto text-center py-8 px-4 text-gray-500 text-xs">
-                          Send a query to inspect its long-term memory retrieval and tool selection metadata.
+                          Send a query to inspect its OKF profile retrieval and tool selection metadata.
                         </div>
                       )}
                     </div>
