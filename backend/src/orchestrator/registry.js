@@ -222,7 +222,25 @@ class ToolRegistry {
 			}
 		}));
 
-		return [...localTools, ...mappedMcpTools];
+		// 3. Gather custom dynamic skills from MongoDB
+		let mappedDbSkills = [];
+		try {
+			const { getDB } = await import('../config/mongodb.js');
+			const db = getDB();
+			const dbSkills = await db.collection('skills').find().toArray();
+			mappedDbSkills = dbSkills.map(skill => ({
+				type: 'function',
+				function: {
+					name: skill.name,
+					description: skill.description,
+					parameters: skill.parameters
+				}
+			}));
+		} catch (err) {
+			logger.warn(`Could not load custom dynamic skills for LLM tools list: ${err.message}`);
+		}
+
+		return [...localTools, ...mappedMcpTools, ...mappedDbSkills];
 	}
 
 	// Dynamic filtering of tools based on matched OKF catalog documents
@@ -245,6 +263,17 @@ class ToolRegistry {
 		matchedDocs.forEach(doc => {
 			if (doc.type === 'tool_group' && Array.isArray(doc.frontmatter.tools)) {
 				doc.frontmatter.tools.forEach(name => activeToolNames.add(name));
+			}
+		});
+
+		// Directly match search terms in tool names & descriptions (enables dynamic skill search)
+		const queryTerms = query.toLowerCase().split(/\W+/).filter(t => t.length > 2);
+		allTools.forEach(tool => {
+			const name = (tool.function?.name || tool.name || '').toLowerCase();
+			const desc = (tool.function?.description || tool.description || '').toLowerCase();
+			const matches = queryTerms.some(term => name.includes(term) || desc.includes(term));
+			if (matches) {
+				activeToolNames.add(tool.function?.name || tool.name);
 			}
 		});
 
@@ -368,6 +397,21 @@ class ToolRegistry {
 				return result.content.map(c => c.text).join('\n');
 			}
 			return JSON.stringify(result);
+		}
+
+		// 3. Fallback to custom dynamic skills from MongoDB
+		try {
+			const { getDB } = await import('../config/mongodb.js');
+			const db = getDB();
+			const skill = await db.collection('skills').findOne({ name });
+			if (skill) {
+				logger.info(`Executing custom dynamic skill: ${name}`);
+				const { executeDynamicSkill } = await import('../utils/skillEvaluator.js');
+				return await executeDynamicSkill(skill, args, toolContext);
+			}
+		} catch (err) {
+			logger.error(`Failed to execute dynamic skill ${name}: ${err.message}`);
+			throw err;
 		}
 
 		throw new Error(`Tool ${name} does not exist.`);

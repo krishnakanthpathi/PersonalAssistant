@@ -173,10 +173,16 @@ const parseMarkdown = (text) => {
       `<div class="mermaid-block-wrapper my-4 border border-white/5 rounded-xl bg-black/10 overflow-hidden">
         <div class="mermaid-block-header flex items-center justify-between px-3 py-1.5 bg-white/[0.02] border-b border-white/5 text-[10px] text-gray-400 font-mono">
           <span>Mermaid Chart</span>
-          <button class="code-copy-btn" data-copy-chart-btn data-code="${encodeURIComponent(escapedCode)}" title="Copy Mermaid code">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            Copy Code
-          </button>
+          <div class="flex items-center gap-2">
+            <button class="code-copy-btn" data-copy-chart-btn data-code="${encodeURIComponent(escapedCode)}" title="Copy Mermaid code">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              Copy Code
+            </button>
+            <button class="code-copy-btn flex items-center gap-1" data-generate-skill-btn data-code="${encodeURIComponent(escapedCode)}" title="Convert this chart into a custom skill">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              Convert to Skill
+            </button>
+          </div>
         </div>
         ${content}
       </div>`
@@ -1494,6 +1500,26 @@ function MainApp() {
                   <span className="hidden sm:inline">Clear</span>
                 </button>
               </div>
+            )}
+
+            {activeTab === 'chat' && messages.length > 0 && (
+              <button
+                onClick={() => {
+                  navigate('/admin', {
+                    state: {
+                      fromTab: 'chat',
+                      activeView: 'skills',
+                      chatHistory: messages,
+                      generateFromChatOnly: true
+                    }
+                  });
+                }}
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-medium text-gray-300 transition-all cursor-pointer"
+                title="Convert entire chat history into a dynamic skill/tool"
+              >
+                <Sparkles size={12} className="text-accent-blue" />
+                <span className="hidden sm:inline">Convert Chat to Skill</span>
+              </button>
             )}
 
             <div className="h-4 w-px bg-white/10 hidden sm:block" />

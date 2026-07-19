@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Volume2,
   Sparkles,
@@ -55,6 +56,7 @@ export default function ChatPanel({
   onRemoveFile,
   isAttaching = false
 }) {
+  const navigate = useNavigate();
   const chatEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
   const fileInputRef = useRef(null);
@@ -144,6 +146,20 @@ export default function ChatPanel({
     if (chartBtn) {
       const code = decodeURIComponent(chartBtn.getAttribute('data-code'));
       copyToClipboard(code, chartBtn, 'Copy Code');
+      return;
+    }
+
+    const generateBtn = e.target.closest('[data-generate-skill-btn]');
+    if (generateBtn) {
+      const code = decodeURIComponent(generateBtn.getAttribute('data-code'));
+      navigate('/admin', { 
+        state: { 
+          fromTab: 'chat',
+          activeView: 'skills',
+          generatedFromChart: code,
+          chatHistory: messages
+        } 
+      });
       return;
     }
   };

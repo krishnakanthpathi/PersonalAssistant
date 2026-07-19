@@ -23,8 +23,10 @@ import {
   Pause,
   Play,
   Save,
-  Database
+  Database,
+  Code
 } from 'lucide-react';
+import SkillsPanel from './SkillsPanel.jsx';
 
 // Helper to get tool icons dynamically
 const getToolIcon = (name) => {
@@ -86,7 +88,9 @@ export default function AdminDashboard() {
   const [isCheckingLatency, setIsCheckingLatency] = useState(false);
   const [latencyResult, setLatencyResult] = useState(null);
 
-  const [activeView, setActiveView] = useState('overview'); // 'overview' or 'logs'
+  const [activeView, setActiveView] = useState(() => {
+    return location.state?.activeView || 'overview';
+  }); // 'overview' or 'logs'
   const [logs, setLogs] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
@@ -795,6 +799,17 @@ export default function AdminDashboard() {
                     <Play size={13} />
                     Test Center
                   </button>
+                  <button
+                    onClick={() => { setActiveView('skills'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'skills'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <Code size={13} />
+                    Custom Skills
+                  </button>
                 </div>
               </div>
 
@@ -1482,6 +1497,15 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+              ) : activeView === 'skills' ? (
+                <SkillsPanel 
+                  generatedFromChart={location.state?.generatedFromChart}
+                  chatHistory={location.state?.chatHistory}
+                  generateFromChatOnly={location.state?.generateFromChatOnly}
+                  onClearGeneratedState={() => {
+                    navigate('/admin', { state: { ...location.state, generatedFromChart: null, chatHistory: null, generateFromChatOnly: null }, replace: true });
+                  }}
+                />
               ) : (
                 /* ================= TEST CENTER VIEW ================= */
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
