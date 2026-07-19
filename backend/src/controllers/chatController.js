@@ -179,9 +179,16 @@ export const handleChat = async (req, res) => {
 		try {
 			const db = getDB();
 			const sessionsCollection = db.collection('chat_sessions');
+			
+			let friendlyContent = `Error: ${error.message}`;
+			const errLower = error.message.toLowerCase();
+			if (errLower.includes('context length') || errLower.includes('context window') || errLower.includes('tokens') || errLower.includes('too many tokens') || errLower.includes('maximum context')) {
+				friendlyContent = `⚠️ **Context Limit Exceeded**: The uploaded document or chat history contains too many tokens for the model's context window. Please upload a smaller document (e.g., fewer pages) or start a new chat session to clear the current history context.`;
+			}
+			
 			const errorMessage = {
 				role: 'assistant',
-				content: `Error: ${error.message}`,
+				content: friendlyContent,
 				speech: null,
 				logs: [],
 				isError: true,

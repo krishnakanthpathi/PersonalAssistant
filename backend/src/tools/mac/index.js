@@ -30,3 +30,4 @@ export * from './inputTools.js';
 export * from './systemInfoTools.js';
 export * from './appIntegrationTools.js';
 export * from './iphoneMirrorTools.js';
+export * from './analyzeImage.js';

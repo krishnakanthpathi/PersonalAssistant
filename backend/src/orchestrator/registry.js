@@ -22,6 +22,7 @@ import { runAppleScriptTool } from '../tools/mac/runAppleScriptTool.js';
 import { timerTool } from '../tools/mac/timer.js';
 import { remindersTool } from '../tools/mac/reminders.js';
 import { rdsQueryTool } from '../tools/rdsQuery.js';
+import { analyzeImageTool } from '../tools/mac/analyzeImage.js';
 
 import {
 	listAppsTool,
@@ -134,6 +135,7 @@ class ToolRegistry {
 		this.tools.set(timerTool.definition.name, timerTool);
 		this.tools.set(remindersTool.definition.name, remindersTool);
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
+		this.tools.set(analyzeImageTool.definition.name, analyzeImageTool);
 
 		this.tools.set(listAppsTool.definition.name, listAppsTool);
 		this.tools.set(listWindowsTool.definition.name, listWindowsTool);
@@ -369,7 +371,13 @@ class ToolRegistry {
 				'search_nodes',
 				'open_nodes',
 				'create_entities',
-				'add_observations'
+				'add_observations',
+				'open_application',
+				'close_application',
+				'run_applescript',
+				'open_url',
+				'analyze_image',
+				'take_screenshot'
 			]);
 
 			for (const tool of allTools) {

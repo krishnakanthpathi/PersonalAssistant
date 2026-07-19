@@ -32,7 +32,7 @@ export default function SettingsPanel({
   const [grokModels, setGrokModels] = useState([]);
   const [ollamaModels, setOllamaModels] = useState([]);
   const [fetchingStatus, setFetchingStatus] = useState({ openai: false, grok: false, ollama: false });
-  const [showManualInput, setShowManualInput] = useState({ openai: false, grok: false, ollama: false });
+  const [showManualInput, setShowManualInput] = useState({ openai: false, grok: false, ollama: false, multimedia: false });
 
   // Sync loaded/fetched models for the current active provider
   useEffect(() => {
@@ -385,23 +385,70 @@ export default function SettingsPanel({
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Multimedia Model</label>
-                        <button
-                          type="button"
-                          onClick={() => handleFetchModels(settingsForm.multimediaProvider || 'ollama')}
-                          className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
-                          title="Fetch available models for multimedia provider"
-                        >
-                          <RefreshCw className="w-2.5 h-2.5" />
-                          Fetch
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleFetchModels(settingsForm.multimediaProvider || 'ollama')}
+                            className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
+                            title="Fetch available models for multimedia provider"
+                          >
+                            {fetchingStatus[settingsForm.multimediaProvider || 'ollama'] ? (
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-2.5 h-2.5" />
+                            )}
+                            Fetch
+                          </button>
+                          {((settingsForm.multimediaProvider === 'openai' && openaiModels.length > 0) ||
+                            (settingsForm.multimediaProvider === 'grok' && grokModels.length > 0) ||
+                            (settingsForm.multimediaProvider === 'ollama' && ollamaModels.length > 0)) && (
+                            <button
+                              type="button"
+                              onClick={() => setShowManualInput(prev => ({ ...prev, multimedia: !prev.multimedia }))}
+                              className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
+                              title="Toggle manual input"
+                            >
+                              {showManualInput.multimedia ? 'Select List' : 'Type Name'}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="e.g., llama3.2-vision, llava"
-                        value={settingsForm.multimediaModel || ''}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaModel: e.target.value }))}
-                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
-                      />
+                      {!showManualInput.multimedia && (
+                        (settingsForm.multimediaProvider === 'openai' && openaiModels.length > 0) ||
+                        (settingsForm.multimediaProvider === 'grok' && grokModels.length > 0) ||
+                        (settingsForm.multimediaProvider === 'ollama' && ollamaModels.length > 0)
+                      ) ? (
+                        <select
+                          value={settingsForm.multimediaModel || ''}
+                          onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaModel: e.target.value }))}
+                          className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
+                        >
+                          {(() => {
+                            const modelsList = 
+                              settingsForm.multimediaProvider === 'openai' ? openaiModels :
+                              settingsForm.multimediaProvider === 'grok' ? grokModels :
+                              ollamaModels;
+                            return (
+                              <>
+                                {!modelsList.includes(settingsForm.multimediaModel) && settingsForm.multimediaModel && (
+                                  <option value={settingsForm.multimediaModel}>{settingsForm.multimediaModel}</option>
+                                )}
+                                {modelsList.map(m => (
+                                  <option key={m} value={m}>{m}</option>
+                                ))}
+                              </>
+                            );
+                          })()}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="e.g., llama3.2-vision, llava"
+                          value={settingsForm.multimediaModel || ''}
+                          onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaModel: e.target.value }))}
+                          className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
+                        />
+                      )}
                     </div>
                   </div>
 

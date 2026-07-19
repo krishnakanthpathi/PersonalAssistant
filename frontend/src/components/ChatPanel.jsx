@@ -15,7 +15,8 @@ import {
   Database,
   Paperclip,
   X,
-  File
+  File,
+  Loader2
 } from 'lucide-react';
 
 const getToolNameFromLog = (log) => {
@@ -51,7 +52,8 @@ export default function ChatPanel({
   showInspector = false,
   selectedFiles = [],
   onAttachFiles,
-  onRemoveFile
+  onRemoveFile,
+  isAttaching = false
 }) {
   const chatEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -383,16 +385,16 @@ export default function ChatPanel({
               <span className="italic opacity-85 truncate">{interimSpeech || "Speak now..."}</span>
             </div>
           )}
-          {selectedFiles && selectedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2.5 p-2.5 bg-bg-secondary border border-border-color rounded-xl animate-fadeIn max-h-24 overflow-y-auto w-full">
+          {(isAttaching || (selectedFiles && selectedFiles.length > 0)) && (
+            <div className="flex flex-wrap gap-2 mb-2.5 p-2.5 bg-bg-secondary border border-border-color rounded-xl animate-fadeIn max-h-24 overflow-y-auto w-full items-center">
               {selectedFiles.map((file, idx) => (
-                <div key={idx} className="relative group flex items-center gap-2 p-1.5 bg-black/40 border border-white/10 rounded-lg pr-7 text-xs text-gray-300">
+                <div key={idx} className="relative group flex items-center gap-2 p-1.5 bg-black/40 border border-white/10 rounded-lg pr-7 text-xs text-gray-300 font-sans">
                   {file.type.startsWith('image/') ? (
                     <img src={file.data} alt={file.name} className="w-8 h-8 rounded object-cover" />
                   ) : (
                     <File className="w-5 h-5 text-accent-blue" />
                   )}
-                  <span className="truncate max-w-[120px] font-sans" title={file.name}>{file.name}</span>
+                  <span className="truncate max-w-[120px]" title={file.name}>{file.name}</span>
                   <button
                     onClick={() => onRemoveFile(idx)}
                     className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 bg-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-md transition-all"
@@ -401,6 +403,12 @@ export default function ChatPanel({
                   </button>
                 </div>
               ))}
+              {isAttaching && (
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 pl-1 font-sans">
+                  <Loader2 className="w-3 h-3 animate-spin text-accent-blue" />
+                  <span>Loading file...</span>
+                </div>
+              )}
             </div>
           )}
 

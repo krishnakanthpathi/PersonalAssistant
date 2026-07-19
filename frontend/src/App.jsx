@@ -458,27 +458,42 @@ function MainApp() {
 
   // Selected files for attachment
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isAttaching, setIsAttaching] = useState(false);
 
-  const onAttachFiles = (files) => {
+  const onAttachFiles = async (files) => {
     const maxSize = 50 * 1024 * 1024; // 50MB
-    for (const file of files) {
-      if (file.size > maxSize) {
-        alert(`File "${file.name}" exceeds the 50MB size limit.`);
-        continue;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setSelectedFiles(prev => [
-          ...prev,
-          {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            data: event.target.result
+    setIsAttaching(true);
+    try {
+      const loadPromises = Array.from(files).map(file => {
+        return new Promise((resolve) => {
+          if (file.size > maxSize) {
+            alert(`File "${file.name}" exceeds the 50MB size limit.`);
+            resolve(null);
+            return;
           }
-        ]);
-      };
-      reader.readAsDataURL(file);
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            resolve({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              data: event.target.result
+            });
+          };
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const loaded = await Promise.all(loadPromises);
+      const validLoaded = loaded.filter(Boolean);
+      if (validLoaded.length > 0) {
+        setSelectedFiles(prev => [...prev, ...validLoaded]);
+      }
+    } catch (err) {
+      console.error('Error attaching files:', err);
+    } finally {
+      setIsAttaching(false);
     }
   };
 
@@ -803,17 +818,17 @@ function MainApp() {
       let url = `http://localhost:3000/api/models?provider=${provider}`;
       const settings = customSettings || settingsForm;
       if (provider === 'openai') {
-        const apiKey = settings.openaiApiKey;
-        const baseUrl = settings.openaiBaseUrl;
+        const apiKey = (settings.multimediaProvider === 'openai' && settings.multimediaApiKey) ? settings.multimediaApiKey : settings.openaiApiKey;
+        const baseUrl = (settings.multimediaProvider === 'openai' && settings.multimediaBaseUrl) ? settings.multimediaBaseUrl : settings.openaiBaseUrl;
         if (apiKey) url += `&apiKey=${encodeURIComponent(apiKey)}`;
         if (baseUrl) url += `&baseUrl=${encodeURIComponent(baseUrl)}`;
       } else if (provider === 'grok') {
-        const apiKey = settings.grokApiKey;
-        const baseUrl = settings.grokBaseUrl;
+        const apiKey = (settings.multimediaProvider === 'grok' && settings.multimediaApiKey) ? settings.multimediaApiKey : settings.grokApiKey;
+        const baseUrl = (settings.multimediaProvider === 'grok' && settings.multimediaBaseUrl) ? settings.multimediaBaseUrl : settings.grokBaseUrl;
         if (apiKey) url += `&apiKey=${encodeURIComponent(apiKey)}`;
         if (baseUrl) url += `&baseUrl=${encodeURIComponent(baseUrl)}`;
       } else if (provider === 'ollama') {
-        const baseUrl = settings.ollamaUrl;
+        const baseUrl = (settings.multimediaProvider === 'ollama' && settings.multimediaBaseUrl) ? settings.multimediaBaseUrl : settings.ollamaUrl;
         if (baseUrl) url += `&baseUrl=${encodeURIComponent(baseUrl)}`;
       }
 
@@ -1524,6 +1539,7 @@ function MainApp() {
                   selectedFiles={selectedFiles}
                   onAttachFiles={onAttachFiles}
                   onRemoveFile={onRemoveFile}
+                  isAttaching={isAttaching}
                 />
               </div>
               {showInspector && (() => {
