@@ -12,7 +12,10 @@ import {
   Square,
   Copy,
   Check,
-  Database
+  Database,
+  Paperclip,
+  X,
+  File
 } from 'lucide-react';
 
 const getToolNameFromLog = (log) => {
@@ -45,10 +48,25 @@ export default function ChatPanel({
   parseMarkdown,
   onInspectMessage = () => {},
   activeInspectIndex = null,
-  showInspector = false
+  showInspector = false,
+  selectedFiles = [],
+  onAttachFiles,
+  onRemoveFile
 }) {
   const chatEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    if (onAttachFiles) {
+      onAttachFiles(files);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -260,6 +278,49 @@ export default function ChatPanel({
                 ) : (
                   <div className="markdown-body min-w-0" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) || (msg.isError ? 'An error occurred' : 'Thinking...') }} />
                 )}
+
+                {msg.attachments && msg.attachments.length > 0 && (
+                  <div className="flex flex-col gap-3 mt-3 pt-3 border-t border-white/5 w-full">
+                    {msg.attachments.map((att, attIdx) => {
+                      const fileUrl = att.url.startsWith('data:') || att.url.startsWith('http') ? att.url : `http://localhost:3000${att.url}`;
+                      if (att.type.startsWith('image/')) {
+                        return (
+                          <div key={attIdx} className="relative group max-w-sm rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                            <img src={fileUrl} alt={att.name} className="max-h-60 w-auto object-contain rounded-md" />
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <a href={fileUrl} download={att.name} className="px-2 py-1 bg-black/80 hover:bg-black/90 rounded text-[10px] text-white flex items-center gap-1 font-sans">
+                                Download
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      } else if (att.type.startsWith('video/')) {
+                        return (
+                          <div key={attIdx} className="max-w-md rounded-lg overflow-hidden border border-white/10 bg-black/20 p-1">
+                            <video src={fileUrl} controls className="max-h-60 w-full rounded" />
+                            <div className="p-2 text-[10px] text-gray-500 truncate font-mono">{att.name}</div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <a
+                            key={attIdx}
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all w-fit text-xs text-gray-300 font-sans"
+                          >
+                            <FileText className="w-5 h-5 text-accent-blue" />
+                            <div className="text-left">
+                              <div className="font-bold text-white truncate max-w-[200px]">{att.name}</div>
+                              <div className="text-[10px] text-gray-500 font-medium">PDF Document</div>
+                            </div>
+                          </a>
+                        );
+                      }
+                    })}
+                  </div>
+                )}
               </div>
 
               {msg.role === 'assistant' && msg.speech && (
@@ -322,7 +383,45 @@ export default function ChatPanel({
               <span className="italic opacity-85 truncate">{interimSpeech || "Speak now..."}</span>
             </div>
           )}
+          {selectedFiles && selectedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2.5 p-2.5 bg-bg-secondary border border-border-color rounded-xl animate-fadeIn max-h-24 overflow-y-auto w-full">
+              {selectedFiles.map((file, idx) => (
+                <div key={idx} className="relative group flex items-center gap-2 p-1.5 bg-black/40 border border-white/10 rounded-lg pr-7 text-xs text-gray-300">
+                  {file.type.startsWith('image/') ? (
+                    <img src={file.data} alt={file.name} className="w-8 h-8 rounded object-cover" />
+                  ) : (
+                    <File className="w-5 h-5 text-accent-blue" />
+                  )}
+                  <span className="truncate max-w-[120px] font-sans" title={file.name}>{file.name}</span>
+                  <button
+                    onClick={() => onRemoveFile(idx)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 bg-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-md transition-all"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-end gap-2 p-2 bg-bg-secondary border border-border-color rounded-2xl shadow-md focus-within:border-accent-mono/50 transition-all">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5 transition-all shadow-sm shrink-0"
+              disabled={isProcessing}
+              title="Attach images, videos, or PDFs"
+            >
+              <Paperclip size={16} />
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              accept="image/*,video/*,application/pdf"
+              onChange={handleFileChange}
+            />
+
             <textarea
               className="flex-grow bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm text-gray-200 placeholder-gray-500 resize-none max-h-36 py-2 px-2 sm:px-3 leading-relaxed min-w-0"
               value={prompt}
@@ -355,7 +454,7 @@ export default function ChatPanel({
               <button
                 className="w-9 h-9 flex items-center justify-center bg-accent-mono hover:bg-neutral-200 text-black rounded-xl disabled:opacity-50 transition-all shadow-sm shrink-0"
                 onClick={() => handleSend()}
-                disabled={!prompt.trim()}
+                disabled={!prompt.trim() && selectedFiles.length === 0}
               >
                 <Send size={16} />
               </button>

@@ -42,7 +42,12 @@ export const getConfig = async (req, res) => {
 				embeddingApiKey: dbSettings.embeddingApiKey || env.EMBEDDING_API_KEY || '',
 				embeddingBaseUrl: dbSettings.embeddingBaseUrl || env.EMBEDDING_BASE_URL || '',
 				openaiEmbeddingModel: dbSettings.openaiEmbeddingModel || env.OPENAI_EMBEDDING_MODEL || '',
-				ollamaEmbeddingModel: dbSettings.ollamaEmbeddingModel || env.OLLAMA_EMBEDDING_MODEL || ''
+				ollamaEmbeddingModel: dbSettings.ollamaEmbeddingModel || env.OLLAMA_EMBEDDING_MODEL || '',
+				useMultimediaModel: dbSettings.useMultimediaModel !== undefined ? dbSettings.useMultimediaModel : env.USE_MULTIMEDIA_MODEL,
+				multimediaProvider: dbSettings.multimediaProvider || env.MULTIMEDIA_PROVIDER || 'ollama',
+				multimediaModel: dbSettings.multimediaModel || env.MULTIMEDIA_MODEL || '',
+				multimediaApiKey: dbSettings.multimediaApiKey || env.MULTIMEDIA_API_KEY || '',
+				multimediaBaseUrl: dbSettings.multimediaBaseUrl || env.MULTIMEDIA_BASE_URL || ''
 			}
 		});
 	} catch (error) {
@@ -66,7 +71,12 @@ export const updateConfig = async (req, res) => {
 			embeddingApiKey,
 			embeddingBaseUrl,
 			openaiEmbeddingModel,
-			ollamaEmbeddingModel
+			ollamaEmbeddingModel,
+			useMultimediaModel,
+			multimediaProvider,
+			multimediaModel,
+			multimediaApiKey,
+			multimediaBaseUrl
 		} = req.body;
 
 		// Validate provider
@@ -77,6 +87,11 @@ export const updateConfig = async (req, res) => {
 		// Validate embedding provider
 		if (embeddingProvider && !['openai', 'ollama'].includes(embeddingProvider)) {
 			return res.status(400).json({ success: false, error: 'Invalid embedding provider value. Must be openai or ollama.' });
+		}
+
+		// Validate multimedia provider
+		if (multimediaProvider && !['openai', 'ollama', 'grok'].includes(multimediaProvider)) {
+			return res.status(400).json({ success: false, error: 'Invalid multimedia provider value. Must be openai, ollama, or grok.' });
 		}
 
 		const db = getDB();
@@ -95,6 +110,11 @@ export const updateConfig = async (req, res) => {
 		if (embeddingBaseUrl !== undefined) updateData.embeddingBaseUrl = embeddingBaseUrl;
 		if (openaiEmbeddingModel !== undefined) updateData.openaiEmbeddingModel = openaiEmbeddingModel;
 		if (ollamaEmbeddingModel !== undefined) updateData.ollamaEmbeddingModel = ollamaEmbeddingModel;
+		if (useMultimediaModel !== undefined) updateData.useMultimediaModel = useMultimediaModel;
+		if (multimediaProvider !== undefined) updateData.multimediaProvider = multimediaProvider;
+		if (multimediaModel !== undefined) updateData.multimediaModel = multimediaModel;
+		if (multimediaApiKey !== undefined) updateData.multimediaApiKey = multimediaApiKey;
+		if (multimediaBaseUrl !== undefined) updateData.multimediaBaseUrl = multimediaBaseUrl;
 
 		await db.collection('app_config').updateOne(
 			{ _id: 'llm_settings' },
@@ -117,6 +137,11 @@ export const updateConfig = async (req, res) => {
 		if (embeddingBaseUrl !== undefined) env.EMBEDDING_BASE_URL = embeddingBaseUrl;
 		if (openaiEmbeddingModel !== undefined) env.OPENAI_EMBEDDING_MODEL = openaiEmbeddingModel;
 		if (ollamaEmbeddingModel !== undefined) env.OLLAMA_EMBEDDING_MODEL = ollamaEmbeddingModel;
+		if (useMultimediaModel !== undefined) env.USE_MULTIMEDIA_MODEL = useMultimediaModel;
+		if (multimediaProvider !== undefined) env.MULTIMEDIA_PROVIDER = multimediaProvider;
+		if (multimediaModel !== undefined) env.MULTIMEDIA_MODEL = multimediaModel;
+		if (multimediaApiKey !== undefined) env.MULTIMEDIA_API_KEY = multimediaApiKey;
+		if (multimediaBaseUrl !== undefined) env.MULTIMEDIA_BASE_URL = multimediaBaseUrl;
 
 		res.json({
 			success: true,

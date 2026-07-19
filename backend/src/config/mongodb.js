@@ -78,7 +78,12 @@ export async function loadDbConfig() {
 				embeddingApiKey: env.EMBEDDING_API_KEY,
 				embeddingBaseUrl: env.EMBEDDING_BASE_URL,
 				openaiEmbeddingModel: env.OPENAI_EMBEDDING_MODEL,
-				ollamaEmbeddingModel: env.OLLAMA_EMBEDDING_MODEL
+				ollamaEmbeddingModel: env.OLLAMA_EMBEDDING_MODEL,
+				useMultimediaModel: env.USE_MULTIMEDIA_MODEL,
+				multimediaProvider: env.MULTIMEDIA_PROVIDER,
+				multimediaModel: env.MULTIMEDIA_MODEL,
+				multimediaApiKey: env.MULTIMEDIA_API_KEY,
+				multimediaBaseUrl: env.MULTIMEDIA_BASE_URL
 			};
 			await collection.insertOne(configDoc);
 		} else {
@@ -128,6 +133,11 @@ export async function loadDbConfig() {
 			if (configDoc.embeddingBaseUrl) env.EMBEDDING_BASE_URL = configDoc.embeddingBaseUrl;
 			if (configDoc.openaiEmbeddingModel) env.OPENAI_EMBEDDING_MODEL = configDoc.openaiEmbeddingModel;
 			if (configDoc.ollamaEmbeddingModel) env.OLLAMA_EMBEDDING_MODEL = configDoc.ollamaEmbeddingModel;
+			if (configDoc.useMultimediaModel !== undefined) env.USE_MULTIMEDIA_MODEL = configDoc.useMultimediaModel;
+			if (configDoc.multimediaProvider) env.MULTIMEDIA_PROVIDER = configDoc.multimediaProvider;
+			if (configDoc.multimediaModel) env.MULTIMEDIA_MODEL = configDoc.multimediaModel;
+			if (configDoc.multimediaApiKey) env.MULTIMEDIA_API_KEY = configDoc.multimediaApiKey;
+			if (configDoc.multimediaBaseUrl) env.MULTIMEDIA_BASE_URL = configDoc.multimediaBaseUrl;
 			logger.info("Loaded custom LLM provider configuration overrides from MongoDB database.");
 		}
 	} catch (error) {

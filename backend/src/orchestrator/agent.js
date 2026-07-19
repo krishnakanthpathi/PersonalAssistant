@@ -23,7 +23,7 @@ export class Agent {
 	 * @param {Array} history 
 	 * @param {Function} onStatusUpdate 
 	 */
-	run = catchErrors(async (prompt, history = [], onStatusUpdate = null, shouldStop = null) => {
+	run = catchErrors(async (prompt, history = [], onStatusUpdate = null, shouldStop = null, images = []) => {
 		const requestId = metricsService.startRequest(prompt);
 		const logs = [];
 		const triggerStatusUpdate = (status) => {
@@ -45,7 +45,7 @@ export class Agent {
 			checkAborted();
 
 			// 1. Prepare message history and RAG search query
-			const { messages, cleanedHistory, combinedRAGQuery, ragFacts } = await prepareMessages(prompt, history);
+			const { messages, cleanedHistory, combinedRAGQuery, ragFacts } = await prepareMessages(prompt, history, images);
 
 			// 2. Fetch tool definitions using RAG selection
 			const retrievalStart = Date.now();

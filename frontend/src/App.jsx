@@ -445,11 +445,46 @@ function MainApp() {
     ollamaModel: '',
     grokApiKey: '',
     grokBaseUrl: '',
-    grokModel: ''
+    grokModel: '',
+    useMultimediaModel: false,
+    multimediaProvider: 'ollama',
+    multimediaModel: '',
+    multimediaApiKey: '',
+    multimediaBaseUrl: ''
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
+
+  // Selected files for attachment
+  const [selectedFiles, setSelectedFiles] = useState([]);
+
+  const onAttachFiles = (files) => {
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    for (const file of files) {
+      if (file.size > maxSize) {
+        alert(`File "${file.name}" exceeds the 50MB size limit.`);
+        continue;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSelectedFiles(prev => [
+          ...prev,
+          {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            data: event.target.result
+          }
+        ]);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onRemoveFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, idx) => idx !== index));
+  };
 
   // Code syntax highlight theme
   const [codeTheme, setCodeTheme] = useState(
@@ -864,7 +899,12 @@ function MainApp() {
             ollamaModel: configData.settings.ollamaModel || '',
             grokApiKey: configData.settings.grokApiKey || '',
             grokBaseUrl: configData.settings.grokBaseUrl || '',
-            grokModel: configData.settings.grokModel || ''
+            grokModel: configData.settings.grokModel || '',
+            useMultimediaModel: configData.settings.useMultimediaModel !== undefined ? configData.settings.useMultimediaModel : false,
+            multimediaProvider: configData.settings.multimediaProvider || 'ollama',
+            multimediaModel: configData.settings.multimediaModel || '',
+            multimediaApiKey: configData.settings.multimediaApiKey || '',
+            multimediaBaseUrl: configData.settings.multimediaBaseUrl || ''
           };
           setSettingsForm(loadedSettings);
           fetchAvailableModels(configData.provider, loadedSettings);
@@ -1121,7 +1161,9 @@ function MainApp() {
 
   const handleSend = async (textToSend) => {
     const inputMsg = textToSend || prompt;
-    if (!inputMsg.trim() || isProcessing) return;
+    const hasAttachments = selectedFiles.length > 0;
+    if (!inputMsg.trim() && !hasAttachments) return;
+    if (isProcessing) return;
 
     stopSpeaking();
     stopListening();
@@ -1132,8 +1174,19 @@ function MainApp() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Append user message
-    const userMessage = { role: 'user', content: inputMsg };
+    const attachmentsToSend = [...selectedFiles];
+    setSelectedFiles([]);
+
+    // Append user message (with local preview attachment meta)
+    const userMessage = { 
+      role: 'user', 
+      content: inputMsg, 
+      attachments: attachmentsToSend.map(file => ({
+        name: file.name,
+        type: file.type,
+        url: file.data
+      }))
+    };
     setMessages(prev => [...prev, userMessage]);
     setIsProcessing(true);
     setCurrentStatusLog('Initializing connection...');
@@ -1147,7 +1200,12 @@ function MainApp() {
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: inputMsg, history: messages, sessionId: currentSessionId }),
+        body: JSON.stringify({ 
+          prompt: inputMsg, 
+          history: messages, 
+          sessionId: currentSessionId,
+          attachments: attachmentsToSend
+        }),
         signal: controller.signal
       });
       console.log(`[CHAT] Response received. Status: ${response.status}`);
@@ -1463,6 +1521,9 @@ function MainApp() {
                   }}
                   activeInspectIndex={getInspectMessage().index}
                   showInspector={showInspector}
+                  selectedFiles={selectedFiles}
+                  onAttachFiles={onAttachFiles}
+                  onRemoveFile={onRemoveFile}
                 />
               </div>
               {showInspector && (() => {

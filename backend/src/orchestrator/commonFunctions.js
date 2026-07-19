@@ -91,7 +91,7 @@ export async function loadMemoryContext(query) {
 	}
 }
 
-export async function prepareMessages(prompt, history) {
+export async function prepareMessages(prompt, history, images = []) {
 	const cleanedHistory = history
 		.map(m => {
 			if (m.role === 'assistant') {
@@ -114,74 +114,7 @@ export async function prepareMessages(prompt, history) {
 		})
 		.filter(m => m.role && m.content);
 
-	const SLIDING_WINDOW_SIZE = 6;
-	const slidingWindow = cleanedHistory.length > SLIDING_WINDOW_SIZE
-		? cleanedHistory.slice(-SLIDING_WINDOW_SIZE)
-		: cleanedHistory;
-	const olderHistory = cleanedHistory.length > SLIDING_WINDOW_SIZE
-		? cleanedHistory.slice(0, -SLIDING_WINDOW_SIZE)
-		: [];
-
 	let systemPromptText = await loadSystemPrompt();
-
-	// Retrieve relevant older messages from history using keyword scoring
-	if (olderHistory.length > 0) {
-		const queryTerms = prompt.toLowerCase().split(/\W+/).filter(term => term.length > 2);
-		if (queryTerms.length > 0) {
-			// Group older history into QA turns
-			const turns = [];
-			for (let i = 0; i < olderHistory.length; i++) {
-				if (olderHistory[i].role === 'user') {
-					const turn = {
-						user: olderHistory[i].content,
-						assistant: ''
-					};
-					if (i + 1 < olderHistory.length && olderHistory[i + 1].role === 'assistant') {
-						turn.assistant = olderHistory[i + 1].content;
-						i++;
-					}
-					turns.push(turn);
-				} else {
-					turns.push({
-						user: '',
-						assistant: olderHistory[i].content
-					});
-				}
-			}
-
-			// Score each turn based on keyword frequency
-			const scoredTurns = turns.map(turn => {
-				const searchText = ((turn.user || '') + ' ' + (turn.assistant || '')).toLowerCase();
-				let score = 0;
-				for (const term of queryTerms) {
-					const regex = new RegExp(term.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
-					const matches = searchText.match(regex);
-					if (matches) {
-						score += matches.length;
-					}
-				}
-				return { turn, score };
-			});
-
-			// Filter matching turns and sort by descending score
-			const matchingTurns = scoredTurns
-				.filter(item => item.score > 0)
-				.sort((a, b) => b.score - a.score)
-				.slice(0, 3)
-				.map(item => item.turn);
-
-			if (matchingTurns.length > 0) {
-				let historyContext = '\n\n## Relevant Past Messages (from earlier in the session):\n';
-				for (const turn of matchingTurns) {
-					if (turn.user) historyContext += `User: ${turn.user}\n`;
-					if (turn.assistant) historyContext += `Assistant: ${turn.assistant}\n`;
-					historyContext += '---\n';
-				}
-				systemPromptText = `${systemPromptText}${historyContext}`;
-				logger.info(`Injected ${matchingTurns.length} relevant historical QA turns into context using keyword search.`);
-			}
-		}
-	}
 
 	// Inject matching memory context directly into the system prompt using Chroma
 	const { contextBlock, ragFacts } = await loadMemoryContext(prompt);
@@ -194,8 +127,8 @@ export async function prepareMessages(prompt, history) {
 			role: 'system',
 			content: systemPromptText
 		},
-		...slidingWindow,
-		{ role: 'user', content: prompt }
+		...cleanedHistory,
+		{ role: 'user', content: prompt, images: images || [] }
 	];
 
 	const userMessages = cleanedHistory.filter(m => m.role === 'user').slice(-2);
@@ -214,25 +147,49 @@ export async function prepareMessages(prompt, history) {
 // ==========================================
 
 export async function callLLM(msgs, includeTools = false, tools = [], requestId = null) {
-	const provider = env.LLM_PROVIDER;
-	logger.info(`Calling LLM via provider: ${provider}`);
+	// Determine if we should override using the multimedia model config
+	const hasImages = msgs.some(m => m.images && m.images.length > 0);
+	const useMultimedia = env.USE_MULTIMEDIA_MODEL && hasImages;
+
+	let provider = env.LLM_PROVIDER;
+	let model = '';
+	let baseUrl = '';
+	let apiKey = '';
+
+	if (useMultimedia) {
+		provider = env.MULTIMEDIA_PROVIDER || env.LLM_PROVIDER;
+		if (provider === 'openai') {
+			model = env.MULTIMEDIA_MODEL || env.OPENAI_MODEL;
+			baseUrl = env.MULTIMEDIA_BASE_URL || env.OPENAI_BASE_URL || '';
+			apiKey = env.MULTIMEDIA_API_KEY || env.OPENAI_API_KEY || '';
+		} else if (provider === 'grok') {
+			model = env.MULTIMEDIA_MODEL || env.GROK_MODEL || 'grok-2-1218';
+			baseUrl = env.MULTIMEDIA_BASE_URL || env.GROK_BASE_URL || 'https://api.x.ai/v1';
+			apiKey = env.MULTIMEDIA_API_KEY || env.GROK_API_KEY || '';
+		} else if (provider === 'ollama') {
+			model = env.MULTIMEDIA_MODEL || env.OLLAMA_MODEL;
+			baseUrl = env.MULTIMEDIA_BASE_URL || env.OLLAMA_URL;
+		}
+		logger.info(`Using dedicated multimedia model: provider=${provider}, model=${model}`);
+	} else {
+		if (provider === 'openai') {
+			model = env.OPENAI_MODEL;
+			baseUrl = env.OPENAI_BASE_URL || '';
+			apiKey = env.OPENAI_API_KEY || '';
+		} else if (provider === 'grok') {
+			model = env.GROK_MODEL || 'grok-2-1218';
+			baseUrl = env.GROK_BASE_URL || 'https://api.x.ai/v1';
+			apiKey = env.GROK_API_KEY || '';
+		} else if (provider === 'ollama') {
+			model = env.OLLAMA_MODEL;
+			baseUrl = env.OLLAMA_URL;
+		}
+		logger.info(`Using standard chat model: provider=${provider}, model=${model}`);
+	}
+
 	let duration = 0;
 	let promptEvalDuration = 0;
 	let generatedContent = '';
-
-	// Determine model and baseUrl based on provider
-	let model = '';
-	let baseUrl = '';
-	if (provider === 'openai') {
-		model = env.OPENAI_MODEL;
-		baseUrl = env.OPENAI_BASE_URL || '';
-	} else if (provider === 'grok') {
-		model = env.GROK_MODEL || 'grok-2-1218';
-		baseUrl = env.GROK_BASE_URL || 'https://api.x.ai/v1';
-	} else if (provider === 'ollama') {
-		model = env.OLLAMA_MODEL;
-		baseUrl = env.OLLAMA_URL;
-	}
 
 	// Classify tool calling strategy
 	const { strategy } = getToolCallingCapability(provider, model, baseUrl);
@@ -260,17 +217,47 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 	// Prepare and clean messages history for the API payload
 	finalMsgs = prepareMessagesPayload(finalMsgs, strategy);
 
+	// Format images for OpenAI-like APIs (OpenAI & Grok) or Ollama
+	if (provider === 'openai' || provider === 'grok') {
+		for (const msg of finalMsgs) {
+			if (msg.images && msg.images.length > 0) {
+				const contentParts = [
+					{ type: 'text', text: msg.content }
+				];
+				for (const img of msg.images) {
+					contentParts.push({
+						type: 'image_url',
+						image_url: {
+							url: `data:${img.mimeType};base64,${img.data}`
+						}
+					});
+				}
+				msg.content = contentParts;
+				delete msg.images;
+			}
+		}
+	} else if (provider === 'ollama') {
+		for (const msg of finalMsgs) {
+			if (msg.images && msg.images.length > 0) {
+				msg.images = msg.images.map(img => img.data);
+			} else {
+				delete msg.images;
+			}
+		}
+	}
+
 	if (provider === 'openai') {
-		if (!env.OPENAI_API_KEY) {
-			throw new Error('OPENAI_API_KEY is not defined in the environment variables.');
+		const targetKey = apiKey || env.OPENAI_API_KEY;
+		if (!targetKey) {
+			throw new Error('OPENAI_API_KEY is not defined.');
 		}
 		const openaiInstance = new OpenAI({
-			apiKey: env.OPENAI_API_KEY,
-			baseURL: env.OPENAI_BASE_URL || undefined
+			apiKey: targetKey,
+			baseURL: baseUrl || undefined
 		});
 
 		const payload = {
-			model: env.OPENAI_MODEL,
+			model: model,
 			messages: finalMsgs,
 			stream: false
 		};
@@ -280,7 +267,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`OpenAI request: model=${env.OPENAI_MODEL}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`OpenAI request: model=${model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
@@ -317,16 +304,17 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 			throw error;
 		}
 	} else if (provider === 'grok') {
-		if (!env.GROK_API_KEY) {
-			throw new Error('GROK_API_KEY is not defined in the environment variables.');
+		const targetKey = apiKey || env.GROK_API_KEY;
+		if (!targetKey) {
+			throw new Error('GROK_API_KEY is not defined.');
 		}
 		const grokInstance = new OpenAI({
-			apiKey: env.GROK_API_KEY,
-			baseURL: env.GROK_BASE_URL || 'https://api.x.ai/v1'
+			apiKey: targetKey,
+			baseURL: baseUrl || 'https://api.x.ai/v1'
 		});
 
 		const payload = {
-			model: env.GROK_MODEL || 'grok-2-1218',
+			model: model,
 			messages: finalMsgs,
 			stream: false
 		};
@@ -336,7 +324,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`Grok request: model=${payload.model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`Grok request: model=${model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
@@ -374,7 +362,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		}
 	} else {
 		const payload = {
-			model: env.OLLAMA_MODEL,
+			model: model,
 			messages: finalMsgs,
 			stream: false,
 			options: {
@@ -386,11 +374,11 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`Ollama request: model=${env.OLLAMA_MODEL}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`Ollama request: model=${model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
-			const res = await axios.post(`${env.OLLAMA_URL}/api/chat`, payload);
+			const res = await axios.post(`${baseUrl}/api/chat`, payload);
 			const elapsed = Date.now() - start;
 			const data = res.data;
 

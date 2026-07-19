@@ -2,13 +2,16 @@ import { Agent } from '../orchestrator/agent.js';
 import { logger } from '../utils/logger.js';
 import { getDB } from '../config/mongodb.js';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
+import { parsePdfText, extractVideoFrames } from '../utils/mediaProcessor.js';
 
 const agent = new Agent();
 const activeSessions = new Map();
 
 export const handleChat = async (req, res) => {
-	let { prompt, history, sessionId } = req.body;
-	logger.info(`Received chat request: ${prompt} (session: ${sessionId})`);
+	let { prompt, history, sessionId, attachments } = req.body;
+	logger.info(`Received chat request: ${prompt} (session: ${sessionId}, attachments: ${attachments?.length || 0})`);
 
 	// Ensure we have a valid sessionId
 	if (!sessionId) {
@@ -47,6 +50,81 @@ export const handleChat = async (req, res) => {
 		const db = getDB();
 		const sessionsCollection = db.collection('chat_sessions');
 
+		// Process attachments
+		const processedAttachments = [];
+		const images = [];
+		let enhancedPrompt = prompt;
+
+		if (attachments && attachments.length > 0) {
+			const attachmentsDir = path.resolve('data/attachments');
+			if (!fs.existsSync(attachmentsDir)) {
+				fs.mkdirSync(attachmentsDir, { recursive: true });
+			}
+
+			for (const file of attachments) {
+				if (!file.data) continue;
+				const base64Data = file.data.includes(';base64,')
+					? file.data.split(';base64,')[1]
+					: file.data;
+				const buffer = Buffer.from(base64Data, 'base64');
+
+				// Generate safe unique filename
+				const fileExt = path.extname(file.name) || '';
+				const fileBase = path.basename(file.name, fileExt).replace(/[^a-zA-Z0-9_-]/g, '_');
+				const uniqueName = `${sessionId}-${Date.now()}-${fileBase}${fileExt}`;
+				const filePath = path.join(attachmentsDir, uniqueName);
+
+				fs.writeFileSync(filePath, buffer);
+
+				const staticUrl = `/attachments/${uniqueName}`;
+				const attachmentMeta = {
+					name: file.name,
+					type: file.type,
+					url: staticUrl,
+					path: filePath
+				};
+
+				processedAttachments.push(attachmentMeta);
+
+				// PDF Extraction
+				if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+					try {
+						sendSSE('status', `Parsing PDF: ${file.name}...`);
+						const pdfText = await parsePdfText(buffer);
+						if (pdfText.trim()) {
+							enhancedPrompt += `\n\n[Content of PDF file "${file.name}":]\n---\n${pdfText}\n---`;
+						}
+					} catch (pdfErr) {
+						logger.error(`Error parsing PDF attachment: ${pdfErr.message}`);
+					}
+				}
+				// Image Parsing
+				else if (file.type.startsWith('image/')) {
+					images.push({
+						type: 'image',
+						data: base64Data,
+						mimeType: file.type
+					});
+				}
+				// Video Parsing (Keyframe Extraction)
+				else if (file.type.startsWith('video/')) {
+					try {
+						sendSSE('status', `Extracting keyframes from video: ${file.name}...`);
+						const frames = await extractVideoFrames(filePath, sessionId);
+						for (const frame of frames) {
+							images.push({
+								type: 'image',
+								data: frame.data,
+								mimeType: frame.type
+							});
+						}
+					} catch (videoErr) {
+						logger.error(`Error processing video: ${videoErr.message}`);
+					}
+				}
+			}
+		}
+
 		// 1. Insert or update the chat session
 		const title = prompt.length > 50 ? prompt.substring(0, 47) + "..." : prompt;
 		await sessionsCollection.updateOne(
@@ -62,6 +140,7 @@ export const handleChat = async (req, res) => {
 		const userMessage = {
 			role: 'user',
 			content: prompt,
+			attachments: processedAttachments,
 			speech: null,
 			logs: [],
 			isError: false,
@@ -72,10 +151,10 @@ export const handleChat = async (req, res) => {
 			{ $push: { messages: userMessage } }
 		);
 
-		// 3. Run agent with history and abort checks
-		const response = await agent.run(prompt, history, (status) => {
+		// 3. Run agent with history, abort checks, and images
+		const response = await agent.run(enhancedPrompt, history, (status) => {
 			sendSSE('status', status);
-		}, () => isAborted);
+		}, () => isAborted, images);
 
 		// 4. Save assistant response
 		const assistantMessage = {
@@ -175,6 +254,7 @@ export const getChatMessages = async (req, res) => {
 		const messages = (session.messages || []).map(m => ({
 			role: m.role,
 			content: m.content,
+			attachments: m.attachments || [],
 			speech: m.speech,
 			isError: m.isError === true,
 			logs: m.logs || [],

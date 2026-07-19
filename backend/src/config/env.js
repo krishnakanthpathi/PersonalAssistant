@@ -14,6 +14,13 @@ export const env = {
 	LLM_PROVIDER: process.env.LLM_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'ollama'),
 	EMBEDDING_PROVIDER: process.env.EMBEDDING_PROVIDER,
 
+	// multimedia / vision model settings
+	USE_MULTIMEDIA_MODEL: process.env.USE_MULTIMEDIA_MODEL === 'true',
+	MULTIMEDIA_PROVIDER: process.env.MULTIMEDIA_PROVIDER || 'ollama',
+	MULTIMEDIA_MODEL: process.env.MULTIMEDIA_MODEL || '',
+	MULTIMEDIA_API_KEY: process.env.MULTIMEDIA_API_KEY || '',
+	MULTIMEDIA_BASE_URL: process.env.MULTIMEDIA_BASE_URL || '',
+
 	// ollama
 	OLLAMA_URL: process.env.OLLAMA_URL || 'http://localhost:11434',
 	OLLAMA_MODEL: process.env.OLLAMA_MODEL || 'llama3.1',

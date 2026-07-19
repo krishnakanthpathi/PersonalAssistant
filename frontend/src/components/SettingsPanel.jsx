@@ -348,6 +348,90 @@ export default function SettingsPanel({
               </ul>
             </div>
 
+            {/* Multimedia Settings Card */}
+            <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white">Multimedia / Vision Settings</h3>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Use a dedicated vision model to process messages with attachments.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settingsForm.useMultimediaModel || false}
+                    onChange={(e) => setSettingsForm(prev => ({ ...prev, useMultimediaModel: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-blue"></div>
+                </label>
+              </div>
+
+              {settingsForm.useMultimediaModel && (
+                <div className="space-y-4 pt-3 border-t border-white/5 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Multimedia Provider</label>
+                      <select
+                        value={settingsForm.multimediaProvider || 'ollama'}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaProvider: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-gray-200 outline-none focus:border-accent-blue/50"
+                      >
+                        <option value="ollama">Ollama (Local API)</option>
+                        <option value="openai">OpenAI SDK (Cloud / compatible API)</option>
+                        <option value="grok">Grok API (x.ai)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Multimedia Model</label>
+                        <button
+                          type="button"
+                          onClick={() => handleFetchModels(settingsForm.multimediaProvider || 'ollama')}
+                          className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
+                          title="Fetch available models for multimedia provider"
+                        >
+                          <RefreshCw className="w-2.5 h-2.5" />
+                          Fetch
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="e.g., llama3.2-vision, llava"
+                        value={settingsForm.multimediaModel || ''}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaModel: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">API Key (OpenAI / Grok Override)</label>
+                      <input
+                        type="password"
+                        placeholder="sk-... (Leave empty to use main API Key)"
+                        value={settingsForm.multimediaApiKey || ''}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaApiKey: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Base URL (Override)</label>
+                      <input
+                        type="text"
+                        placeholder="http://localhost:11434 (Leave empty to use default)"
+                        value={settingsForm.multimediaBaseUrl || ''}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaBaseUrl: e.target.value }))}
+                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
               <button
                 type="submit"
