@@ -29,3 +29,12 @@ export function runAppleScript(script) {
 		child.stdin.end();
 	});
 }
+
+/**
+ * Copies a PNG image file to the macOS system clipboard.
+ */
+export async function copyImageToClipboard(filePath) {
+	const escapedPath = filePath.replace(/"/g, '\\"');
+	const script = `set the clipboard to (read (POSIX file "${escapedPath}") as «class PNGf»)`;
+	return runAppleScript(script);
+}

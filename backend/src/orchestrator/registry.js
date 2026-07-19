@@ -82,9 +82,7 @@ import {
 	clipboardReadTool,
 	clipboardWriteTool,
 	notifyTool,
-	promptUserTool,
-	screenshotScreenTool,
-	screenshotWindowTool
+	promptUserTool
 } from '../tools/mac/systemInfoTools.js';
 import {
 	mailTool,
@@ -190,8 +188,6 @@ class ToolRegistry {
 		this.tools.set(clipboardWriteTool.definition.name, clipboardWriteTool);
 		this.tools.set(notifyTool.definition.name, notifyTool);
 		this.tools.set(promptUserTool.definition.name, promptUserTool);
-		this.tools.set(screenshotScreenTool.definition.name, screenshotScreenTool);
-		this.tools.set(screenshotWindowTool.definition.name, screenshotWindowTool);
 
 		this.tools.set(mailTool.definition.name, mailTool);
 		this.tools.set(calendarTool.definition.name, calendarTool);

@@ -1,7 +1,5 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import fs from 'fs';
-import path from 'path';
 import { runAppleScript } from '../../utils/appleScript.js';
 import { catchErrors } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
@@ -187,65 +185,3 @@ export const promptUserTool = {
 	}, 'Failed to prompt user')
 };
 
-export const screenshotScreenTool = {
-	definition: {
-		name: 'screenshot_screen',
-		description: 'Capture the screen (main display or specific display ID) as a base64 PNG.',
-		parameters: {
-			type: 'object',
-			properties: {
-				displayId: { type: 'integer', description: 'Optional display ID.' }
-			}
-		}
-	},
-	execute: catchErrors(async ({ displayId }) => {
-		logger.info(`Taking screenshot of screen...`);
-		const targetDir = path.resolve('data/screenshots');
-		if (!fs.existsSync(targetDir)) {
-			fs.mkdirSync(targetDir, { recursive: true });
-		}
-
-		const fileName = `screen_screenshot_${Date.now()}.png`;
-		const filePath = path.join(targetDir, fileName);
-
-		let command = `screencapture -x "${filePath}"`;
-		if (displayId) {
-			command = `screencapture -x -D ${displayId} "${filePath}"`;
-		}
-
-		await execAsync(command);
-		const base64 = await fs.promises.readFile(filePath, 'base64');
-		return base64;
-	}, 'Failed to take screenshot')
-};
-
-export const screenshotWindowTool = {
-	definition: {
-		name: 'screenshot_window',
-		description: 'Capture a specific window by its numeric window number ID as a base64 PNG.',
-		parameters: {
-			type: 'object',
-			properties: {
-				windowId: { type: 'integer', description: 'The numeric window ID.' }
-			},
-			required: ['windowId']
-		}
-	},
-	execute: catchErrors(async ({ windowId }) => {
-		if (windowId === undefined || windowId === null || isNaN(parseInt(windowId, 10))) {
-			throw new Error('Valid numeric windowId is required.');
-		}
-		logger.info(`Taking screenshot of window ${windowId}...`);
-		const targetDir = path.resolve('data/screenshots');
-		if (!fs.existsSync(targetDir)) {
-			fs.mkdirSync(targetDir, { recursive: true });
-		}
-
-		const fileName = `window_screenshot_${windowId}_${Date.now()}.png`;
-		const filePath = path.join(targetDir, fileName);
-
-		await execAsync(`screencapture -x -l ${windowId} "${filePath}"`);
-		const base64 = await fs.promises.readFile(filePath, 'base64');
-		return base64;
-	}, 'Failed to take window screenshot')
-};
