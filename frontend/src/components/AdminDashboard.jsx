@@ -354,6 +354,25 @@ export default function AdminDashboard() {
     setIsCheckingLatency(true);
     setLatencyResult(null);
     try {
+      // Construct dummy arguments based on the tool parameters schema
+      const params = selectedExplorerTool.parameters || {};
+      const mockArgs = {};
+      if (params.properties) {
+        for (const [key, prop] of Object.entries(params.properties)) {
+          if (prop.enum && prop.enum.length > 0) {
+            mockArgs[key] = prop.enum[0];
+          } else if (prop.type === 'array') {
+            mockArgs[key] = [];
+          } else if (prop.type === 'integer' || prop.type === 'number') {
+            mockArgs[key] = 1;
+          } else if (prop.type === 'boolean') {
+            mockArgs[key] = false;
+          } else {
+            mockArgs[key] = 'test';
+          }
+        }
+      }
+
       const response = await fetch('http://localhost:3000/api/tools/test', {
         method: 'POST',
         headers: {
@@ -361,7 +380,7 @@ export default function AdminDashboard() {
         },
         body: JSON.stringify({
           name: selectedExplorerTool.name,
-          args: {}
+          args: mockArgs
         })
       });
       const data = await response.json();
@@ -1231,6 +1250,41 @@ export default function AdminDashboard() {
                             </div>
                             <p className="text-xs text-gray-300 leading-relaxed font-sans">{selectedExplorerTool.description}</p>
                           </div>
+
+                          {metrics.aggregates?.tools?.[selectedExplorerTool.name] ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-1">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase">Database Average</span>
+                                <span className="font-mono text-xs font-bold text-white">
+                                  {metrics.aggregates.tools[selectedExplorerTool.name].averageLatency} ms
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase">Database Avg (Start)</span>
+                                <span className="font-mono text-xs font-bold text-accent-blue">
+                                  {metrics.aggregates.tools[selectedExplorerTool.name].averageLatencyFromRequestStart} ms
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase">Total Calls</span>
+                                <span className="font-mono text-xs font-bold text-gray-300">
+                                  {metrics.aggregates.tools[selectedExplorerTool.name].calls}
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase">Success Rate</span>
+                                <span className={`font-mono text-xs font-bold ${
+                                  metrics.aggregates.tools[selectedExplorerTool.name].successRate >= 0.9 ? 'text-accent-emerald' : 'text-yellow-400'
+                                }`}>
+                                  {(metrics.aggregates.tools[selectedExplorerTool.name].successRate * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-gray-500 italic bg-white/[0.01] border border-white/5 border-dashed rounded-xl p-3 mt-1">
+                              No execution metrics recorded for this tool yet.
+                            </div>
+                          )}
 
                           <div className="border-t border-white/5 pt-4">
                             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Parameters Schema</span>

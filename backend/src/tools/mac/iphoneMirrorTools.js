@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import path from 'path';
 import { catchErrors } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 
@@ -59,10 +60,15 @@ export const iphoneMirrorTool = {
 				throw new Error('iPhone Mirroring window not found on screen.');
 			}
 
-			const tempPath = `/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/temp-iphone-${Date.now()}.png`;
-			await execAsync(`screencapture -l ${windowId} "${tempPath}"`);
-			const base64 = await fs.promises.readFile(tempPath, 'base64');
-			await fs.promises.unlink(tempPath);
+			const targetDir = path.resolve('data/screenshots');
+			if (!fs.existsSync(targetDir)) {
+				fs.mkdirSync(targetDir, { recursive: true });
+			}
+			const fileName = `iphone_mirror_screenshot_${Date.now()}.png`;
+			const filePath = path.join(targetDir, fileName);
+
+			await execAsync(`screencapture -l ${windowId} "${filePath}"`);
+			const base64 = await fs.promises.readFile(filePath, 'base64');
 			return base64;
 		}
 	}, 'Failed to run iPhone Mirroring action')
