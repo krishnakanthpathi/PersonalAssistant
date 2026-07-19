@@ -23,6 +23,7 @@ import { timerTool } from '../tools/mac/timer.js';
 import { remindersTool } from '../tools/mac/reminders.js';
 import { rdsQueryTool } from '../tools/rdsQuery.js';
 import { analyzeImageTool } from '../tools/mac/analyzeImage.js';
+import { getKnowledgeDocumentTool, updateKnowledgeDocumentTool } from '../tools/mac/okfTools.js';
 
 import {
 	listAppsTool,
@@ -100,17 +101,12 @@ import {
 
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
-import { Embedder } from '../rag/embedder.js';
-import { VectorDB } from '../rag/vectorDb.js';
-import { rankTools } from '../rag/pipeline.js';
 import { logger } from '../utils/logger.js';
+import { OKFEngine } from '../rag/okfEngine.js';
 
 class ToolRegistry {
 	constructor() {
 		this.tools = new Map();
-		this.embedder = new Embedder();
-		this.vectorDb = new VectorDB();
-		this.dbInitialized = false;
 	}
 
 	initialize() {
@@ -136,6 +132,8 @@ class ToolRegistry {
 		this.tools.set(remindersTool.definition.name, remindersTool);
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
 		this.tools.set(analyzeImageTool.definition.name, analyzeImageTool);
+		this.tools.set(getKnowledgeDocumentTool.definition.name, getKnowledgeDocumentTool);
+		this.tools.set(updateKnowledgeDocumentTool.definition.name, updateKnowledgeDocumentTool);
 
 		this.tools.set(listAppsTool.definition.name, listAppsTool);
 		this.tools.set(listWindowsTool.definition.name, listWindowsTool);
@@ -201,58 +199,6 @@ class ToolRegistry {
 		this.tools.set(iphoneMirrorTool.definition.name, iphoneMirrorTool);
 	}
 
-	// Ensure database connection is loaded
-	async ensureDbLoaded() {
-		if (!this.dbInitialized) {
-			await this.vectorDb.connect();
-			this.dbInitialized = true;
-		}
-	}
-
-	// Pre-warm all tool embeddings at server startup
-	async warmUpEmbeddings() {
-		logger.info('[RAG Warmup] Starting tool embeddings warm-up...');
-		await this.ensureDbLoaded();
-
-		const allTools = await this.getOllamaTools();
-		logger.info(`[RAG Warmup] Found ${allTools.length} total tools.`);
-
-		const activeProvider = env.EMBEDDING_PROVIDER || (env.OPENAI_API_KEY ? 'openai' : 'ollama');
-		const currentModel = activeProvider === 'openai'
-			? (env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small')
-			: (env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text');
-
-		const toolsToEmbed = [];
-		const toolsToEmbedTexts = [];
-
-		for (const tool of allTools) {
-			const toolName = tool.function?.name || tool.name;
-			const isCached = this.vectorDb.isUpToDate(toolName, tool, currentModel);
-			if (!isCached) {
-				const description = tool.function?.description || tool.description || '';
-				toolsToEmbed.push(tool);
-				toolsToEmbedTexts.push(`Tool: ${toolName}. Description: ${description}`);
-			}
-		}
-
-		if (toolsToEmbed.length === 0) {
-			logger.info(`[RAG Warmup] All ${allTools.length} tool embeddings are up-to-date. No re-embedding needed.`);
-			return;
-		}
-
-		logger.info(`[RAG Warmup] Generating embeddings for ${toolsToEmbed.length} tools using model: ${currentModel}...`);
-		const embeddings = await this.embedder.embedBatch(toolsToEmbedTexts);
-
-		for (let i = 0; i < toolsToEmbed.length; i++) {
-			const tool = toolsToEmbed[i];
-			const toolName = tool.function?.name || tool.name;
-			this.vectorDb.set(toolName, tool, embeddings[i], currentModel);
-		}
-
-		await this.vectorDb.save();
-		logger.info(`[RAG Warmup] Successfully pre-warmed ${toolsToEmbed.length} tool embeddings. Total cached: ${allTools.length}.`);
-	}
-
 	// Dynamic, asynchronous fetch of all available tools (Local + MCP)
 	async getOllamaTools() {
 		// 1. Gather local tools
@@ -279,177 +225,130 @@ class ToolRegistry {
 		return [...localTools, ...mappedMcpTools];
 	}
 
-	// Dynamic filtering of tools based on RAG relevance to query
+	// Dynamic filtering of tools based on matched OKF catalog documents
 	async getRelevantTools(query) {
-		await this.ensureDbLoaded();
 		const allTools = await this.getOllamaTools();
 
 		if (!query || typeof query !== 'string' || query.trim() === '') {
 			return allTools;
 		}
 
-		const activeProvider = env.EMBEDDING_PROVIDER || (env.OPENAI_API_KEY ? 'openai' : 'ollama');
-		const currentModel = activeProvider === 'openai'
-			? (env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small')
-			: (env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text');
+		// Ensure OKFEngine is loaded
+		if (!OKFEngine.initialized) {
+			await OKFEngine.initialize();
+		}
 
-		try {
-			const toolsToEmbed = [];
-			const toolsToEmbedTexts = [];
+		// Match prompt query against OKF documents
+		const matchedDocs = OKFEngine.match(query);
+		
+		const activeToolNames = new Set();
+		matchedDocs.forEach(doc => {
+			if (doc.type === 'tool_group' && Array.isArray(doc.frontmatter.tools)) {
+				doc.frontmatter.tools.forEach(name => activeToolNames.add(name));
+			}
+		});
 
+		let selectedTools = allTools.filter(tool => {
+			const toolName = tool.function?.name || tool.name;
+			return activeToolNames.has(toolName);
+		});
+
+		// Fallback to first 12 tools if no specific tool group matched
+		if (selectedTools.length === 0) {
+			selectedTools = allTools.slice(0, 12);
+		}
+
+		const CORE_TOOLS = new Set([
+			'read_graph',
+			'search_nodes',
+			'open_nodes',
+			'create_entities',
+			'add_observations',
+			'open_application',
+			'close_application',
+			'run_applescript',
+			'open_url',
+			'analyze_image',
+			'take_screenshot',
+			'get_knowledge_document',
+			'update_knowledge_document'
+		]);
+
+		for (const tool of allTools) {
+			const toolName = tool.function?.name || tool.name;
+			if (CORE_TOOLS.has(toolName)) {
+				const alreadyIncluded = selectedTools.some(t => (t.function?.name || t.name) === toolName);
+				if (!alreadyIncluded) {
+					selectedTools.push(tool);
+				}
+			}
+		}
+
+		// Prevent prompt bloat by capping matching tools (excluding core fallback tools)
+		const maxToolsLimit = env.MAX_RELEVANT_TOOLS || 12;
+		if (selectedTools.length > maxToolsLimit + CORE_TOOLS.size) {
+			const matchesOnly = selectedTools.filter(t => !CORE_TOOLS.has(t.function?.name || t.name));
+			const coreOnly = selectedTools.filter(t => CORE_TOOLS.has(t.function?.name || t.name));
+			selectedTools = [...matchesOnly.slice(0, maxToolsLimit), ...coreOnly];
+		}
+
+		// Group-based tool expansion: if at least one tool from a group is retrieved, include other essential tools from that group.
+		const groups = [
+			{
+				name: 'filesystem',
+				match: (t, name) => name.startsWith('fs_') || t.serverName === 'filesystem',
+				essential: new Set([
+					'fs_list', 'fs_read', 'fs_write', 'fs_make_dir', 'fs_move', 'fs_delete',
+					'list_directory', 'read_file', 'write_file', 'create_directory', 'move_file', 'remove_file'
+				])
+			},
+			{
+				name: 'notion',
+				match: (t, name) => name.startsWith('notion_') || t.serverName === 'notion',
+				essential: new Set([
+					'notion_search', 'notion_get_page', 'notion_create_page', 'notion_update_page', 'notion_append_block'
+				])
+			},
+			{
+				name: 'gmail',
+				match: (t, name) => name.startsWith('gmail_') || name.includes('mail') || t.serverName === 'gmail',
+				essential: new Set([
+					'search_threads', 'get_thread', 'send_draft', 'create_draft', 'reply_to_thread'
+				])
+			},
+			{
+				name: 'calendar',
+				match: (t, name) => name.startsWith('calendar_') || t.serverName === 'google-calendar',
+				essential: new Set([
+					'list_events', 'get_event', 'create_event', 'update_event', 'delete_event'
+				])
+			}
+		];
+
+		const activeGroups = new Set();
+		for (const tool of selectedTools) {
+			const toolName = tool.function?.name || tool.name;
+			for (const group of groups) {
+				if (group.match(tool, toolName)) {
+					activeGroups.add(group.name);
+				}
+			}
+		}
+
+		for (const groupName of activeGroups) {
+			const group = groups.find(g => g.name === groupName);
 			for (const tool of allTools) {
 				const toolName = tool.function?.name || tool.name;
-				const isCached = this.vectorDb.isUpToDate(toolName, tool, currentModel);
-
-				if (!isCached) {
-					const description = tool.function?.description || tool.description || '';
-					const textToEmbed = `Tool: ${toolName}. Description: ${description}`;
-					toolsToEmbed.push(tool);
-					toolsToEmbedTexts.push(textToEmbed);
-				}
-			}
-
-			if (toolsToEmbed.length > 0) {
-				const embeddings = await this.embedder.embedBatch(toolsToEmbedTexts);
-				for (let i = 0; i < toolsToEmbed.length; i++) {
-					const tool = toolsToEmbed[i];
-					const toolName = tool.function?.name || tool.name;
-					this.vectorDb.set(toolName, tool, embeddings[i], currentModel);
-				}
-				await this.vectorDb.save();
-			}
-
-			let selectedTools = [];
-			const availableToolNames = new Set(allTools.map(t => t.function?.name || t.name));
-
-			let queryEmbedding = null;
-			try {
-				queryEmbedding = await this.embedder.embed(query);
-			} catch (err) {
-				// Silent fallback
-			}
-
-			if (queryEmbedding) {
-				try {
-					const results = await this.vectorDb.query(queryEmbedding, env.MAX_RELEVANT_TOOLS);
-					if (results && results.ids && results.ids[0]) {
-						for (let i = 0; i < results.ids[0].length; i++) {
-							const name = results.ids[0][i];
-							const metadata = results.metadatas[0][i];
-							if (availableToolNames.has(name) && metadata && metadata.tool) {
-								const toolObj = JSON.parse(metadata.tool);
-								const distance = results.distances[0][i];
-								toolObj.score = 1 - distance;
-								selectedTools.push(toolObj);
-							}
-						}
-					}
-				} catch (err) {
-					// log fall backing
-					logger.error(`Failed to query Chroma DB natively: ${err.message}. Falling back to manual ranking.`);
-				}
-			}
-
-			if (selectedTools.length === 0) {
-				const cachedToolsList = this.vectorDb.getAll();
-				const activeCachedTools = cachedToolsList.filter(item => {
-					const name = item.tool.function?.name || item.tool.name;
-					return availableToolNames.has(name);
-				});
-
-				selectedTools = rankTools(
-					query,
-					queryEmbedding,
-					activeCachedTools,
-					env.TOOL_SIMILARITY_THRESHOLD,
-					env.MAX_RELEVANT_TOOLS
-				);
-			}
-
-			const CORE_TOOLS = new Set([
-				'read_graph',
-				'search_nodes',
-				'open_nodes',
-				'create_entities',
-				'add_observations',
-				'open_application',
-				'close_application',
-				'run_applescript',
-				'open_url',
-				'analyze_image',
-				'take_screenshot'
-			]);
-
-			for (const tool of allTools) {
-				const toolName = tool.function?.name || tool.name;
-				if (CORE_TOOLS.has(toolName)) {
+				if (group.essential.has(toolName)) {
 					const alreadyIncluded = selectedTools.some(t => (t.function?.name || t.name) === toolName);
 					if (!alreadyIncluded) {
 						selectedTools.push(tool);
 					}
 				}
 			}
-
-			// Group-based tool expansion: if at least one tool from a group is retrieved, include other essential tools from that group.
-			const groups = [
-				{
-					name: 'filesystem',
-					match: (t, name) => name.startsWith('fs_') || t.serverName === 'filesystem',
-					essential: new Set([
-						'fs_list', 'fs_read', 'fs_write', 'fs_make_dir', 'fs_move', 'fs_delete',
-						'list_directory', 'read_file', 'write_file', 'create_directory', 'move_file', 'remove_file'
-					])
-				},
-				{
-					name: 'notion',
-					match: (t, name) => name.startsWith('notion_') || t.serverName === 'notion',
-					essential: new Set([
-						'notion_search', 'notion_get_page', 'notion_create_page', 'notion_update_page', 'notion_append_block'
-					])
-				},
-				{
-					name: 'gmail',
-					match: (t, name) => name.startsWith('gmail_') || t.serverName === 'gmail' || name.includes('mail'),
-					essential: new Set([
-						'search_threads', 'get_thread', 'send_draft', 'create_draft', 'reply_to_thread'
-					])
-				},
-				{
-					name: 'calendar',
-					match: (t, name) => name.startsWith('calendar_') || t.serverName === 'google-calendar',
-					essential: new Set([
-						'list_events', 'get_event', 'create_event', 'update_event', 'delete_event'
-					])
-				}
-			];
-
-			const activeGroups = new Set();
-			for (const tool of selectedTools) {
-				const toolName = tool.function?.name || tool.name;
-				for (const group of groups) {
-					if (group.match(tool, toolName)) {
-						activeGroups.add(group.name);
-					}
-				}
-			}
-
-			for (const groupName of activeGroups) {
-				const group = groups.find(g => g.name === groupName);
-				for (const tool of allTools) {
-					const toolName = tool.function?.name || tool.name;
-					if (group.essential.has(toolName)) {
-						const alreadyIncluded = selectedTools.some(t => (t.function?.name || t.name) === toolName);
-						if (!alreadyIncluded) {
-							selectedTools.push(tool);
-						}
-					}
-				}
-			}
-
-			return selectedTools;
-		} catch (error) {
-			return allTools;
 		}
+
+		return selectedTools;
 	}
 
 	async callTool(name, args, toolContext = null) {

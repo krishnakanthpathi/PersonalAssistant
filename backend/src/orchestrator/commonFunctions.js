@@ -12,8 +12,7 @@ import { metricsService } from '../utils/metrics.js';
 import { env } from '../config/env.js';
 import { getDB } from '../config/mongodb.js';
 import { getToolCallingCapability, standardizeToolSchema, injectXmlToolsInstructions, prepareMessagesPayload } from './toolCallFilter.js';
-import { PersonalInfoVectorDB } from '../rag/personalDb.js';
-import { Embedder } from '../rag/embedder.js';
+import { OKFEngine } from '../rag/okfEngine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROMPT_FILE_PATH = path.join(__dirname, '../config/system_prompt.md');
@@ -43,51 +42,33 @@ export async function loadSystemPrompt() {
 	return systemPromptText;
 }
 
-export async function loadMemoryContext(query) {
+export async function loadOKFContext(query) {
 	try {
-		const personalDb = new PersonalInfoVectorDB();
-		await personalDb.connect();
-
-		const embedder = new Embedder();
-		const queryEmbedding = await embedder.embed(query);
-
-		// Get top matching facts/entities from Chroma using configured limit
-		const results = await personalDb.query(queryEmbedding, env.RAG_PERSONAL_DB_LIMIT || 8);
-
-		if (!results || !results.documents || !results.documents[0] || results.documents[0].length === 0) {
-			return { contextBlock: '', ragFacts: [] };
+		if (!OKFEngine.initialized) {
+			await OKFEngine.initialize();
 		}
 
-		let contextBlock = '\n\n## User Long-Term Memory (Relevant Facts Found)\n';
-		contextBlock += 'The following relevant facts about the user (Krishnakanth) were found in local long-term memory:\n';
-
-		let matchCount = 0;
-		const ragFacts = [];
-		for (let i = 0; i < results.documents[0].length; i++) {
-			const doc = results.documents[0][i];
-			const distance = results.distances[0][i];
-			const similarity = 1 - distance; // in cosine space: similarity = 1 - distance
-
-			// Filter out facts based on configured similarity threshold
-			if (similarity >= (env.RAG_PERSONAL_DB_THRESHOLD !== undefined ? env.RAG_PERSONAL_DB_THRESHOLD : 0.20)) {
-				contextBlock += doc + '\n\n';
-				matchCount++;
-				ragFacts.push({
-					text: doc,
-					similarity: parseFloat(similarity.toFixed(4))
-				});
-			}
+		const matchedDocs = OKFEngine.match(query);
+		if (!matchedDocs || matchedDocs.length === 0) {
+			return { contextBlock: '', okfDocs: [] };
 		}
 
-		if (matchCount === 0) {
-			return { contextBlock: '', ragFacts: [] };
-		}
+		let contextBlock = '\n\n## User Long-Term Memory (Open Knowledge Format)\n';
+		contextBlock += 'The following structured knowledge files about the user (Krishnakanth), preferences, routines, and environment are loaded:\n\n';
 
-		logger.info(`Injected ${matchCount} relevant memory entities into system prompt using Chroma vector search.`);
-		return { contextBlock, ragFacts };
+		matchedDocs.forEach(doc => {
+			contextBlock += `### Document: ${doc.filename} (Type: ${doc.type})\n`;
+			contextBlock += `**Title**: ${doc.title}\n`;
+			contextBlock += `**Tags**: ${doc.tags.join(', ')}\n\n`;
+			contextBlock += `${doc.content}\n\n`;
+			contextBlock += `---\n\n`;
+		});
+
+		logger.info(`Injected ${matchedDocs.length} matched OKF documents into system prompt.`);
+		return { contextBlock, okfDocs: matchedDocs.map(d => d.filename) };
 	} catch (error) {
-		logger.error(`Failed to load memory context from Chroma: ${error.message}`);
-		return { contextBlock: '', ragFacts: [] };
+		logger.error(`Failed to load memory context from OKF catalog: ${error.message}`);
+		return { contextBlock: '', okfDocs: [] };
 	}
 }
 
@@ -116,8 +97,8 @@ export async function prepareMessages(prompt, history, images = []) {
 
 	let systemPromptText = await loadSystemPrompt();
 
-	// Inject matching memory context directly into the system prompt using Chroma
-	const { contextBlock, ragFacts } = await loadMemoryContext(prompt);
+	// Inject matching memory context directly into the system prompt using OKF Catalog
+	const { contextBlock, okfDocs } = await loadOKFContext(prompt);
 	if (contextBlock) {
 		systemPromptText = `${systemPromptText}${contextBlock}`;
 	}
@@ -138,7 +119,7 @@ export async function prepareMessages(prompt, history, images = []) {
 		messages,
 		cleanedHistory,
 		combinedRAGQuery,
-		ragFacts: ragFacts || []
+		ragFacts: okfDocs || []
 	};
 }
 
@@ -888,11 +869,17 @@ export function parseAgentResponse(rawContent) {
 		speech = cleanTextForSpeech(action);
 	}
 
+	// Clean remaining assistant-specific tags
+	const tagRegex = /<\/?(speech|action|thought)>/gi;
+	speech = speech.replace(tagRegex, '').trim();
+	action = action.replace(tagRegex, '').trim();
+
 	return { speech, content: action };
 }
 
 export function cleanTextForSpeech(text) {
 	let clean = text
+		.replace(/<[^>]*>/g, '')
 		.replace(/```[\s\S]*?```/g, '')
 		.replace(/`([^`]+)`/g, '$1')
 		.replace(/[#*_\-]/g, '')

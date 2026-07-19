@@ -2,7 +2,8 @@
 node_modules/
 
 # Production / Build
-data/
+data/*
+!data/knowledge_catalog/
 data/screenshots/
 data/downloads/
 dist/

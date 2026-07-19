@@ -9,7 +9,7 @@ import { logger } from './utils/logger.js';
 import { env } from './config/env.js';
 import { connectToMongoDB } from './config/mongodb.js';
 import apiRoutes from './routes/api.js';
-import { PersonalInfoVectorDB } from './rag/personalDb.js';
+import { OKFEngine } from './rag/okfEngine.js';
 import { registry } from './orchestrator/registry.js';
 
 import path from 'path';
@@ -52,24 +52,13 @@ async function startServer() {
 	// Initialize MCP Manager & spawn the filesystem server
 	await mcpManager.initialize();
 
-	// Pre-warm tool embeddings (runs after MCP so all tools are available)
-	try {
-		await registry.warmUpEmbeddings();
-	} catch (err) {
-		logger.error(`[RAG Warmup] Failed to pre-warm tool embeddings: ${err.message}`);
-	}
 
-	// Connect and synchronize personal information RAG in Chroma in the background
+
+	// Initialize Open Knowledge Format (OKF) Engine from files catalog
 	try {
-		const personalDb = new PersonalInfoVectorDB();
-		await personalDb.connect();
-		personalDb.syncFromMemoryJson().then(() => {
-			logger.info('Chroma personal info RAG synchronization complete.');
-		}).catch(err => {
-			logger.error(`Chroma personal info RAG synchronization failed: ${err.message}`);
-		});
+		await OKFEngine.initialize();
 	} catch (err) {
-		logger.error(`Failed to initialize Chroma personal info RAG on startup: ${err.message}`);
+		logger.error(`Failed to initialize OKF Engine on startup: ${err.message}`);
 	}
 
 	app.listen(env.PORT, () => {

@@ -1,9 +1,13 @@
 import { mcpManager } from '../mcp/mcpManager.js';
 import { registry } from '../orchestrator/registry.js';
 import { logger } from '../utils/logger.js';
+import { connectToMongoDB } from '../config/mongodb.js';
 
 async function testRAGSelection() {
 	logger.info('Starting RAG tool selection test...');
+
+	// Initialize database to fetch MCP auth tokens
+	await connectToMongoDB();
 
 	// 1. Initialize MCP Manager to load all tools
 	await mcpManager.initialize();
