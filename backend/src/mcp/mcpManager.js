@@ -138,6 +138,18 @@ export class MCPManager {
 				logger.warn(`Failed to initialize Video Converter MCP client on boot: ${err.message}`);
 			}
 		}
+
+		// 11. Initialize Terminal Client if configured
+		if (config.mcpServers.terminal) {
+			try {
+				const { TerminalClient } = await import('./clients/terminal.js');
+				const terminalClient = new TerminalClient(config.mcpServers.terminal);
+				await terminalClient.connect();
+				this.servers.set('terminal', terminalClient);
+			} catch (err) {
+				logger.warn(`Failed to initialize Terminal MCP client on boot: ${err.message}`);
+			}
+		}
 	}, 'Failed to initialize MCP Manager');
 
 	/**
@@ -231,6 +243,12 @@ export class MCPManager {
 			const videoConverterClient = new VideoConverterClient(serverConfig);
 			await videoConverterClient.connect();
 			this.servers.set(serverName, videoConverterClient);
+			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
+		} else if (serverName === 'terminal') {
+			const { TerminalClient } = await import('./clients/terminal.js');
+			const terminalClient = new TerminalClient(serverConfig);
+			await terminalClient.connect();
+			this.servers.set(serverName, terminalClient);
 			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
 		}
 	}

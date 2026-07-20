@@ -20,6 +20,9 @@ function categorizeTool(toolName, description = '') {
 	if (name.startsWith('api-') || name.includes('notion')) {
 		return 'notion';
 	}
+	if (name.includes('terminal') || name.includes('command') || name.includes('change_directory') || name.includes('get_current_directory') || name.includes('get_allowed_commands')) {
+		return 'terminal';
+	}
 	if (name.startsWith('fs_') || name.includes('read_file') || name.includes('write_file') || name.includes('directory') || name.includes('folder') || name.includes('file_info') || name.includes('allowed_directories')) {
 		return 'filesystem';
 	}

@@ -78,6 +78,15 @@
 				"-m",
 				"mcp_video_converter.server"
 			]
+		},
+		"terminal": {
+			"command": "node",
+			"args": [
+				"/Users/krishnakanth/Projects/PersonalAssisstent/mcps/terminal-mcp/index.js"
+			],
+			"env": {
+				"ALLOWED_COMMANDS": "npm,node,git,ls,echo,cat,pwd"
+			}
 		}
 	}
 }

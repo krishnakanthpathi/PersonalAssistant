@@ -405,6 +405,13 @@ class ToolRegistry {
 				essential: new Set([
 					'list-events', 'get-event', 'create-event', 'update-event', 'delete-event', 'list-calendars'
 				])
+			},
+			{
+				name: 'terminal',
+				match: (t, name) => name.includes('command') || name.includes('terminal') || t.serverName === 'terminal',
+				essential: new Set([
+					'execute_command', 'change_directory', 'get_current_directory', 'get_allowed_commands'
+				])
 			}
 		];
 
