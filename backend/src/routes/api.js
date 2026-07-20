@@ -9,7 +9,7 @@ import { getGoogleAuthUrl, handleGoogleCallback, getGoogleAuthStatus, disconnect
 import { streamLogs } from '../controllers/logsController.js';
 import { searchPersonalDb, testOkfRetrieval } from '../controllers/personalDbController.js';
 import { getSkills, createSkill, updateSkill, deleteSkill, testSkill, generateSkill } from '../controllers/skillsController.js';
-import { getPrebuiltForms, createPrebuiltForm, deletePrebuiltForm, updatePrebuiltForm } from '../controllers/prebuiltFormsController.js';
+import { getPrebuiltForms, createPrebuiltForm, deletePrebuiltForm, updatePrebuiltForm, toggleFavoritePrebuiltForm } from '../controllers/prebuiltFormsController.js';
 
 const router = Router();
 
@@ -42,6 +42,7 @@ router.get("/api/prebuilt-forms", getPrebuiltForms);
 router.post("/api/prebuilt-forms", createPrebuiltForm);
 router.put("/api/prebuilt-forms/:id", updatePrebuiltForm);
 router.delete("/api/prebuilt-forms/:id", deletePrebuiltForm);
+router.post("/api/prebuilt-forms/:id/toggle-favorite", toggleFavoritePrebuiltForm);
 
 // Google OAuth Flow
 router.get("/api/auth/google/url", getGoogleAuthUrl);

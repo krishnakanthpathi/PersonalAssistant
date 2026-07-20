@@ -25,7 +25,10 @@ import {
   Menu,
   Database,
   PlayCircle,
-  X
+  X,
+  Star,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -396,6 +399,8 @@ function MainApp() {
   const [showQuickActionsPopover, setShowQuickActionsPopover] = useState(false);
   const [quickActionForms, setQuickActionForms] = useState([]);
   const [quickActionInputs, setQuickActionInputs] = useState({});
+  const [favoritesSectionOpen, setFavoritesSectionOpen] = useState(true);
+  const [othersSectionOpen, setOthersSectionOpen] = useState(false);
 
   const fetchQuickActionForms = async () => {
     try {
@@ -441,6 +446,21 @@ function MainApp() {
     setTimeout(() => {
       handleSend(interpolatedPrompt);
     }, 100);
+  };
+
+  const handleToggleFavoriteQuickAction = async (id, e) => {
+    if (e) e.stopPropagation();
+    try {
+      const res = await fetch(`http://localhost:3000/api/prebuilt-forms/${id}/toggle-favorite`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchQuickActionForms();
+      }
+    } catch (error) {
+      console.error('Error toggling favorite in quick actions:', error);
+    }
   };
 
   useEffect(() => {
@@ -1872,27 +1892,39 @@ function MainApp() {
             </div>
 
             {/* Modal Content */}
-            <div className="flex-grow overflow-y-auto p-5 flex flex-col gap-4">
+            <div className="flex-grow overflow-y-auto p-5 flex flex-col gap-4 select-none">
               {quickActionForms.length === 0 ? (
                 <div className="text-gray-500 text-xs text-center py-8">
                   Loading available shortcuts...
                 </div>
-              ) : (
-                quickActionForms.map((card) => (
+              ) : (() => {
+                const favoriteForms = quickActionForms.filter(f => f.isFavorite);
+                const otherForms = quickActionForms.filter(f => !f.isFavorite);
+
+                const renderCard = (card) => (
                   <div
                     key={card._id}
-                    className="p-4 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl flex flex-col gap-3 transition-all animate-slideUp"
+                    className="p-4 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl flex flex-col gap-3 transition-all animate-slideUp text-left"
                   >
-                    <div>
-                      <h4 className="font-bold text-xs text-white">{card.title}</h4>
-                      <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">{card.description}</p>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-xs text-white">{card.title}</h4>
+                        <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">{card.description}</p>
+                      </div>
+                      <button
+                        onClick={(e) => handleToggleFavoriteQuickAction(card._id, e)}
+                        className={`p-1.5 hover:bg-white/5 rounded transition cursor-pointer flex-shrink-0 ${card.isFavorite ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-300'}`}
+                        title={card.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                      >
+                        <Star size={13} fill={card.isFavorite ? 'currentColor' : 'none'} />
+                      </button>
                     </div>
 
                     {card.inputs && card.inputs.length > 0 && (
                       <div className="flex flex-col gap-2.5 bg-black/35 p-3 rounded-lg border border-white/5">
                         {card.inputs.map(input => (
                           <div key={input.name} className="flex flex-col gap-1 text-[10px]">
-                            <label className="text-gray-400 font-medium">{input.label}</label>
+                            <label className="text-gray-400 font-medium text-left">{input.label}</label>
                             <input
                               type={input.type || 'text'}
                               value={quickActionInputs[card._id]?.[input.name] ?? ''}
@@ -1913,8 +1945,64 @@ function MainApp() {
                       Run Prompt
                     </button>
                   </div>
-                ))
-              )}
+                );
+
+                return (
+                  <div className="flex flex-col gap-5">
+                    {/* Favorites Dropdown Section (Open by default) */}
+                    <div className="flex flex-col gap-2.5">
+                      <button
+                        onClick={() => setFavoritesSectionOpen(!favoritesSectionOpen)}
+                        className="flex items-center justify-between w-full pb-2 border-b border-white/5 text-gray-400 hover:text-white transition cursor-pointer text-xs font-bold uppercase tracking-wider text-left"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Star size={12} className="text-amber-400" fill="currentColor" />
+                          Favorites ({favoriteForms.length})
+                        </span>
+                        {favoritesSectionOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                      </button>
+                      
+                      {favoritesSectionOpen && (
+                        <div className="flex flex-col gap-3 pl-1">
+                          {favoriteForms.length === 0 ? (
+                            <div className="text-gray-500 text-xs italic py-4 text-center bg-white/[0.01] border border-dashed border-white/5 rounded-xl">
+                              No favorites selected yet. Click the star icon on any card to add it here.
+                            </div>
+                          ) : (
+                            favoriteForms.map(renderCard)
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* All Shortcuts Dropdown Section (Closed by default) */}
+                    <div className="flex flex-col gap-2.5">
+                      <button
+                        onClick={() => setOthersSectionOpen(!othersSectionOpen)}
+                        className="flex items-center justify-between w-full pb-2 border-b border-white/5 text-gray-400 hover:text-white transition cursor-pointer text-xs font-bold uppercase tracking-wider text-left"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <PlayCircle size={12} className="text-gray-400" />
+                          All Shortcuts ({otherForms.length})
+                        </span>
+                        {othersSectionOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                      </button>
+                      
+                      {othersSectionOpen && (
+                        <div className="flex flex-col gap-3 pl-1">
+                          {otherForms.length === 0 ? (
+                            <div className="text-gray-500 text-xs italic py-4 text-center bg-white/[0.01] border border-dashed border-white/5 rounded-xl">
+                              No additional shortcuts found.
+                            </div>
+                          ) : (
+                            otherForms.map(renderCard)
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -85,7 +85,8 @@ import {
 	clipboardReadTool,
 	clipboardWriteTool,
 	notifyTool,
-	promptUserTool
+	promptUserTool,
+	getDateTimeTool
 } from '../tools/mac/systemInfoTools.js';
 import {
 	mailTool,
@@ -190,6 +191,7 @@ class ToolRegistry {
 		this.tools.set(clipboardWriteTool.definition.name, clipboardWriteTool);
 		this.tools.set(notifyTool.definition.name, notifyTool);
 		this.tools.set(promptUserTool.definition.name, promptUserTool);
+		this.tools.set(getDateTimeTool.definition.name, getDateTimeTool);
 
 		this.tools.set(mailTool.definition.name, mailTool);
 		this.tools.set(calendarTool.definition.name, calendarTool);

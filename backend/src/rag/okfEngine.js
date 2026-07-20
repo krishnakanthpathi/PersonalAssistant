@@ -133,19 +133,35 @@ class OKFEngineClass {
 			return { doc, score };
 		});
 
-		// Sort descending
-		scoredDocs.sort((a, b) => b.score - a.score);
+		// Group scored documents by parent folder to avoid search shadowing.
+		// A high matching score in user profile docs should not filter out matched tool documentation docs.
+		const groups = {
+			user: scoredDocs.filter(item => item.doc.filename.startsWith('user/')),
+			tools: scoredDocs.filter(item => item.doc.filename.startsWith('tools/')),
+			others: scoredDocs.filter(item => !item.doc.filename.startsWith('user/') && !item.doc.filename.startsWith('tools/'))
+		};
 
-		const maxScore = scoredDocs[0]?.score || 0;
-		if (maxScore === 0) {
+		const matches = [];
+		let totalMaxScore = 0;
+
+		Object.entries(groups).forEach(([groupName, groupDocs]) => {
+			if (groupDocs.length === 0) return;
+			const maxScore = Math.max(...groupDocs.map(item => item.score));
+			if (maxScore > 0) {
+				totalMaxScore = Math.max(totalMaxScore, maxScore);
+				const threshold = Math.max(1, maxScore - 2);
+				groupDocs.forEach(item => {
+					if (item.score >= threshold) {
+						matches.push(item.doc);
+					}
+				});
+			}
+		});
+
+		if (totalMaxScore === 0) {
+			// If absolutely nothing matched, return everything as fallback
 			return this.documents;
 		}
-
-		// Only return docs that have a score close to the maximum matched score
-		const threshold = Math.max(1, maxScore - 2);
-		const matches = scoredDocs
-			.filter(item => item.score >= threshold)
-			.map(item => item.doc);
 
 		return matches;
 	}

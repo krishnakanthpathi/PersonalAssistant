@@ -128,3 +128,29 @@ export const updatePrebuiltForm = async (req, res) => {
 		res.status(400).json({ success: false, error: error.message });
 	}
 };
+
+export const toggleFavoritePrebuiltForm = async (req, res) => {
+	try {
+		const { id } = req.params;
+		if (!id) throw new Error('ID is required');
+
+		const db = getDB();
+		const collection = db.collection('prebuilt_forms');
+
+		const form = await collection.findOne({ _id: new ObjectId(id) });
+		if (!form) {
+			throw new Error('Prebuilt form not found');
+		}
+
+		const newFavoriteState = !form.isFavorite;
+
+		await collection.updateOne(
+			{ _id: new ObjectId(id) },
+			{ $set: { isFavorite: newFavoriteState } }
+		);
+
+		res.json({ success: true, isFavorite: newFavoriteState });
+	} catch (error) {
+		res.status(400).json({ success: false, error: error.message });
+	}
+};

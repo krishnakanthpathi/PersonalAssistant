@@ -29,7 +29,8 @@ import {
   PlusCircle,
   Trash,
   PlayCircle,
-  Edit3
+  Edit3,
+  Star
 } from 'lucide-react';
 import SkillsPanel from './SkillsPanel.jsx';
 
@@ -247,6 +248,22 @@ export default function AdminDashboard() {
         executePrompt: interpolatedPrompt 
       } 
     });
+  };
+
+  const handleToggleFavorite = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/prebuilt-forms/${id}/toggle-favorite`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchPrebuiltForms();
+      } else {
+        alert('Failed to toggle favorite: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
   };
 
   // OKF Retrieval Tester state
@@ -853,6 +870,13 @@ export default function AdminDashboard() {
                       <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">{card.description}</p>
                     </div>
                     <div className="flex gap-1 items-center flex-shrink-0">
+                      <button
+                        onClick={() => handleToggleFavorite(card._id)}
+                        className={`p-1 rounded transition cursor-pointer ${card.isFavorite ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-300'}`}
+                        title={card.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                      >
+                        <Star size={12} fill={card.isFavorite ? 'currentColor' : 'none'} />
+                      </button>
                       <button
                         onClick={() => handleEditPrebuiltForm(card)}
                         className="text-gray-500 hover:text-accent-blue p-1 rounded transition cursor-pointer"

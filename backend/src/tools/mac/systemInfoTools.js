@@ -185,3 +185,25 @@ export const promptUserTool = {
 	}, 'Failed to prompt user')
 };
 
+export const getDateTimeTool = {
+	definition: {
+		name: 'get_date_time',
+		description: 'Retrieve the current local date, time, and timezone information from the host system.',
+		parameters: {
+			type: 'object',
+			properties: {}
+		}
+	},
+	execute: catchErrors(async () => {
+		logger.info('Retrieving current local system date and time...');
+		const now = new Date();
+		const result = {
+			localTime: now.toString(),
+			isoString: now.toISOString(),
+			timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+			epochMs: now.getTime()
+		};
+		return JSON.stringify(result, null, 2);
+	}, 'Failed to retrieve date and time')
+};
+
