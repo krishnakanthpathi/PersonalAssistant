@@ -258,7 +258,7 @@ class ToolRegistry {
 
 		// Match prompt query against OKF documents
 		const matchedDocs = OKFEngine.match(query);
-		
+
 		const activeToolNames = new Set();
 		matchedDocs.forEach(doc => {
 			if (doc.type === 'tool_group' && Array.isArray(doc.frontmatter.tools)) {

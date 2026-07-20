@@ -417,10 +417,19 @@ export const fsDeleteTool = {
 			return `Permanently deleted ${filePath}`;
 		} else {
 			// Move to Trash using AppleScript Finder
-			const appleScriptPath = resolved.replace(/"/g, '\\"');
-			const script = `tell application "Finder" to move POSIX file "${appleScriptPath}" to trash`;
-			await execAsync(`osascript -e '${script}'`);
-			return `Moved ${filePath} to Trash successfully.`;
+			try {
+				const appleScriptPath = resolved.replace(/"/g, '\\"');
+				const script = `tell application "Finder" to move POSIX file "${appleScriptPath}" to trash`;
+				await execAsync(`osascript -e '${script}'`);
+				return `Moved ${filePath} to Trash successfully.`;
+			} catch (err) {
+				if (err.message.includes('-8013') || err.message.toLowerCase().includes('needs to be downloaded')) {
+					logger.info(`Finder failed to trash iCloud file: ${resolved}. Revealing in Finder.`);
+					await execAsync(`open -R "${resolved.replace(/"/g, '\\"')}"`);
+					throw new Error(`The item "${filePath}" is an iCloud placeholder and cannot be moved to Trash programmatically. I have opened Finder and highlighted the item for you so you can delete it manually.`);
+				}
+				throw err;
+			}
 		}
 	}, 'Failed to delete path')
 };

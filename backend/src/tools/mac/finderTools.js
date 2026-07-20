@@ -154,10 +154,22 @@ export const moveToTrashTool = {
 	execute: catchErrors(async ({ path: filePath }) => {
 		const resolved = path.resolve(filePath);
 		logger.info(`Moving to Trash: ${resolved}`);
-		const appleScriptPath = resolved.replace(/"/g, '\\"');
-		const script = `tell application "Finder" to move POSIX file "${appleScriptPath}" to trash`;
-		await runAppleScript(script);
-		return `Moved "${filePath}" to Trash successfully.`;
+		try {
+			const appleScriptPath = resolved.replace(/"/g, '\\"');
+			const script = `tell application "Finder" to move POSIX file "${appleScriptPath}" to trash`;
+			await runAppleScript(script);
+			return `Moved "${filePath}" to Trash successfully.`;
+		} catch (err) {
+			if (err.message.includes('-8013') || err.message.toLowerCase().includes('needs to be downloaded')) {
+				logger.info(`Finder failed to trash iCloud file: ${resolved}. Revealing in Finder.`);
+				const { exec } = await import('child_process');
+				const { promisify } = await import('util');
+				const execAsync = promisify(exec);
+				await execAsync(`open -R "${resolved.replace(/"/g, '\\"')}"`);
+				throw new Error(`The item "${filePath}" is an iCloud placeholder and cannot be moved to Trash programmatically. I have opened Finder and highlighted the item for you so you can delete it manually.`);
+			}
+			throw err;
+		}
 	}, 'Failed to move to trash')
 };
 
