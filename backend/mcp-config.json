@@ -5,7 +5,7 @@
 			"args": [
 				"-y",
 				"@modelcontextprotocol/server-filesystem",
-				"/Users/krishnakanth"
+				"/Users/srivenkataaryapandrangi/Desktop/Jarvis/PersonalAssistant"
 			]
 		},
 		"notion": {
@@ -22,17 +22,8 @@
 				"@cocal/google-calendar-mcp"
 			],
 			"env": {
-				"GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json",
-				"GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/google-calendar-token.json"
-			}
-		},
-		"youtube": {
-			"command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/.venv/bin/python",
-			"args": [
-				"/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/youtube_server.py"
-			],
-			"env": {
-				"YOUTUBE_API_KEY": "YOUR_YOUTUBE_API_KEY_HERE"
+				"GOOGLE_OAUTH_CREDENTIALS": "/Users/srivenkataaryapandrangi/Desktop/Jarvis/PersonalAssistant/backend/gcp-oauth.keys.json",
+				"GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/srivenkataaryapandrangi/Desktop/Jarvis/PersonalAssistant/backend/data/google-calendar-token.json"
 			}
 		},
 		"firecrawl": {
@@ -69,14 +60,13 @@
 				"@modelcontextprotocol/server-memory"
 			],
 			"env": {
-				"MEMORY_FILE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/memory.json"
+				"MEMORY_FILE_PATH": "/Users/srivenkataaryapandrangi/Desktop/Jarvis/PersonalAssistant/backend/data/memory.json"
 			}
 		},
-		"video-converter": {
-			"command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/mcp-video-converter/mcp-video-converter/.venv/bin/python",
+		"mac": {
+			"command": "/Users/srivenkataaryapandrangi/Desktop/Jarvis/PersonalAssistant/mcps/mac-mcp/.venv/bin/python",
 			"args": [
-				"-m",
-				"mcp_video_converter.server"
+				"/Users/srivenkataaryapandrangi/Desktop/Jarvis/PersonalAssistant/mcps/mac-mcp/mac_server.py"
 			]
 		}
 	}
