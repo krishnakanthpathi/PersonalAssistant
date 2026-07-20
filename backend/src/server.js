@@ -49,8 +49,12 @@ async function startServer() {
 	// Connect to MongoDB
 	await connectToMongoDB();
 
-	// Initialize MCP Manager & spawn the filesystem server
-	await mcpManager.initialize();
+	// Initialize MCP Manager & spawn connected servers safely
+	try {
+		await mcpManager.initialize();
+	} catch (err) {
+		logger.warn(`MCP Manager initialization warning: ${err.message}`);
+	}
 
 
 
