@@ -2,6 +2,7 @@ import { OKFEngine } from '../../rag/okfEngine.js';
 import { catchErrors } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 import fs from 'fs';
+import path from 'path';
 
 export const getKnowledgeDocumentTool = {
 	definition: {
@@ -28,7 +29,10 @@ export const getKnowledgeDocumentTool = {
 		}
 		
 		const docs = OKFEngine.loadAll();
-		const doc = docs.find(d => d.filename.toLowerCase() === filename.toLowerCase());
+		const doc = docs.find(d => 
+			d.filename.toLowerCase() === filename.toLowerCase() ||
+			path.basename(d.filename).toLowerCase() === filename.toLowerCase()
+		);
 		if (!doc) {
 			throw new Error(`Knowledge document "${filename}" not found in OKF catalog.`);
 		}

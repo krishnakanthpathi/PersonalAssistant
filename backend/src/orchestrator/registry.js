@@ -219,7 +219,8 @@ class ToolRegistry {
 				name: tool.name,
 				description: tool.description,
 				parameters: tool.inputSchema // Map MCP inputSchema to OpenAI/Ollama parameters key
-			}
+			},
+			serverName: tool.serverName // Preserve serverName metadata
 		}));
 
 		// 3. Gather custom dynamic skills from MongoDB
@@ -267,19 +268,72 @@ class ToolRegistry {
 		});
 
 		// Directly match search terms in tool names & descriptions (enables dynamic skill search)
-		const queryTerms = query.toLowerCase().split(/\W+/).filter(t => t.length > 2);
-		allTools.forEach(tool => {
-			const name = (tool.function?.name || tool.name || '').toLowerCase();
-			const desc = (tool.function?.description || tool.description || '').toLowerCase();
-			const matches = queryTerms.some(term => name.includes(term) || desc.includes(term));
-			if (matches) {
-				activeToolNames.add(tool.function?.name || tool.name);
+		const STOP_WORDS = new Set([
+			'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'arent', 'as', 'at',
+			'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by',
+			'cant', 'cannot', 'could', 'couldnt',
+			'did', 'didnt', 'do', 'does', 'doesnt', 'doing', 'dont', 'down', 'during',
+			'each',
+			'few', 'for', 'from', 'further',
+			'get', 'had', 'hadnt', 'has', 'hasnt', 'have', 'havent', 'having', 'he', 'hed', 'hell', 'hes', 'her', 'here', 'heres', 'hers', 'herself', 'him', 'himself', 'his', 'how', 'hows',
+			'i', 'id', 'ill', 'im', 'ive', 'if', 'in', 'into', 'is', 'isnt', 'it', 'its', 'itself',
+			'lets',
+			'me', 'more', 'most', 'mustnt', 'my', 'myself',
+			'no', 'nor', 'not',
+			'of', 'off', 'on', 'once', 'only', 'or', 'other', 'ought', 'our', 'ours', 'ourselves', 'out', 'over', 'own',
+			'same', 'set', 'shant', 'she', 'shed', 'shell', 'shes', 'should', 'shouldnt', 'so', 'some', 'such',
+			'than', 'that', 'thats', 'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there', 'theres', 'these', 'they', 'theyd', 'theyll', 'theyre', 'theyve', 'this', 'those', 'through', 'to', 'too',
+			'under', 'until', 'up', 'very',
+			'was', 'wasnt', 'we', 'wed', 'well', 'were', 'weve', 'werent', 'what', 'whats', 'when', 'whens', 'where', 'wheres', 'which', 'while', 'who', 'whos', 'whom', 'why', 'whys', 'with', 'wont', 'would', 'wouldnt',
+			'you', 'youd', 'youll', 'youre', 'youve', 'your', 'yours', 'yourself', 'yourselves'
+		]);
+
+		const queryTerms = query.toLowerCase().split(/\W+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
+		const searchTerms = [...queryTerms];
+		queryTerms.forEach(term => {
+			if (term.endsWith('s') && term.length > 3) {
+				searchTerms.push(term.slice(0, -1));
 			}
 		});
 
-		let selectedTools = allTools.filter(tool => {
-			const toolName = tool.function?.name || tool.name;
-			return activeToolNames.has(toolName);
+		const matchedToolNames = new Set();
+		if (searchTerms.length > 0) {
+			allTools.forEach(tool => {
+				const name = (tool.function?.name || tool.name || '').toLowerCase();
+				const desc = (tool.function?.description || tool.description || '').toLowerCase();
+				const matches = searchTerms.some(term => name.includes(term) || desc.includes(term));
+				if (matches) {
+					matchedToolNames.add(tool.function?.name || tool.name);
+				}
+			});
+		}
+
+		// Prioritize tools by OKF match order first, then append keyword-matched tools
+		let selectedTools = [];
+		const includedNames = new Set();
+
+		// 1. Add tools matching OKF documents in order of match relevance
+		matchedDocs.forEach(doc => {
+			if (doc.type === 'tool_group' && Array.isArray(doc.frontmatter.tools)) {
+				doc.frontmatter.tools.forEach(name => {
+					if (!includedNames.has(name)) {
+						const tool = allTools.find(t => (t.function?.name || t.name) === name);
+						if (tool) {
+							selectedTools.push(tool);
+							includedNames.add(name);
+						}
+					}
+				});
+			}
+		});
+
+		// 2. Add keyword matched tools
+		allTools.forEach(tool => {
+			const name = tool.function?.name || tool.name;
+			if (matchedToolNames.has(name) && !includedNames.has(name)) {
+				selectedTools.push(tool);
+				includedNames.add(name);
+			}
 		});
 
 		// Fallback to first 12 tools if no specific tool group matched
@@ -333,23 +387,23 @@ class ToolRegistry {
 			},
 			{
 				name: 'notion',
-				match: (t, name) => name.startsWith('notion_') || t.serverName === 'notion',
+				match: (t, name) => name.startsWith('notion_') || name.startsWith('API-') || t.serverName === 'notion',
 				essential: new Set([
-					'notion_search', 'notion_get_page', 'notion_create_page', 'notion_update_page', 'notion_append_block'
+					'API-post-search', 'API-retrieve-a-page', 'API-post-page', 'API-patch-page', 'API-get-block-children', 'API-patch-block-children'
 				])
 			},
 			{
 				name: 'gmail',
 				match: (t, name) => name.startsWith('gmail_') || name.includes('mail') || t.serverName === 'gmail',
 				essential: new Set([
-					'search_threads', 'get_thread', 'send_draft', 'create_draft', 'reply_to_thread'
+					'list_threads', 'get_thread', 'list_messages', 'get_message', 'send_message', 'create_draft', 'send_draft'
 				])
 			},
 			{
 				name: 'calendar',
 				match: (t, name) => name.startsWith('calendar_') || t.serverName === 'google-calendar',
 				essential: new Set([
-					'list_events', 'get_event', 'create_event', 'update_event', 'delete_event'
+					'list-events', 'get-event', 'create-event', 'update-event', 'delete-event', 'list-calendars'
 				])
 			}
 		];
@@ -391,7 +445,13 @@ class ToolRegistry {
 		const mcpTools = await mcpManager.getTools();
 		const mcpTool = mcpTools.find(t => t.name === name);
 		if (mcpTool) {
-			const result = await mcpManager.callTool(mcpTool.serverName, name, args, toolContext);
+			let result = await mcpManager.callTool(mcpTool.serverName, name, args, toolContext);
+
+			// Intercept and clean up Gmail/Calendar payloads to avoid token bloat
+			if (mcpTool.serverName === 'gmail') {
+				result = cleanGmailMcpResult(name, result);
+			}
+
 			// Extract and return text content from standard MCP payload format
 			if (result && result.content && result.content.length > 0) {
 				return result.content.map(c => c.text).join('\n');
@@ -416,6 +476,80 @@ class ToolRegistry {
 
 		throw new Error(`Tool ${name} does not exist.`);
 	}
+}
+
+function cleanGmailMcpResult(toolName, result) {
+	if (!result || !Array.isArray(result.content)) {
+		return result;
+	}
+
+	result.content.forEach(c => {
+		if (c.type === 'text' && typeof c.text === 'string') {
+			try {
+				const data = JSON.parse(c.text);
+				const cleaned = cleanGmailData(data, toolName);
+				c.text = JSON.stringify(cleaned, null, 2);
+			} catch (e) {
+				// Not valid JSON or parsing failed, leave as is
+			}
+		}
+	});
+
+	return result;
+}
+
+function cleanGmailData(data, toolName) {
+	if (Array.isArray(data)) {
+		return data.map(item => cleanGmailData(item, toolName));
+	}
+	if (typeof data !== 'object' || data === null) {
+		return data;
+	}
+
+	const cleaned = { ...data };
+
+	// Clean headers if present
+	if (cleaned.payload && Array.isArray(cleaned.payload.headers)) {
+		const ALLOWED_HEADERS = new Set(['from', 'to', 'subject', 'date', 'cc', 'bcc', 'reply-to']);
+		cleaned.payload.headers = cleaned.payload.headers.filter(h =>
+			h && h.name && ALLOWED_HEADERS.has(h.name.toLowerCase())
+		);
+	}
+
+	// Recursively clean parts if present
+	if (cleaned.payload && Array.isArray(cleaned.payload.parts)) {
+		cleaned.payload.parts = cleanParts(cleaned.payload.parts);
+	}
+
+	if (Array.isArray(cleaned.parts)) {
+		cleaned.parts = cleanParts(cleaned.parts);
+	}
+
+	// If it's a thread, it might have a messages array
+	if (Array.isArray(cleaned.messages)) {
+		cleaned.messages = cleaned.messages.map(msg => cleanGmailData(msg, toolName));
+	}
+
+	// Remove raw fields
+	delete cleaned.raw;
+
+	return cleaned;
+}
+
+function cleanParts(parts) {
+	return parts.map(part => {
+		const cleanedPart = { ...part };
+		if (cleanedPart.headers && Array.isArray(cleanedPart.headers)) {
+			const ALLOWED_HEADERS = new Set(['from', 'to', 'subject', 'date', 'cc', 'bcc', 'reply-to', 'content-type']);
+			cleanedPart.headers = cleanedPart.headers.filter(h =>
+				h && h.name && ALLOWED_HEADERS.has(h.name.toLowerCase())
+			);
+		}
+		if (Array.isArray(cleanedPart.parts)) {
+			cleanedPart.parts = cleanParts(cleanedPart.parts);
+		}
+		return cleanedPart;
+	});
 }
 
 export const registry = new ToolRegistry();

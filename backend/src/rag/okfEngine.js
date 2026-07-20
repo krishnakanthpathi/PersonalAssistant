@@ -14,13 +14,13 @@ export function parseMarkdownOKF(fileContent) {
 	const yamlStr = match[1];
 	const content = match[2];
 	const frontmatter = {};
-	
+
 	yamlStr.split('\n').forEach(line => {
 		const colonIdx = line.indexOf(':');
 		if (colonIdx > -1) {
 			const key = line.slice(0, colonIdx).trim();
 			let val = line.slice(colonIdx + 1).trim();
-			
+
 			// Strip single/double quotes
 			if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
 				val = val.slice(1, -1);
@@ -65,13 +65,13 @@ class OKFEngineClass {
 
 			logger.info(`Initializing OKF Knowledge Engine from ${CATALOG_DIR}...`);
 			const mdFilepaths = await getMarkdownFilesRecursively(CATALOG_DIR);
-			
+
 			this.documents = [];
 			for (const filepath of mdFilepaths) {
 				const file = path.relative(CATALOG_DIR, filepath);
 				const contentStr = await fs.promises.readFile(filepath, 'utf8');
 				const parsed = parseMarkdownOKF(contentStr);
-				
+
 				this.documents.push({
 					filename: file,
 					filepath,
@@ -110,11 +110,18 @@ class OKFEngineClass {
 			return this.documents;
 		}
 
+		const searchTerms = [...terms];
+		terms.forEach(term => {
+			if (term.endsWith('s') && term.length > 3) {
+				searchTerms.push(term.slice(0, -1));
+			}
+		});
+
 		const scoredDocs = this.documents.map(doc => {
 			let score = 0;
 			const searchArea = `${doc.title} ${doc.type} ${doc.tags.join(' ')} ${doc.content}`.toLowerCase();
-			
-			terms.forEach(term => {
+
+			searchTerms.forEach(term => {
 				if (searchArea.includes(term)) {
 					score += 1;
 					// Extra weight for metadata hits
@@ -139,17 +146,23 @@ class OKFEngineClass {
 		const matches = scoredDocs
 			.filter(item => item.score >= threshold)
 			.map(item => item.doc);
-		
+
 		return matches;
 	}
 
 	async updateDocument(filename, contentBody, newFrontmatter = {}) {
-		const filepath = path.join(CATALOG_DIR, filename);
+		// Find if the document already exists in the catalog (matching path or basename)
+		const existingDoc = this.documents.find(d =>
+			d.filename.toLowerCase() === filename.toLowerCase() ||
+			path.basename(d.filename).toLowerCase() === filename.toLowerCase()
+		);
+		const relativePath = existingDoc ? existingDoc.filename : filename;
+		const filepath = path.join(CATALOG_DIR, relativePath);
 		const parentDir = path.dirname(filepath);
 		if (!fs.existsSync(parentDir)) {
 			fs.mkdirSync(parentDir, { recursive: true });
 		}
-		
+
 		// Load existing to preserve frontmatter or check existence
 		let existingFrontmatter = {};
 		if (fs.existsSync(filepath)) {
@@ -177,10 +190,10 @@ class OKFEngineClass {
 
 		const fullContent = yamlStr + contentBody.trim() + '\n';
 		await fs.promises.writeFile(filepath, fullContent, 'utf8');
-		
+
 		// Reload catalog to refresh engine cache
 		await this.initialize();
-		logger.info(`OKF Engine document updated and reloaded: ${filename}`);
+		logger.info(`OKF Engine document updated and reloaded: ${relativePath}`);
 	}
 }
 

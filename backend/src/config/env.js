@@ -51,6 +51,7 @@ export const env = {
 	// tools
 	MAX_RELEVANT_TOOLS: parseInt(process.env.MAX_RELEVANT_TOOLS || '20', 10),
 	TOOL_SIMILARITY_THRESHOLD: parseFloat(process.env.TOOL_SIMILARITY_THRESHOLD || '0.25'),
+	MAX_TOOL_RESULT_LENGTH: parseInt(process.env.MAX_TOOL_RESULT_LENGTH || '35000', 10),
 
 	// personal rag db
 	RAG_PERSONAL_DB_LIMIT: parseInt(process.env.RAG_PERSONAL_DB_LIMIT || '8', 10),

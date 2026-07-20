@@ -23,7 +23,7 @@ export class Agent {
 	 * @param {Array} history 
 	 * @param {Function} onStatusUpdate 
 	 */
-	run = catchErrors(async (prompt, history = [], onStatusUpdate = null, shouldStop = null, images = []) => {
+	run = catchErrors(async (prompt, history = [], onStatusUpdate = null, shouldStop = null, images = [], onMetadataRetrieved = null) => {
 		const requestId = metricsService.startRequest(prompt);
 		const logs = [];
 		const triggerStatusUpdate = (status) => {
@@ -52,6 +52,16 @@ export class Agent {
 			const tools = await registry.getRelevantTools(combinedRAGQuery);
 			const retrievalDuration = Date.now() - retrievalStart;
 			metricsService.recordRetrievalTime(requestId, retrievalDuration);
+
+			if (onMetadataRetrieved) {
+				onMetadataRetrieved({
+					ragFacts: ragFacts || [],
+					relevantTools: tools ? tools.map(t => ({
+						name: t.name || t.function?.name,
+						description: t.description || t.function?.description
+					})) : []
+				});
+			}
 
 			// Record Given Context (System + History + Query + Available Tools)
 			const givenContextText = `[System Prompt]\n${messages[0].content}\n\n[Chat History]\n${JSON.stringify(cleanedHistory, null, 2)}\n\n[Prompt]\n${prompt}\n\n[Relevant Tools from RAG]\n${tools.map(t => `- ${t.function?.name || t.name}: ${t.function?.description || t.description}`).join('\n')}`;

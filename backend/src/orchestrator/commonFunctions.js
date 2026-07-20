@@ -757,7 +757,7 @@ export async function executeToolWithLogging(toolName, toolArgs, toolContext, re
 		const toolLatency = Date.now() - toolCallStart;
 
 		const resultString = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
-		const MAX_RESULT_LENGTH = 100000;
+		const MAX_RESULT_LENGTH = env.MAX_TOOL_RESULT_LENGTH || 35000;
 		let finalResult = resultString;
 		if (resultString.length > MAX_RESULT_LENGTH) {
 			logger.warn(`Tool "${toolName}" result length (${resultString.length}) exceeds safety limit of ${MAX_RESULT_LENGTH}. Truncating.`);
