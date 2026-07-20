@@ -23,7 +23,9 @@ import {
   Mic,
   MicOff,
   Menu,
-  Database
+  Database,
+  PlayCircle,
+  X
 } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -390,11 +392,69 @@ function MainApp() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mermaidRenderTrigger, setMermaidRenderTrigger] = useState(0);
 
+  // Quick Action Predefined Prompts State
+  const [showQuickActionsPopover, setShowQuickActionsPopover] = useState(false);
+  const [quickActionForms, setQuickActionForms] = useState([]);
+  const [quickActionInputs, setQuickActionInputs] = useState({});
+
+  const fetchQuickActionForms = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/prebuilt-forms');
+      const data = await res.json();
+      if (data.success) {
+        setQuickActionForms(data.forms || []);
+        const initialValues = {};
+        (data.forms || []).forEach(form => {
+          initialValues[form._id] = {};
+          (form.inputs || []).forEach(input => {
+            initialValues[form._id][input.name] = input.defaultValue || '';
+          });
+        });
+        setQuickActionInputs(initialValues);
+      }
+    } catch (e) {
+      console.error('Failed to fetch quick action forms:', e);
+    }
+  };
+
+  const handleQuickActionInputChange = (cardId, name, value) => {
+    setQuickActionInputs(prev => ({
+      ...prev,
+      [cardId]: {
+        ...(prev[cardId] || {}),
+        [name]: value
+      }
+    }));
+  };
+
+  const handleRunQuickAction = (card) => {
+    let interpolatedPrompt = card.prompt;
+    const cardValues = quickActionInputs[card._id] || {};
+    
+    (card.inputs || []).forEach(input => {
+      const val = cardValues[input.name] !== undefined ? cardValues[input.name] : (input.defaultValue || '');
+      interpolatedPrompt = interpolatedPrompt.replace(new RegExp(`{{\\s*${input.name}\\s*}}`, 'g'), val);
+    });
+
+    setShowQuickActionsPopover(false);
+    setPrompt('');
+    setTimeout(() => {
+      handleSend(interpolatedPrompt);
+    }, 100);
+  };
+
   useEffect(() => {
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
+      const execPrompt = location.state.executePrompt;
       // Clear navigation state to prevent restoring it on future navigations
       navigate(location.pathname, { replace: true, state: {} });
+      if (execPrompt) {
+        setPrompt('');
+        setTimeout(() => {
+          handleSend(execPrompt);
+        }, 150);
+      }
     }
   }, [location.state, navigate, location.pathname]);
   const [prompt, setPrompt] = useState('');
@@ -1560,6 +1620,19 @@ function MainApp() {
               <LayoutDashboard size={12} />
               <span className="hidden sm:inline">Telemetry</span>
             </Link>
+
+            {/* Quick Actions Button */}
+            <button
+              onClick={() => {
+                setShowQuickActionsPopover(true);
+                fetchQuickActionForms();
+              }}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1.5 bg-accent-emerald text-white rounded-lg text-xs font-semibold shadow-glow transition-all hover:bg-accent-emerald/80 cursor-pointer"
+              title="Execute predefined prompts & shortcuts"
+            >
+              <PlayCircle size={12} />
+              <span className="hidden sm:inline">Quick Actions</span>
+            </button>
           </div>
         </div>
 
@@ -1778,6 +1851,74 @@ function MainApp() {
           )}
         </div>
       </main>
+
+      {/* Quick Actions Popover Modal */}
+      {showQuickActionsPopover && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-bg-card border border-border-color rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-border-color flex items-center justify-between bg-bg-secondary/20">
+              <div className="flex items-center gap-2">
+                <PlayCircle className="w-5 h-5 text-accent-emerald animate-pulse" />
+                <h3 className="font-bold text-sm text-white uppercase tracking-wider">Quick Actions Shortcuts</h3>
+              </div>
+              <button
+                onClick={() => setShowQuickActionsPopover(false)}
+                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-grow overflow-y-auto p-5 flex flex-col gap-4">
+              {quickActionForms.length === 0 ? (
+                <div className="text-gray-500 text-xs text-center py-8">
+                  Loading available shortcuts...
+                </div>
+              ) : (
+                quickActionForms.map((card) => (
+                  <div
+                    key={card._id}
+                    className="p-4 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl flex flex-col gap-3 transition-all animate-slideUp"
+                  >
+                    <div>
+                      <h4 className="font-bold text-xs text-white">{card.title}</h4>
+                      <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">{card.description}</p>
+                    </div>
+
+                    {card.inputs && card.inputs.length > 0 && (
+                      <div className="flex flex-col gap-2.5 bg-black/35 p-3 rounded-lg border border-white/5">
+                        {card.inputs.map(input => (
+                          <div key={input.name} className="flex flex-col gap-1 text-[10px]">
+                            <label className="text-gray-400 font-medium">{input.label}</label>
+                            <input
+                              type={input.type || 'text'}
+                              value={quickActionInputs[card._id]?.[input.name] ?? ''}
+                              onChange={e => handleQuickActionInputChange(card._id, input.name, e.target.value)}
+                              placeholder={input.defaultValue || ''}
+                              className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-md text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/40 font-mono"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleRunQuickAction(card)}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-lg text-xs transition cursor-pointer"
+                    >
+                      <PlayCircle size={13} />
+                      Run Prompt
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

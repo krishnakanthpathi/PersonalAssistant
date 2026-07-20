@@ -24,7 +24,12 @@ import {
   Play,
   Save,
   Database,
-  Code
+  Code,
+  Plus,
+  PlusCircle,
+  Trash,
+  PlayCircle,
+  Edit3
 } from 'lucide-react';
 import SkillsPanel from './SkillsPanel.jsx';
 
@@ -102,6 +107,147 @@ export default function AdminDashboard() {
   const [useSemanticSearch, setUseSemanticSearch] = useState(true);
   const [semanticResults, setSemanticResults] = useState([]);
   const [isSearchingTools, setIsSearchingTools] = useState(false);
+
+  // Prebuilt action cards state
+  const [prebuiltForms, setPrebuiltForms] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingFormId, setEditingFormId] = useState(null);
+  const [newFormTitle, setNewFormTitle] = useState('');
+  const [newFormDesc, setNewFormDesc] = useState('');
+  const [newFormPrompt, setNewFormPrompt] = useState('');
+  const [newFormInputs, setNewFormInputs] = useState([]);
+  const [formInputsValues, setFormInputsValues] = useState({});
+  const [newInputName, setNewInputName] = useState('');
+  const [newInputLabel, setNewInputLabel] = useState('');
+
+  const fetchPrebuiltForms = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/prebuilt-forms');
+      const data = await res.json();
+      if (data.success) {
+        setPrebuiltForms(data.forms || []);
+        const initialValues = {};
+        (data.forms || []).forEach(form => {
+          initialValues[form._id] = {};
+          (form.inputs || []).forEach(input => {
+            initialValues[form._id][input.name] = input.defaultValue || '';
+          });
+        });
+        setFormInputsValues(initialValues);
+      }
+    } catch (e) {
+      console.error('Failed to fetch prebuilt forms:', e);
+    }
+  };
+
+  const handleEditPrebuiltForm = (card) => {
+    setEditingFormId(card._id);
+    setNewFormTitle(card.title);
+    setNewFormDesc(card.description);
+    setNewFormPrompt(card.prompt);
+    setNewFormInputs(card.inputs || []);
+    setShowAddForm(true);
+  };
+
+  const handleCreatePrebuiltForm = async (e) => {
+    e.preventDefault();
+    if (!newFormTitle.trim() || !newFormDesc.trim() || !newFormPrompt.trim()) {
+      alert('Title, Description, and Prompt template are required.');
+      return;
+    }
+    const isEdit = !!editingFormId;
+    const url = isEdit 
+      ? `http://localhost:3000/api/prebuilt-forms/${editingFormId}` 
+      : 'http://localhost:3000/api/prebuilt-forms';
+    const method = isEdit ? 'PUT' : 'POST';
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newFormTitle,
+          description: newFormDesc,
+          prompt: newFormPrompt,
+          inputs: newFormInputs
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowAddForm(false);
+        setEditingFormId(null);
+        setNewFormTitle('');
+        setNewFormDesc('');
+        setNewFormPrompt('');
+        setNewFormInputs([]);
+        fetchPrebuiltForms();
+      } else {
+        alert('Failed to save card: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error saving action card:', error);
+    }
+  };
+
+  const handleDeletePrebuiltForm = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this action card?')) return;
+    try {
+      const res = await fetch(`http://localhost:3000/api/prebuilt-forms/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchPrebuiltForms();
+      } else {
+        alert('Failed to delete card: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error deleting card:', error);
+    }
+  };
+
+  const handleAddInputVariable = () => {
+    if (!newInputName.trim() || !newInputLabel.trim()) {
+      alert('Input variable name and user label are required.');
+      return;
+    }
+    setNewFormInputs(prev => [
+      ...prev,
+      { name: newInputName.trim(), label: newInputLabel.trim(), type: 'text', defaultValue: '' }
+    ]);
+    setNewInputName('');
+    setNewInputLabel('');
+  };
+
+  const handleRemoveInputVariable = (index) => {
+    setNewFormInputs(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleInputChange = (cardId, name, value) => {
+    setFormInputsValues(prev => ({
+      ...prev,
+      [cardId]: {
+        ...(prev[cardId] || {}),
+        [name]: value
+      }
+    }));
+  };
+
+  const handleRunActionCard = (card) => {
+    let interpolatedPrompt = card.prompt;
+    const cardValues = formInputsValues[card._id] || {};
+    
+    (card.inputs || []).forEach(input => {
+      const val = cardValues[input.name] !== undefined ? cardValues[input.name] : (input.defaultValue || '');
+      interpolatedPrompt = interpolatedPrompt.replace(new RegExp(`{{\\s*${input.name}\\s*}}`, 'g'), val);
+    });
+
+    navigate('/', { 
+      state: { 
+        activeTab: 'chat', 
+        executePrompt: interpolatedPrompt 
+      } 
+    });
+  };
 
   // OKF Retrieval Tester state
   const [okfTestQuery, setOkfTestQuery] = useState('');
@@ -414,6 +560,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchMetrics();
     fetchToolsAndConfig();
+    fetchPrebuiltForms();
   }, []);
 
   // Poll metrics every 5 seconds
@@ -561,50 +708,196 @@ export default function AdminDashboard() {
       {/* Main Container */}
       <div className="flex flex-grow h-[calc(100vh-64px)] overflow-hidden">
 
-        {/* Left Sidebar: Recent Request History List */}
+        {/* Left Sidebar: Prebuilt Prompts / Action Cards */}
         <aside className="w-80 flex-shrink-0 border-r border-border-color bg-bg-secondary/20 flex flex-col h-full overflow-hidden">
-          <div className="p-4 border-b border-border-color bg-bg-secondary/10 flex items-center gap-2">
-            <History size={15} className="text-accent-mono" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Recent Requests ({metrics.requests?.length || 0})</h2>
+          <div className="p-4 border-b border-border-color bg-bg-secondary/10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PlayCircle size={15} className="text-accent-emerald" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Action Cards ({prebuiltForms.length})</h2>
+            </div>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-1 px-2 py-1 bg-accent-emerald/10 hover:bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/20 rounded-md text-[10px] font-bold transition cursor-pointer animate-pulse"
+              title="Create a new Prebuilt Action Card"
+            >
+              <Plus size={10} />
+              Add Card
+            </button>
           </div>
 
-          <div className="flex-grow overflow-y-auto p-3 flex flex-col gap-2">
-            {metrics.requests?.length === 0 ? (
+          <div className="flex-grow overflow-y-auto p-3 flex flex-col gap-3">
+            {showAddForm && (
+              <form onSubmit={handleCreatePrebuiltForm} className="p-3 bg-white/5 border border-accent-emerald/20 rounded-xl flex flex-col gap-2.5 animate-fadeIn">
+                <span className="text-[10px] font-bold text-accent-emerald uppercase tracking-wider block">
+                  {editingFormId ? 'Edit Action Card' : 'New Action Card'}
+                </span>
+                
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-500 font-semibold uppercase">Title</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Open SSH Terminal"
+                    value={newFormTitle}
+                    onChange={e => setNewFormTitle(e.target.value)}
+                    className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-500 font-semibold uppercase">Description</label>
+                  <textarea
+                    required
+                    placeholder="Short description of this action"
+                    value={newFormDesc}
+                    onChange={e => setNewFormDesc(e.target.value)}
+                    rows={2}
+                    className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 resize-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-500 font-semibold uppercase">Prompt Template</label>
+                  <textarea
+                    required
+                    placeholder="Prebuilt prompt. Use {{var_name}} for variables."
+                    value={newFormPrompt}
+                    onChange={e => setNewFormPrompt(e.target.value)}
+                    rows={3}
+                    className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white font-mono placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 resize-none"
+                  />
+                </div>
+
+                {/* Variable inputs definition */}
+                <div className="border-t border-white/5 pt-2">
+                  <label className="text-[9px] text-gray-500 font-semibold uppercase block mb-1">Variables Setup</label>
+                  
+                  {newFormInputs.length > 0 && (
+                    <div className="flex flex-col gap-1.5 mb-2">
+                      {newFormInputs.map((input, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-black/20 px-2 py-1 rounded text-[10px] font-mono border border-white/5">
+                          <span className="text-gray-300">{"{{" + input.name + "}}"}</span>
+                          <span className="text-gray-500">({input.label})</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInputVariable(idx)}
+                            className="text-red-400 hover:text-red-300 font-bold ml-1 text-xs cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      placeholder="var name"
+                      value={newInputName}
+                      onChange={e => setNewInputName(e.target.value)}
+                      className="w-1/2 px-2 py-1 bg-black/40 border border-white/5 rounded text-[10px] text-white"
+                    />
+                    <input
+                      type="text"
+                      placeholder="label"
+                      value={newInputLabel}
+                      onChange={e => setNewInputLabel(e.target.value)}
+                      className="w-1/2 px-2 py-1 bg-black/40 border border-white/5 rounded text-[10px] text-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddInputVariable}
+                    className="mt-1.5 w-full py-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold border border-white/5 rounded cursor-pointer text-center"
+                  >
+                    + Add Variable
+                  </button>
+                </div>
+
+                <div className="flex gap-2 border-t border-white/5 pt-2.5 mt-1">
+                  <button
+                    type="submit"
+                    className="flex-grow py-1.5 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-lg text-xs transition cursor-pointer"
+                  >
+                    {editingFormId ? 'Update Card' : 'Save Card'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setEditingFormId(null);
+                      setNewFormInputs([]);
+                    }}
+                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {prebuiltForms.length === 0 ? (
               <div className="text-gray-500 text-xs text-center py-8 border border-dashed border-white/5 rounded-xl">
-                No history recorded yet.
+                No Action Cards found.
               </div>
             ) : (
-              metrics.requests?.map((req) => {
-                const isSelected = selectedRequest?.id === req.id;
-                return (
-                  <button
-                    key={req.id}
-                    onClick={() => setSelectedRequest(req)}
-                    className={`p-3 text-left rounded-xl transition-all duration-200 border text-xs ${isSelected
-                      ? 'bg-accent-blue/10 border-accent-blue/30 text-white font-semibold shadow-glow'
-                      : 'bg-white/5 hover:bg-white/10 border-transparent text-gray-400 hover:text-white'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full ${req.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'}`}>
-                        {req.success ? 'SUCCESS' : 'FAILED'}
-                      </span>
-                      <span className="text-[9px] font-mono text-gray-500">
-                        {req.totalDuration ? `${(req.totalDuration / 1000).toFixed(1)}s` : 'N/A'}
-                      </span>
+              prebuiltForms.map((card) => (
+                <div
+                  key={card._id}
+                  className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2 hover:bg-white/[0.07] transition-all animate-fadeIn"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold text-xs text-white">{card.title}</h3>
+                      <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">{card.description}</p>
                     </div>
-                    <p className="font-medium truncate mb-1.5 text-gray-200">{req.prompt}</p>
-                    <div className="flex items-center justify-between text-[8px] text-gray-500">
-                      <span>{new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                      {req.toolCalls?.length > 0 && (
-                        <span className="font-semibold text-accent-mono bg-accent-mono/5 px-1.5 py-0.5 rounded">
-                          {req.toolCalls.length} tool{req.toolCalls.length > 1 ? 's' : ''}
-                        </span>
+                    <div className="flex gap-1 items-center flex-shrink-0">
+                      <button
+                        onClick={() => handleEditPrebuiltForm(card)}
+                        className="text-gray-500 hover:text-accent-blue p-1 rounded transition cursor-pointer"
+                        title="Edit Card"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                      {!card.isPredefined && (
+                        <button
+                          onClick={() => handleDeletePrebuiltForm(card._id)}
+                          className="text-gray-500 hover:text-red-400 p-1 rounded transition cursor-pointer"
+                          title="Delete Card"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       )}
                     </div>
+                  </div>
+
+                  {card.inputs && card.inputs.length > 0 && (
+                    <div className="flex flex-col gap-2 bg-black/25 p-2 rounded-lg border border-white/5 mt-1">
+                      {card.inputs.map(input => (
+                        <div key={input.name} className="flex flex-col gap-1 text-[10px]">
+                          <label className="text-gray-400 font-medium">{input.label}</label>
+                          <input
+                            type={input.type || 'text'}
+                            value={formInputsValues[card._id]?.[input.name] ?? ''}
+                            onChange={e => handleInputChange(card._id, input.name, e.target.value)}
+                            placeholder={input.defaultValue || ''}
+                            className="px-2 py-1 bg-black/40 border border-white/5 rounded-md text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/40"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => handleRunActionCard(card)}
+                    className="mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-lg text-xs transition cursor-pointer"
+                  >
+                    <PlayCircle size={12} />
+                    Run Action
                   </button>
-                );
-              })
+                </div>
+              ))
             )}
           </div>
         </aside>

@@ -103,30 +103,6 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Status indicator Card */}
-        <div className="bg-bg-card border border-border-color rounded-2xl p-4 mb-6 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between mb-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
-            System status
-            <span className="flex items-center gap-1.5 font-bold normal-case text-gray-200">
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-accent-emerald shadow-[0_0_10px_var(--color-accent-emerald)] animate-pulse' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`}></span>
-              {isConnected ? 'Online' : 'Offline'}
-            </span>
-          </div>
-          <div className="flex flex-col gap-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">LLM Provider:</span>
-              <span className="font-mono text-gray-200 font-semibold uppercase">{config.provider}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Active Model:</span>
-              <span className="font-mono text-gray-200 font-semibold text-[10px] max-w-[150px] truncate" title={config.model}>{config.model}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Port:</span>
-              <span className="font-mono text-gray-200 font-semibold">{config.port}</span>
-            </div>
-          </div>
-        </div>
 
         {/* Background Tasks Card */}
         {mcpTasks && mcpTasks.length > 0 && (

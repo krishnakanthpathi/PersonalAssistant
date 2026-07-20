@@ -24,6 +24,7 @@ import { remindersTool } from '../tools/mac/reminders.js';
 import { rdsQueryTool } from '../tools/rdsQuery.js';
 import { analyzeImageTool } from '../tools/mac/analyzeImage.js';
 import { getKnowledgeDocumentTool, updateKnowledgeDocumentTool } from '../tools/mac/okfTools.js';
+import { createPrebuiltFormTool } from '../tools/prebuiltFormTools.js';
 
 import {
 	listAppsTool,
@@ -134,6 +135,7 @@ class ToolRegistry {
 		this.tools.set(analyzeImageTool.definition.name, analyzeImageTool);
 		this.tools.set(getKnowledgeDocumentTool.definition.name, getKnowledgeDocumentTool);
 		this.tools.set(updateKnowledgeDocumentTool.definition.name, updateKnowledgeDocumentTool);
+		this.tools.set(createPrebuiltFormTool.definition.name, createPrebuiltFormTool);
 
 		this.tools.set(listAppsTool.definition.name, listAppsTool);
 		this.tools.set(listWindowsTool.definition.name, listWindowsTool);
