@@ -1,92 +1,94 @@
 {
-	"mcpServers": {
-		"filesystem": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-filesystem",
-				"/Users/krishnakanth"
-			]
-		},
-		"notion": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@notionhq/notion-mcp-server"
-			]
-		},
-		"google-calendar": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@cocal/google-calendar-mcp"
-			],
-			"env": {
-				"GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json",
-				"GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/google-calendar-token.json"
-			}
-		},
-		"youtube": {
-			"command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/.venv/bin/python",
-			"args": [
-				"/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/youtube_server.py"
-			],
-			"env": {
-				"YOUTUBE_API_KEY": "YOUR_YOUTUBE_API_KEY_HERE"
-			}
-		},
-		"firecrawl": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"firecrawl-mcp"
-			],
-			"env": {
-				"FIRECRAWL_API_KEY": ""
-			}
-		},
-		"gmail": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@shinzolabs/gmail-mcp"
-			],
-			"env": {
-				"PORT": "0"
-			}
-		},
-		"github": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-github"
-			]
-		},
-		"memory": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-memory"
-			],
-			"env": {
-				"MEMORY_FILE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/memory.json"
-			}
-		},
-		"video-converter": {
-			"command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/mcp-video-converter/mcp-video-converter/.venv/bin/python",
-			"args": [
-				"-m",
-				"mcp_video_converter.server"
-			]
-		},
-		"terminal": {
-			"command": "node",
-			"args": [
-				"/Users/krishnakanth/Projects/PersonalAssisstent/mcps/terminal-mcp/index.js"
-			],
-			"env": {
-				"ALLOWED_COMMANDS": "npm,node,git,ls,echo,cat,pwd"
-			}
-		}
-	}
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/krishnakanth"
+      ],
+      "enabled": false
+    },
+    "notion": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ]
+    },
+    "google-calendar": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cocal/google-calendar-mcp"
+      ],
+      "env": {
+        "GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json",
+        "GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/google-calendar-token.json"
+      }
+    },
+    "youtube": {
+      "command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/.venv/bin/python",
+      "args": [
+        "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/youtube_server.py"
+      ],
+      "env": {
+        "YOUTUBE_API_KEY": "YOUR_YOUTUBE_API_KEY_HERE"
+      }
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": ""
+      }
+    },
+    "gmail": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@shinzolabs/gmail-mcp"
+      ],
+      "env": {
+        "PORT": "0"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ]
+    },
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "env": {
+        "MEMORY_FILE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/memory.json"
+      }
+    },
+    "video-converter": {
+      "command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/mcp-video-converter/mcp-video-converter/.venv/bin/python",
+      "args": [
+        "-m",
+        "mcp_video_converter.server"
+      ],
+      "enabled": false
+    },
+    "terminal": {
+      "command": "node",
+      "args": [
+        "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/terminal-mcp/index.js"
+      ],
+      "env": {
+        "ALLOWED_COMMANDS": "npm,node,git,ls,echo,cat,pwd"
+      }
+    }
+  }
 }

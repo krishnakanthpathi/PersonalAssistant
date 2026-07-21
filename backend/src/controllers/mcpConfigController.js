@@ -47,7 +47,8 @@ export const getMcpConfig = catchErrors(async (req, res) => {
 			command: cfg.command || '',
 			args: cfg.args || [],
 			env: cfg.env || {},
-			status: isConnected ? 'connected' : 'disconnected',
+			enabled: cfg.enabled !== false,
+			status: isConnected ? 'connected' : (cfg.enabled === false ? 'disabled' : 'disconnected'),
 			toolsCount
 		});
 	}
@@ -60,7 +61,7 @@ export const getMcpConfig = catchErrors(async (req, res) => {
  * Adds or updates an MCP server configuration, and connects/reconnects it dynamically
  */
 export const saveMcpServer = catchErrors(async (req, res) => {
-	const { name, type, url, command, args, env } = req.body;
+	const { name, type, url, command, args, env, enabled } = req.body;
 
 	if (!name) {
 		return res.status(400).json({ error: 'Server name is required' });
@@ -73,6 +74,8 @@ export const saveMcpServer = catchErrors(async (req, res) => {
 
 	// Build the new config object
 	const serverConfig = {};
+	serverConfig.enabled = enabled !== false;
+
 	if (type === 'sse') {
 		if (!url) {
 			return res.status(400).json({ error: 'SSE URL is required for SSE type' });
@@ -95,12 +98,48 @@ export const saveMcpServer = catchErrors(async (req, res) => {
 	// Hot reload the client in background
 	try {
 		await mcpManager.reconnectServer(name);
-		res.json({ success: true, message: `Server "${name}" saved and connected successfully.` });
+		res.json({ success: true, message: `Server "${name}" saved and status updated successfully.` });
 	} catch (err) {
 		logger.error(`Failed to dynamically connect MCP server "${name}": ${err.message}`);
 		res.status(500).json({ error: `Config saved, but failed to connect: ${err.message}` });
 	}
 }, 'Failed to save MCP server');
+
+/**
+ * POST /api/mcp/config/:name/toggle
+ * Enabes or disables an MCP server
+ */
+export const toggleMcpServer = catchErrors(async (req, res) => {
+	const { name } = req.params;
+	const { enabled } = req.body;
+
+	if (enabled === undefined) {
+		return res.status(400).json({ error: 'enabled state is required' });
+	}
+
+	const config = getMcpConfigData();
+	if (!config.mcpServers || !config.mcpServers[name]) {
+		return res.status(404).json({ error: `Server "${name}" not found in config` });
+	}
+
+	config.mcpServers[name].enabled = !!enabled;
+	saveMcpConfigData(config);
+
+	logger.info(`Toggled MCP server "${name}" to enabled=${enabled}. Updating connection dynamically...`);
+
+	try {
+		if (enabled) {
+			await mcpManager.reconnectServer(name);
+			res.json({ success: true, message: `Server "${name}" enabled and connected successfully.` });
+		} else {
+			await mcpManager.disconnectServer(name);
+			res.json({ success: true, message: `Server "${name}" disabled and disconnected successfully.` });
+		}
+	} catch (err) {
+		logger.error(`Failed to dynamically toggle state for MCP server "${name}": ${err.message}`);
+		res.status(500).json({ error: `Toggled configuration saved, but failed to apply: ${err.message}` });
+	}
+}, 'Failed to toggle MCP server state');
 
 /**
  * DELETE /api/mcp/config/:name

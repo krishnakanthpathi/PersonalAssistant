@@ -82,7 +82,11 @@ export class MCPManager {
 		// Initialize all configured MCP servers dynamically
 		for (const [serverName, serverConfig] of Object.entries(config.mcpServers)) {
 			try {
-				await this.connectServer(serverName, serverConfig);
+				if (serverConfig.enabled !== false) {
+					await this.connectServer(serverName, serverConfig);
+				} else {
+					logger.info(`MCP server "${serverName}" is disabled, skipping boot connection.`);
+				}
 			} catch (err) {
 				logger.warn(`Failed to initialize MCP client "${serverName}" on boot: ${err.message}`);
 			}
@@ -150,8 +154,12 @@ export class MCPManager {
 		if (!config.mcpServers || !config.mcpServers[serverName]) return;
 
 		const serverConfig = config.mcpServers[serverName];
-		await this.connectServer(serverName, serverConfig);
-		logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
+		if (serverConfig.enabled !== false) {
+			await this.connectServer(serverName, serverConfig);
+			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
+		} else {
+			logger.info(`MCP server "${serverName}" is disabled. Skipped connection load.`);
+		}
 	}
 }
 

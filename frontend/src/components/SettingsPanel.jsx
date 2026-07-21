@@ -56,6 +56,7 @@ export default function SettingsPanel({
   const [formCommand, setFormCommand] = useState('');
   const [formArgs, setFormArgs] = useState('');
   const [formEnv, setFormEnv] = useState([{ key: '', value: '' }]);
+  const [formEnabled, setFormEnabled] = useState(true);
 
   // Env State
   const [envContent, setEnvContent] = useState('');
@@ -139,6 +140,36 @@ export default function SettingsPanel({
     }
   };
 
+  const handleToggleServer = async (name, currentEnabled) => {
+    setMcpError('');
+    setMcpSuccess('');
+    const newEnabled = !currentEnabled;
+    
+    // Optimistic UI update
+    setMcpServers(prev => prev.map(server => 
+      server.name === name ? { ...server, enabled: newEnabled, status: newEnabled ? 'connecting' : 'disabled' } : server
+    ));
+    
+    try {
+      const response = await fetch(`http://localhost:3000/api/mcp/config/${name}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newEnabled })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setMcpSuccess(`Server "${name}" successfully ${newEnabled ? 'enabled' : 'disabled'}.`);
+        fetchMcpServers();
+      } else {
+        setMcpError(data.error || 'Failed to toggle server');
+        fetchMcpServers();
+      }
+    } catch (err) {
+      setMcpError('Network error toggling MCP server');
+      fetchMcpServers();
+    }
+  };
+
   const handleOpenAddModal = () => {
     setEditingServer(null);
     setFormName('');
@@ -147,6 +178,7 @@ export default function SettingsPanel({
     setFormCommand('');
     setFormArgs('');
     setFormEnv([{ key: '', value: '' }]);
+    setFormEnabled(true);
     setShowModal(true);
   };
 
@@ -157,6 +189,7 @@ export default function SettingsPanel({
     setFormUrl(server.url || '');
     setFormCommand(server.command || '');
     setFormArgs(server.args ? server.args.join(' ') : '');
+    setFormEnabled(server.enabled !== false);
     
     // Map env object to key-value row array
     const mappedEnv = Object.entries(server.env || {}).map(([key, value]) => ({ key, value }));
@@ -204,7 +237,8 @@ export default function SettingsPanel({
       url: formType === 'sse' ? formUrl.trim() : undefined,
       command: formType === 'stdio' ? formCommand.trim() : undefined,
       args: formType === 'stdio' ? parsedArgs : undefined,
-      env: formType === 'stdio' ? envObj : undefined
+      env: formType === 'stdio' ? envObj : undefined,
+      enabled: formEnabled
     };
 
     try {
@@ -215,7 +249,7 @@ export default function SettingsPanel({
       });
       const data = await response.json();
       if (response.ok) {
-        setMcpSuccess(`Server "${formName}" successfully saved and hot-reloaded.`);
+        setMcpSuccess(`Server "${formName}" successfully saved and status updated.`);
         setShowModal(false);
         fetchMcpServers();
       } else {
@@ -403,13 +437,13 @@ export default function SettingsPanel({
                     <div className="space-y-3 text-xs">
                       <div>
                         <label className="block text-gray-400 mb-1 text-[10px]">API Key</label>
-                        <input type="password" placeholder="sk-..." value={settingsForm.openaiApiKey}
+                        <input type="password" placeholder="sk-..." value={settingsForm.openaiApiKey || ''}
                           onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiApiKey: e.target.value }))}
                           className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                       </div>
                       <div>
                         <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                        <input type="text" placeholder="https://api.openai.com/v1" value={settingsForm.openaiBaseUrl}
+                        <input type="text" placeholder="https://api.openai.com/v1" value={settingsForm.openaiBaseUrl || ''}
                           onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiBaseUrl: e.target.value }))}
                           className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                       </div>
@@ -457,7 +491,7 @@ export default function SettingsPanel({
                             ))}
                           </select>
                         ) : (
-                          <input type="text" placeholder="gpt-4o" value={settingsForm.openaiModel}
+                          <input type="text" placeholder="gpt-4o" value={settingsForm.openaiModel || ''}
                             onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
                             className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                         )}
@@ -474,7 +508,7 @@ export default function SettingsPanel({
                     <div className="space-y-3 text-xs">
                       <div>
                         <label className="block text-gray-400 mb-1 text-[10px]">Ollama URL</label>
-                        <input type="text" placeholder="http://localhost:11434" value={settingsForm.ollamaUrl}
+                        <input type="text" placeholder="http://localhost:11434" value={settingsForm.ollamaUrl || ''}
                           onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaUrl: e.target.value }))}
                           className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                       </div>
@@ -522,7 +556,7 @@ export default function SettingsPanel({
                             ))}
                           </select>
                         ) : (
-                          <input type="text" placeholder="llama3" value={settingsForm.ollamaModel}
+                          <input type="text" placeholder="llama3" value={settingsForm.ollamaModel || ''}
                             onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
                             className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                         )}
@@ -539,13 +573,13 @@ export default function SettingsPanel({
                     <div className="space-y-3 text-xs">
                       <div>
                         <label className="block text-gray-400 mb-1 text-[10px]">API Key</label>
-                        <input type="password" placeholder="xai-..." value={settingsForm.grokApiKey}
+                        <input type="password" placeholder="xai-..." value={settingsForm.grokApiKey || ''}
                           onChange={(e) => setSettingsForm(prev => ({ ...prev, grokApiKey: e.target.value }))}
                           className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                       </div>
                       <div>
                         <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                        <input type="text" placeholder="https://api.x.ai/v1" value={settingsForm.grokBaseUrl}
+                        <input type="text" placeholder="https://api.x.ai/v1" value={settingsForm.grokBaseUrl || ''}
                           onChange={(e) => setSettingsForm(prev => ({ ...prev, grokBaseUrl: e.target.value }))}
                           className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                       </div>
@@ -593,7 +627,7 @@ export default function SettingsPanel({
                             ))}
                           </select>
                         ) : (
-                          <input type="text" placeholder="grok-2" value={settingsForm.grokModel}
+                          <input type="text" placeholder="grok-2" value={settingsForm.grokModel || ''}
                             onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
                             className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
                         )}
@@ -888,9 +922,11 @@ export default function SettingsPanel({
                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold border ${
                           server.status === 'connected'
                             ? 'bg-accent-emerald/20 border-accent-emerald/20 text-accent-emerald'
+                            : server.status === 'disabled'
+                            ? 'bg-red-500/10 border-red-500/20 text-red-400'
                             : 'bg-gray-500/20 border-white/10 text-gray-400'
                         }`}>
-                          {server.status === 'connected' ? 'ONLINE' : 'OFFLINE'}
+                          {server.status === 'connected' ? 'ONLINE' : server.status === 'disabled' ? 'DISABLED' : 'OFFLINE'}
                         </span>
                         <span className="px-2 py-0.5 rounded-full text-[8px] bg-white/5 border border-white/5 text-gray-400 uppercase tracking-wider font-bold">
                           {server.type}
@@ -921,28 +957,51 @@ export default function SettingsPanel({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex justify-end gap-2 border-t border-white/5 pt-3.5 mt-auto">
-                    <button
-                      onClick={() => handleReconnectServer(server.name)}
-                      className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-                      title="Reconnect/Restart Server"
-                    >
-                      <RefreshCw size={13} />
-                    </button>
-                    <button
-                      onClick={() => handleOpenEditModal(server)}
-                      className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-                      title="Edit Configuration"
-                    >
-                      <Edit size={13} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteServer(server.name)}
-                      className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-                      title="Delete Server"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                  <div className="flex items-center justify-between border-t border-white/5 pt-3.5 mt-auto">
+                    {/* Toggle Switch */}
+                    <div className="flex items-center gap-1.5 select-none">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleServer(server.name, server.enabled)}
+                        className={`relative inline-flex h-4.5 w-8.5 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                          server.enabled ? 'bg-accent-blue' : 'bg-white/10'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            server.enabled ? 'translate-x-4.5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                      <span className="text-[9px] text-gray-400 font-semibold tracking-wider uppercase">
+                        {server.enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        disabled={!server.enabled}
+                        onClick={() => handleReconnectServer(server.name)}
+                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+                        title="Reconnect/Restart Server"
+                      >
+                        <RefreshCw size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleOpenEditModal(server)}
+                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
+                        title="Edit Configuration"
+                      >
+                        <Edit size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteServer(server.name)}
+                        className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-white/5 transition-all cursor-pointer"
+                        title="Delete Server"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1131,6 +1190,20 @@ export default function SettingsPanel({
                   </div>
                 </>
               )}
+
+              {/* Enabled Checkbox */}
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="formEnabled"
+                  checked={formEnabled}
+                  onChange={(e) => setFormEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded border-white/10 bg-black/40 outline-none text-accent-blue focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                />
+                <label htmlFor="formEnabled" className="text-xs text-white font-medium cursor-pointer select-none">
+                  Enable this server on startup
+                </label>
+              </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-white/10 mt-6">
                 <button
