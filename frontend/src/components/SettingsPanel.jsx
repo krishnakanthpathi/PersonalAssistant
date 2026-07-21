@@ -39,7 +39,7 @@ export default function SettingsPanel({
   const [showManualInput, setShowManualInput] = useState({ openai: false, grok: false, ollama: false, multimedia: false });
 
   // Tab State
-  const [settingsTab, setSettingsTab] = useState('general'); // 'general' or 'mcp'
+  const [settingsTab, setSettingsTab] = useState('general'); // 'general', 'mcp', 'env'
 
   // MCP State
   const [mcpServers, setMcpServers] = useState([]);
@@ -57,6 +57,13 @@ export default function SettingsPanel({
   const [formArgs, setFormArgs] = useState('');
   const [formEnv, setFormEnv] = useState([{ key: '', value: '' }]);
 
+  // Env State
+  const [envContent, setEnvContent] = useState('');
+  const [isLoadingEnv, setIsLoadingEnv] = useState(false);
+  const [isSavingEnv, setIsSavingEnv] = useState(false);
+  const [envError, setEnvError] = useState('');
+  const [envSuccess, setEnvSuccess] = useState('');
+
   // Sync loaded/fetched models for the current active provider
   useEffect(() => {
     if (availableModels && availableModels.length > 0) {
@@ -66,16 +73,59 @@ export default function SettingsPanel({
     }
   }, [availableModels, settingsForm.provider]);
 
-  // Load MCP servers list on boot
+  // Load MCP servers and Env config on boot
   useEffect(() => {
     fetchMcpServers();
+    fetchEnvConfig();
   }, []);
+
+  const fetchEnvConfig = async () => {
+    setIsLoadingEnv(true);
+    setEnvError('');
+    try {
+      const response = await fetch('http://localhost:3000/api/env');
+      const data = await response.json();
+      if (response.ok) {
+        setEnvContent(data.content || '');
+      } else {
+        setEnvError(data.error || 'Failed to load system environment settings.');
+      }
+    } catch (err) {
+      setEnvError('Network error loading system environment settings.');
+    } finally {
+      setIsLoadingEnv(false);
+    }
+  };
+
+  const handleSaveEnvConfig = async (e) => {
+    e.preventDefault();
+    setIsSavingEnv(true);
+    setEnvError('');
+    setEnvSuccess('');
+    try {
+      const response = await fetch('http://localhost:3000/api/env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: envContent })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setEnvSuccess('System environment (.env) successfully saved and hot-reloaded.');
+      } else {
+        setEnvError(data.error || 'Failed to save environment settings.');
+      }
+    } catch (err) {
+      setEnvError('Network error saving environment settings.');
+    } finally {
+      setIsSavingEnv(false);
+    }
+  };
 
   const fetchMcpServers = async () => {
     setIsLoadingMcp(true);
     setMcpError('');
     try {
-      const response = await fetch('/api/mcp/config');
+      const response = await fetch('http://localhost:3000/api/mcp/config');
       const data = await response.json();
       if (response.ok) {
         setMcpServers(data.servers || []);
@@ -158,7 +208,7 @@ export default function SettingsPanel({
     };
 
     try {
-      const response = await fetch('/api/mcp/config', {
+      const response = await fetch('http://localhost:3000/api/mcp/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -181,7 +231,7 @@ export default function SettingsPanel({
     setMcpError('');
     setMcpSuccess('');
     try {
-      const response = await fetch(`/api/mcp/config/${name}`, {
+      const response = await fetch(`http://localhost:3000/api/mcp/config/${name}`, {
         method: 'DELETE'
       });
       const data = await response.json();
@@ -200,7 +250,7 @@ export default function SettingsPanel({
     setMcpError('');
     setMcpSuccess('');
     try {
-      const response = await fetch(`/api/mcp/config/${name}/reconnect`, {
+      const response = await fetch(`http://localhost:3000/api/mcp/config/${name}/reconnect`, {
         method: 'POST'
       });
       const data = await response.json();
@@ -286,6 +336,18 @@ export default function SettingsPanel({
           <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-white/10 text-gray-300 font-bold">
             {mcpServers.length}
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSettingsTab('env');
+            fetchEnvConfig();
+          }}
+          className={`pb-3 text-xs font-bold tracking-wider uppercase border-b-2 transition-all cursor-pointer ${
+            settingsTab === 'env' ? 'border-accent-blue text-white' : 'border-transparent text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          System Environment (.env)
         </button>
       </div>
 
@@ -768,7 +830,7 @@ export default function SettingsPanel({
 
           </div>
         </>
-      ) : (
+      ) : settingsTab === 'mcp' ? (
         /* MCP Config Tab view */
         <div className="space-y-6 flex-grow animate-fadeIn">
           {mcpError && (
@@ -886,6 +948,59 @@ export default function SettingsPanel({
               ))}
             </div>
           )}
+        </div>
+      ) : (
+        /* System Environment (.env) tab */
+        <div className="space-y-6 flex-grow flex flex-col min-h-0 animate-fadeIn">
+          {envError && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center flex-shrink-0">
+              <AlertCircle size={14} className="flex-shrink-0" />
+              <span>{envError}</span>
+            </div>
+          )}
+          {envSuccess && (
+            <div className="p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center flex-shrink-0">
+              <CheckCircle size={14} className="flex-shrink-0" />
+              <span>{envSuccess}</span>
+            </div>
+          )}
+
+          {/* Config editor card */}
+          <form onSubmit={handleSaveEnvConfig} className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm flex flex-col flex-grow min-h-0">
+            <div className="flex justify-between items-center mb-4 flex-shrink-0">
+              <div>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">System Environment Configurations</h3>
+                <p className="text-[10px] text-gray-400 mt-1">Directly edit the backend server environment variables (.env). Changes will automatically hot-reload.</p>
+              </div>
+            </div>
+
+            {isLoadingEnv ? (
+              <div className="flex flex-col items-center justify-center flex-grow py-20 gap-3 text-xs text-gray-400">
+                <Loader2 className="w-6 h-6 animate-spin text-accent-blue" />
+                <span>Reading system configuration files...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col flex-grow min-h-[300px] border border-white/10 rounded-xl overflow-hidden bg-black/40 mb-4">
+                <textarea
+                  value={envContent}
+                  onChange={(e) => setEnvContent(e.target.value)}
+                  className="w-full h-full p-4 bg-transparent text-xs font-mono text-emerald-400 outline-none resize-none overflow-y-auto leading-relaxed"
+                  placeholder="# Enter environment variables in KEY=VALUE format"
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/5 flex-shrink-0">
+              <button
+                type="submit"
+                disabled={isSavingEnv || isLoadingEnv}
+                className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all disabled:opacity-50 shadow-glow cursor-pointer"
+              >
+                <Save size={13} />
+                {isSavingEnv ? 'Saving and Reloading...' : 'Save & Reload Environment'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

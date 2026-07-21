@@ -21,7 +21,7 @@ export class GenericStdioClient {
 				if (typeof value === 'string' && value.startsWith('YOUR_') && process.env[key]) {
 					resolvedEnv[key] = process.env[key];
 				} else {
-					resolvedEnv[key] = process.env[key] || value;
+					resolvedEnv[key] = value;
 				}
 			}
 		}

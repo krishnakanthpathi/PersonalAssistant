@@ -11,6 +11,7 @@ import { searchPersonalDb, testOkfRetrieval } from '../controllers/personalDbCon
 import { getSkills, createSkill, updateSkill, deleteSkill, testSkill, generateSkill } from '../controllers/skillsController.js';
 import { getPrebuiltForms, createPrebuiltForm, deletePrebuiltForm, updatePrebuiltForm, toggleFavoritePrebuiltForm } from '../controllers/prebuiltFormsController.js';
 import { getMcpConfig, saveMcpServer, deleteMcpServer, reconnectMcpServer } from '../controllers/mcpConfigController.js';
+import { getEnvConfig, saveEnvConfig } from '../controllers/envController.js';
 
 const router = Router();
 
@@ -60,6 +61,10 @@ router.get("/api/mcp/config", getMcpConfig);
 router.post("/api/mcp/config", saveMcpServer);
 router.delete("/api/mcp/config/:name", deleteMcpServer);
 router.post("/api/mcp/config/:name/reconnect", reconnectMcpServer);
+
+// System Environment Configuration
+router.get("/api/env", getEnvConfig);
+router.post("/api/env", saveEnvConfig);
 
 // Metrics
 router.get("/api/metrics", getMetrics);

@@ -49,7 +49,7 @@ export const streamLogs = (req, res) => {
 	// 1. Send recent log history
 	const logFilePath = path.resolve('data/logs/combined.log');
 	const lastLines = getLastLines(logFilePath, 150);
-	
+
 	const historyLogs = [];
 	for (const line of lastLines) {
 		try {
