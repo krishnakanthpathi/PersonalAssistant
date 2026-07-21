@@ -72,4 +72,3 @@ startServer().catch(err => {
 	process.exit(1);
 });
 
-// Trigger reload for Memory MCP to read restored memory.json

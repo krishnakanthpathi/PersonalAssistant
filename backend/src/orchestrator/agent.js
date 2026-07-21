@@ -1,7 +1,6 @@
 import { registry } from './registry.js';
 import { catchErrors } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
-import { saySpeechTool } from '../tools/mac/saySpeech.js';
 import { metricsService } from '../utils/metrics.js';
 
 import {
@@ -120,7 +119,7 @@ export class Agent {
 
 			const parsed = parseAgentResponse(message.content || '');
 			if (parsed.speech) {
-				saySpeechTool.execute({ text: parsed.speech }).catch(err => {
+				registry.callTool('say_speech', { text: parsed.speech }).catch(err => {
 					logger.error(`Manual speech execution failed: ${err.message}`);
 				});
 			}

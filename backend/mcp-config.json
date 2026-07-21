@@ -89,6 +89,13 @@
       "env": {
         "ALLOWED_COMMANDS": "npm,node,git,ls,echo,cat,pwd"
       }
+    },
+    "native-assistant": {
+      "command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/native-assistant-mcp/.venv/bin/python",
+      "args": [
+        "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/native-assistant-mcp/server.py"
+      ],
+      "enabled": true
     }
   }
 }
