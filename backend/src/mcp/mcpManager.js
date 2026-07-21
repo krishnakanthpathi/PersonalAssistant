@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 
 import { fileURLToPath } from 'url';
-import { FilesystemClient } from './clients/filesystem.js';
 import { logger } from '../utils/logger.js';
 import { catchErrors } from '../utils/errors.js';
 
@@ -13,6 +12,42 @@ export class MCPManager {
 	constructor() {
 		this.servers = new Map();
 	}
+
+	connectServer = catchErrors(async (serverName, serverConfig) => {
+		// Try custom client file first
+		const clientPath = path.join(__dirname, `clients/${serverName}.js`);
+		if (fs.existsSync(clientPath)) {
+			const className = serverName
+				.split('-')
+				.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+				.join('') + 'Client';
+			
+			logger.info(`Loading custom client for "${serverName}" (${className})...`);
+			const module = await import(`./clients/${serverName}.js`);
+			const ClientClass = module[className];
+			if (ClientClass) {
+				const client = new ClientClass(serverConfig);
+				await client.connect();
+				this.servers.set(serverName, client);
+				return;
+			}
+		}
+
+		// Fallback to generic clients
+		if (serverConfig.url) {
+			const { GenericSSEClient } = await import('./clients/generic.js');
+			const client = new GenericSSEClient(serverName, serverConfig);
+			await client.connect();
+			this.servers.set(serverName, client);
+		} else if (serverConfig.command) {
+			const { GenericStdioClient } = await import('./clients/generic.js');
+			const client = new GenericStdioClient(serverName, serverConfig);
+			await client.connect();
+			this.servers.set(serverName, client);
+		} else {
+			throw new Error(`Unsupported configuration for MCP server: ${serverName}`);
+		}
+	}, 'Failed to connect MCP server');
 
 	initialize = catchErrors(async () => {
 		// Check if mcp config file exists
@@ -44,110 +79,12 @@ export class MCPManager {
 			}
 		}
 
-		// 1. Initialize Filesystem Client if configured
-		if (config.mcpServers.filesystem) {
-			const fsClient = new FilesystemClient(config.mcpServers.filesystem);
-			await fsClient.connect();
-			this.servers.set('filesystem', fsClient);
-		}
-
-		// 2. Initialize Notion Client if configured
-		if (config.mcpServers.notion) {
-			const { NotionClient } = await import('./clients/notion.js');
-			const notionClient = new NotionClient(config.mcpServers.notion);
-			await notionClient.connect();
-			this.servers.set('notion', notionClient);
-		}
-
-		// 3. Initialize Puppeteer Client if configured
-		if (config.mcpServers.puppeteer) {
-			const { PuppeteerClient } = await import('./clients/puppeteer.js');
-			const puppeteerClient = new PuppeteerClient(config.mcpServers.puppeteer);
-			await puppeteerClient.connect();
-			this.servers.set('puppeteer', puppeteerClient);
-		}
-
-		// 4. Initialize Google Calendar Client if configured
-		if (config.mcpServers['google-calendar']) {
-			const { GoogleCalendarClient } = await import('./clients/google-calendar.js');
-			const calendarClient = new GoogleCalendarClient(config.mcpServers['google-calendar']);
-			await calendarClient.connect();
-			this.servers.set('google-calendar', calendarClient);
-		}
-
-		// 5. Initialize YouTube Client if configured
-		if (config.mcpServers.youtube) {
-			const { YoutubeClient } = await import('./clients/youtube.js');
-			const youtubeClient = new YoutubeClient(config.mcpServers.youtube);
-			await youtubeClient.connect();
-			this.servers.set('youtube', youtubeClient);
-		}
-
-		// 6. Initialize Firecrawl Client if configured
-		if (config.mcpServers.firecrawl) {
-			const { FirecrawlClient } = await import('./clients/firecrawl.js');
-			const firecrawlClient = new FirecrawlClient(config.mcpServers.firecrawl);
-			await firecrawlClient.connect();
-			this.servers.set('firecrawl', firecrawlClient);
-		}
-
-		// 7. Initialize Gmail Client if configured
-		if (config.mcpServers.gmail) {
+		// Initialize all configured MCP servers dynamically
+		for (const [serverName, serverConfig] of Object.entries(config.mcpServers)) {
 			try {
-				const { GmailClient } = await import('./clients/gmail.js');
-				const gmailClient = new GmailClient(config.mcpServers.gmail);
-				await gmailClient.connect();
-				this.servers.set('gmail', gmailClient);
+				await this.connectServer(serverName, serverConfig);
 			} catch (err) {
-				logger.warn(`Failed to initialize Gmail MCP client on boot: ${err.message}`);
-			}
-		}
-
-		// 8. Initialize GitHub Client if configured
-		if (config.mcpServers.github) {
-			try {
-				const { GithubClient } = await import('./clients/github.js');
-				const githubClient = new GithubClient(config.mcpServers.github);
-				await githubClient.connect();
-				this.servers.set('github', githubClient);
-			} catch (err) {
-				logger.warn(`Failed to initialize GitHub MCP client on boot: ${err.message}`);
-			}
-		}
-
-		// 9. Initialize Memory Client if configured
-		if (config.mcpServers.memory) {
-			try {
-				const { MemoryClient } = await import('./clients/memory.js');
-				const memoryClient = new MemoryClient(config.mcpServers.memory);
-				await memoryClient.connect();
-				this.servers.set('memory', memoryClient);
-			} catch (err) {
-				logger.warn(`Failed to initialize Memory MCP client on boot: ${err.message}`);
-			}
-		}
-
-		// 10. Initialize Video Converter Client if configured
-		if (config.mcpServers['video-converter']) {
-			try {
-				const { VideoConverterClient } = await import('./clients/video-converter.js');
-				const videoConverterClient = new VideoConverterClient(config.mcpServers['video-converter']);
-				await videoConverterClient.connect();
-				this.servers.set('video-converter', videoConverterClient);
-			} catch (err) {
-				logger.warn(`Failed to initialize Video Converter MCP client on boot: ${err.message}`);
-			}
-		}
-
-		// 11. Initialize Terminal Client if configured
-		if (config.mcpServers.terminal) {
-			try {
-				const { TerminalClient } = await import('./clients/terminal.js');
-				const terminalClient = new TerminalClient(config.mcpServers.terminal);
-				await terminalClient.connect();
-				this.servers.set('terminal', terminalClient);
-			} catch (err) {
-				logger.warn(`Failed to initialize Terminal MCP client on boot: ${err.message}`);
+				logger.warn(`Failed to initialize MCP client "${serverName}" on boot: ${err.message}`);
 			}
 		}
 	}, 'Failed to initialize MCP Manager');
@@ -213,44 +150,8 @@ export class MCPManager {
 		if (!config.mcpServers || !config.mcpServers[serverName]) return;
 
 		const serverConfig = config.mcpServers[serverName];
-
-		if (serverName === 'google-calendar') {
-			const { GoogleCalendarClient } = await import('./clients/google-calendar.js');
-			const calendarClient = new GoogleCalendarClient(serverConfig);
-			await calendarClient.connect();
-			this.servers.set(serverName, calendarClient);
-			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
-		} else if (serverName === 'gmail') {
-			const { GmailClient } = await import('./clients/gmail.js');
-			const gmailClient = new GmailClient(serverConfig);
-			await gmailClient.connect();
-			this.servers.set(serverName, gmailClient);
-			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
-		} else if (serverName === 'github') {
-			const { GithubClient } = await import('./clients/github.js');
-			const githubClient = new GithubClient(serverConfig);
-			await githubClient.connect();
-			this.servers.set(serverName, githubClient);
-			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
-		} else if (serverName === 'memory') {
-			const { MemoryClient } = await import('./clients/memory.js');
-			const memoryClient = new MemoryClient(serverConfig);
-			await memoryClient.connect();
-			this.servers.set(serverName, memoryClient);
-			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
-		} else if (serverName === 'video-converter') {
-			const { VideoConverterClient } = await import('./clients/video-converter.js');
-			const videoConverterClient = new VideoConverterClient(serverConfig);
-			await videoConverterClient.connect();
-			this.servers.set(serverName, videoConverterClient);
-			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
-		} else if (serverName === 'terminal') {
-			const { TerminalClient } = await import('./clients/terminal.js');
-			const terminalClient = new TerminalClient(serverConfig);
-			await terminalClient.connect();
-			this.servers.set(serverName, terminalClient);
-			logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
-		}
+		await this.connectServer(serverName, serverConfig);
+		logger.info(`Successfully reconnected and loaded MCP server: ${serverName}`);
 	}
 }
 

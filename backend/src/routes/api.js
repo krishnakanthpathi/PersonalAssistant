@@ -10,6 +10,7 @@ import { streamLogs } from '../controllers/logsController.js';
 import { searchPersonalDb, testOkfRetrieval } from '../controllers/personalDbController.js';
 import { getSkills, createSkill, updateSkill, deleteSkill, testSkill, generateSkill } from '../controllers/skillsController.js';
 import { getPrebuiltForms, createPrebuiltForm, deletePrebuiltForm, updatePrebuiltForm, toggleFavoritePrebuiltForm } from '../controllers/prebuiltFormsController.js';
+import { getMcpConfig, saveMcpServer, deleteMcpServer, reconnectMcpServer } from '../controllers/mcpConfigController.js';
 
 const router = Router();
 
@@ -53,6 +54,12 @@ router.post("/api/auth/google/disconnect", disconnectGoogle);
 // MCP background tasks status
 router.post("/api/mcp/progress", updateMcpProgress);
 router.get("/api/mcp/status", getMcpStatus);
+
+// MCP configuration management
+router.get("/api/mcp/config", getMcpConfig);
+router.post("/api/mcp/config", saveMcpServer);
+router.delete("/api/mcp/config/:name", deleteMcpServer);
+router.post("/api/mcp/config/:name/reconnect", reconnectMcpServer);
 
 // Metrics
 router.get("/api/metrics", getMetrics);
