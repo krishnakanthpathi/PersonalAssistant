@@ -35,7 +35,7 @@ function categorizeTool(toolName, description = '') {
 	if (name.includes('gmail') || name.includes('mail') || name.includes('inbox') || name.includes('message') || name.includes('thread') || name.includes('draft')) {
 		return 'gmail';
 	}
-	if (name.includes('youtube') || name.includes('video_converter') || name.includes('videoconverter')) {
+	if (name.includes('youtube') || name.includes('video_converter') || name.includes('videoconverter') || name.includes('track')) {
 		return 'media';
 	}
 	if (name.includes('window') || name.includes('space') || name.includes('list_apps') || name.includes('focus_app')) {

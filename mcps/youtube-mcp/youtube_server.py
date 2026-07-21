@@ -300,5 +300,84 @@ async def download_youtube_video(video_url_or_title: str, quality: str = "best")
     except Exception as e:
         return f"Failed to download video: {str(e)}"
 
+@mcp.tool()
+async def play_youtube_audio(video_url_or_title: str) -> str:
+    """
+    Play the audio of a YouTube video or search query in the background using mpv.
+
+    Args:
+        video_url_or_title: YouTube video URL, video ID, or search query.
+
+    Returns:
+        A message indicating whether the playback started successfully.
+    """
+    # Extract video ID / URL
+    video_id = extract_video_id(video_url_or_title)
+    url = video_url_or_title
+    
+    # If it is not a direct URL/ID, search for it using YouTube Search API if key is set,
+    # or let yt-dlp search for it directly using "ytsearch:" prefix
+    if not video_id and not url.startswith('http'):
+        if YOUTUBE_API_KEY:
+            search_results = search_youtube_videos(video_url_or_title, 1)
+            if search_results and "error" not in search_results[0]:
+                url = search_results[0]['video_url']
+                title = search_results[0]['title']
+            else:
+                url = f"ytsearch1:{video_url_or_title}"
+                title = video_url_or_title
+        else:
+            url = f"ytsearch1:{video_url_or_title}"
+            title = video_url_or_title
+    else:
+        title = "YouTube Video"
+
+    # Stop any existing mpv instances first to prevent overlapping audio
+    try:
+        if os.name == 'nt':
+            os.system("taskkill /f /im mpv.exe >nul 2>&1")
+        else:
+            os.system("pkill -f mpv >/dev/null 2>&1")
+    except:
+        pass
+
+    # Launch mpv in background to stream audio (no-video)
+    ytdlp_path = "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/.venv/bin/yt-dlp"
+    
+    cmd = [
+        "mpv",
+        "--no-video",
+        f"--script-opts=ytdl_hook-ytdl_path={ytdlp_path}",
+        url
+    ]
+    
+    try:
+        # Spawn headless subprocess
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL
+        )
+        return f"Playing audio for '{title}' in the background. Enjoy your music!"
+    except Exception as e:
+        return f"Failed to start playback. Make sure 'mpv' is installed via Homebrew. Error: {str(e)}"
+
+@mcp.tool()
+def stop_youtube_audio() -> str:
+    """
+    Stop the currently playing background audio.
+
+    Returns:
+        A message confirming playback was stopped.
+    """
+    try:
+        if os.name == 'nt':
+            os.system("taskkill /f /im mpv.exe >nul 2>&1")
+        else:
+            os.system("pkill -f mpv >/dev/null 2>&1")
+        return "Playback stopped."
+    except Exception as e:
+        return f"Failed to stop playback: {str(e)}"
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
