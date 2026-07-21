@@ -53,14 +53,34 @@ export async function loadOKFContext(query) {
 			return { contextBlock: '', okfDocs: [] };
 		}
 
+		// Get all currently active tool names to prune inactive ones from context docs
+		const activeTools = await registry.getOllamaTools();
+		const activeNames = new Set(activeTools.map(t => t.function?.name || t.name));
+
 		let contextBlock = '\n\n## User Long-Term Memory (Open Knowledge Format)\n';
 		contextBlock += 'The following structured knowledge files about the user (Krishnakanth), preferences, routines, and environment are loaded:\n\n';
 
 		matchedDocs.forEach(doc => {
+			let content = doc.content;
+
+			if (doc.type === 'tool_group') {
+				const lines = content.split('\n');
+				const filteredLines = lines.filter(line => {
+					// Regex to capture tool name from bullets, e.g. "- **`tool_name`**:" or "- `tool_name`:"
+					const match = line.match(/(?:-\s+\*\*`?|^\*\s+\*\*`?|-\s+`)([a-zA-Z0-9_\-]+)(?:`?\*\*|`):/);
+					if (match) {
+						const toolName = match[1];
+						return activeNames.has(toolName);
+					}
+					return true;
+				});
+				content = filteredLines.join('\n');
+			}
+
 			contextBlock += `### Document: ${doc.filename} (Type: ${doc.type})\n`;
 			contextBlock += `**Title**: ${doc.title}\n`;
 			contextBlock += `**Tags**: ${doc.tags.join(', ')}\n\n`;
-			contextBlock += `${doc.content}\n\n`;
+			contextBlock += `${content}\n\n`;
 			contextBlock += `---\n\n`;
 		});
 
