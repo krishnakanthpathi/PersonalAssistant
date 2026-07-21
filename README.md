@@ -170,4 +170,4 @@ Open your browser and navigate to `http://localhost:5173`.
 * [/frontend](file:///Users/krishnakanth/Projects/PersonalAssisstent/frontend): React (Vite) telemetry dashboard, chat client, settings panel, and system prompt manager.
 * [/backend](file:///Users/krishnakanth/Projects/PersonalAssisstent/backend): Node.js Express server acting as the agentic orchestrator, RAG query vector engine, and system automation dispatcher.
 * [/mcps](file:///Users/krishnakanth/Projects/PersonalAssisstent/mcps): Custom Python/Node MCP servers (YouTube, Video Converter).
-* [/orb](file:///Users/krishnakanth/Projects/PersonalAssisstent/orb): React + Vite auxiliary user interface environment.
+
