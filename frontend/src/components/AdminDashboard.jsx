@@ -725,207 +725,6 @@ export default function AdminDashboard() {
       {/* Main Container */}
       <div className="flex flex-grow h-[calc(100vh-64px)] overflow-hidden">
 
-        {/* Left Sidebar: Prebuilt Prompts / Action Cards */}
-        <aside className="w-80 flex-shrink-0 border-r border-border-color bg-bg-secondary/20 flex flex-col h-full overflow-hidden">
-          <div className="p-4 border-b border-border-color bg-bg-secondary/10 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PlayCircle size={15} className="text-accent-emerald" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Action Cards ({prebuiltForms.length})</h2>
-            </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-1 px-2 py-1 bg-accent-emerald/10 hover:bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/20 rounded-md text-[10px] font-bold transition cursor-pointer animate-pulse"
-              title="Create a new Prebuilt Action Card"
-            >
-              <Plus size={10} />
-              Add Card
-            </button>
-          </div>
-
-          <div className="flex-grow overflow-y-auto p-3 flex flex-col gap-3">
-            {showAddForm && (
-              <form onSubmit={handleCreatePrebuiltForm} className="p-3 bg-white/5 border border-accent-emerald/20 rounded-xl flex flex-col gap-2.5 animate-fadeIn">
-                <span className="text-[10px] font-bold text-accent-emerald uppercase tracking-wider block">
-                  {editingFormId ? 'Edit Action Card' : 'New Action Card'}
-                </span>
-                
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] text-gray-500 font-semibold uppercase">Title</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Open SSH Terminal"
-                    value={newFormTitle}
-                    onChange={e => setNewFormTitle(e.target.value)}
-                    className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] text-gray-500 font-semibold uppercase">Description</label>
-                  <textarea
-                    required
-                    placeholder="Short description of this action"
-                    value={newFormDesc}
-                    onChange={e => setNewFormDesc(e.target.value)}
-                    rows={2}
-                    className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 resize-none"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] text-gray-500 font-semibold uppercase">Prompt Template</label>
-                  <textarea
-                    required
-                    placeholder="Prebuilt prompt. Use {{var_name}} for variables."
-                    value={newFormPrompt}
-                    onChange={e => setNewFormPrompt(e.target.value)}
-                    rows={3}
-                    className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white font-mono placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 resize-none"
-                  />
-                </div>
-
-                {/* Variable inputs definition */}
-                <div className="border-t border-white/5 pt-2">
-                  <label className="text-[9px] text-gray-500 font-semibold uppercase block mb-1">Variables Setup</label>
-                  
-                  {newFormInputs.length > 0 && (
-                    <div className="flex flex-col gap-1.5 mb-2">
-                      {newFormInputs.map((input, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-black/20 px-2 py-1 rounded text-[10px] font-mono border border-white/5">
-                          <span className="text-gray-300">{"{{" + input.name + "}}"}</span>
-                          <span className="text-gray-500">({input.label})</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveInputVariable(idx)}
-                            className="text-red-400 hover:text-red-300 font-bold ml-1 text-xs cursor-pointer"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      placeholder="var name"
-                      value={newInputName}
-                      onChange={e => setNewInputName(e.target.value)}
-                      className="w-1/2 px-2 py-1 bg-black/40 border border-white/5 rounded text-[10px] text-white"
-                    />
-                    <input
-                      type="text"
-                      placeholder="label"
-                      value={newInputLabel}
-                      onChange={e => setNewInputLabel(e.target.value)}
-                      className="w-1/2 px-2 py-1 bg-black/40 border border-white/5 rounded text-[10px] text-white"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddInputVariable}
-                    className="mt-1.5 w-full py-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold border border-white/5 rounded cursor-pointer text-center"
-                  >
-                    + Add Variable
-                  </button>
-                </div>
-
-                <div className="flex gap-2 border-t border-white/5 pt-2.5 mt-1">
-                  <button
-                    type="submit"
-                    className="flex-grow py-1.5 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-lg text-xs transition cursor-pointer"
-                  >
-                    {editingFormId ? 'Update Card' : 'Save Card'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddForm(false);
-                      setEditingFormId(null);
-                      setNewFormInputs([]);
-                    }}
-                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {prebuiltForms.length === 0 ? (
-              <div className="text-gray-500 text-xs text-center py-8 border border-dashed border-white/5 rounded-xl">
-                No Action Cards found.
-              </div>
-            ) : (
-              prebuiltForms.map((card) => (
-                <div
-                  key={card._id}
-                  className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2 hover:bg-white/[0.07] transition-all animate-fadeIn"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold text-xs text-white">{card.title}</h3>
-                      <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">{card.description}</p>
-                    </div>
-                    <div className="flex gap-1 items-center flex-shrink-0">
-                      <button
-                        onClick={() => handleToggleFavorite(card._id)}
-                        className={`p-1 rounded transition cursor-pointer ${card.isFavorite ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-300'}`}
-                        title={card.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
-                      >
-                        <Star size={12} fill={card.isFavorite ? 'currentColor' : 'none'} />
-                      </button>
-                      <button
-                        onClick={() => handleEditPrebuiltForm(card)}
-                        className="text-gray-500 hover:text-accent-blue p-1 rounded transition cursor-pointer"
-                        title="Edit Card"
-                      >
-                        <Edit3 size={12} />
-                      </button>
-                      {!card.isPredefined && (
-                        <button
-                          onClick={() => handleDeletePrebuiltForm(card._id)}
-                          className="text-gray-500 hover:text-red-400 p-1 rounded transition cursor-pointer"
-                          title="Delete Card"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {card.inputs && card.inputs.length > 0 && (
-                    <div className="flex flex-col gap-2 bg-black/25 p-2 rounded-lg border border-white/5 mt-1">
-                      {card.inputs.map(input => (
-                        <div key={input.name} className="flex flex-col gap-1 text-[10px]">
-                          <label className="text-gray-400 font-medium">{input.label}</label>
-                          <input
-                            type={input.type || 'text'}
-                            value={formInputsValues[card._id]?.[input.name] ?? ''}
-                            onChange={e => handleInputChange(card._id, input.name, e.target.value)}
-                            placeholder={input.defaultValue || ''}
-                            className="px-2 py-1 bg-black/40 border border-white/5 rounded-md text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/40"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => handleRunActionCard(card)}
-                    className="mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-lg text-xs transition cursor-pointer"
-                  >
-                    <PlayCircle size={12} />
-                    Run Action
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
-
         {/* Main Content Area */}
         <main className="flex-grow flex flex-col h-full overflow-y-auto bg-bg-primary/10 p-6">
           {selectedRequest ? (
@@ -1127,10 +926,227 @@ export default function AdminDashboard() {
                     <Code size={13} />
                     Custom Skills
                   </button>
+                  <button
+                    onClick={() => { setActiveView('quick-actions'); setSelectedRequest(null); }}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                      activeView === 'quick-actions'
+                        ? 'border-accent-blue text-white font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <PlayCircle size={13} />
+                    Quick Actions Cards
+                  </button>
                 </div>
               </div>
 
-              {activeView === 'overview' ? (
+              {activeView === 'quick-actions' ? (
+                <div className="flex flex-col gap-6 w-full">
+                  {/* Action Cards Header */}
+                  <div className="flex items-center justify-between pb-4 border-b border-border-color">
+                    <div>
+                      <h2 className="text-md font-semibold text-white font-sans flex items-center gap-2">
+                        <PlayCircle size={16} className="text-accent-emerald" />
+                        Quick Actions & Action Cards ({prebuiltForms.length})
+                      </h2>
+                      <p className="text-xs text-gray-400">
+                        Create, manage, and run reusable prompt templates with custom input variables.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowAddForm(!showAddForm)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald hover:bg-accent-emerald/90 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-glow"
+                      title="Create a new Prebuilt Action Card"
+                    >
+                      <Plus size={12} />
+                      {showAddForm ? 'Close Form' : 'Add Action Card'}
+                    </button>
+                  </div>
+
+                  {/* Creation / Edit Form */}
+                  {showAddForm && (
+                    <form onSubmit={handleCreatePrebuiltForm} className="p-5 bg-white/5 border border-accent-emerald/30 rounded-2xl flex flex-col gap-4 animate-fadeIn max-w-2xl">
+                      <span className="text-xs font-bold text-accent-emerald uppercase tracking-wider block">
+                        {editingFormId ? 'Edit Action Card' : 'New Action Card'}
+                      </span>
+                      
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-gray-400 font-semibold uppercase">Title</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Open SSH Terminal"
+                          value={newFormTitle}
+                          onChange={e => setNewFormTitle(e.target.value)}
+                          className="px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-gray-400 font-semibold uppercase">Description</label>
+                        <textarea
+                          required
+                          placeholder="Short description of this action"
+                          value={newFormDesc}
+                          onChange={e => setNewFormDesc(e.target.value)}
+                          rows={2}
+                          className="px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 resize-none"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-gray-400 font-semibold uppercase">Prompt Template</label>
+                        <textarea
+                          required
+                          placeholder="Prebuilt prompt. Use {{var_name}} for variables."
+                          value={newFormPrompt}
+                          onChange={e => setNewFormPrompt(e.target.value)}
+                          rows={3}
+                          className="px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white font-mono placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 resize-none"
+                        />
+                      </div>
+
+                      {/* Variable inputs definition */}
+                      <div className="border-t border-white/10 pt-3 flex flex-col gap-2">
+                        <label className="text-[10px] text-gray-400 font-semibold uppercase block">Variables Setup</label>
+                        
+                        {newFormInputs.length > 0 && (
+                          <div className="flex flex-col gap-2 mb-1">
+                            {newFormInputs.map((input, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-black/30 px-3 py-1.5 rounded-lg text-xs font-mono border border-white/10">
+                                <span className="text-gray-200">{"{{" + input.name + "}}"}</span>
+                                <span className="text-gray-400 font-sans">({input.label})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveInputVariable(idx)}
+                                  className="text-red-400 hover:text-red-300 p-1"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Variable key (e.g. host)"
+                            value={newInputName}
+                            onChange={e => setNewInputName(e.target.value)}
+                            className="px-3 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 flex-1 font-mono"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Label (e.g. Host Name)"
+                            value={newInputLabel}
+                            onChange={e => setNewInputLabel(e.target.value)}
+                            className="px-3 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/50 flex-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddInputVariable}
+                            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus size={12} /> Add Var
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 justify-end border-t border-white/10 pt-3 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddForm(false); setEditingFormId(null); setNewFormInputs([]); }}
+                          className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl text-xs font-medium transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-xl text-xs transition cursor-pointer"
+                        >
+                          {editingFormId ? 'Update Card' : 'Save Card'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Cards Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {prebuiltForms.length === 0 ? (
+                      <div className="col-span-full text-center py-12 text-gray-500 text-xs border border-dashed border-white/10 rounded-2xl">
+                        No Action Cards available yet. Click "+ Add Action Card" above to create your first shortcut card.
+                      </div>
+                    ) : (
+                      prebuiltForms.map((card) => (
+                        <div
+                          key={card._id}
+                          className="p-4 bg-white/5 border border-white/10 hover:border-white/20 rounded-2xl flex flex-col justify-between gap-3 transition-all group shadow-sm"
+                        >
+                          <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-start gap-2">
+                              <div>
+                                <h3 className="font-bold text-sm text-white">{card.title}</h3>
+                                <p className="text-xs text-gray-400 mt-1 leading-relaxed">{card.description}</p>
+                              </div>
+                              <div className="flex gap-1 items-center flex-shrink-0">
+                                <button
+                                  onClick={() => handleToggleFavorite(card._id)}
+                                  className={`p-1.5 rounded transition cursor-pointer ${card.isFavorite ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-300'}`}
+                                  title={card.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                                >
+                                  <Star size={14} fill={card.isFavorite ? 'currentColor' : 'none'} />
+                                </button>
+                                <button
+                                  onClick={() => handleEditPrebuiltForm(card)}
+                                  className="text-gray-500 hover:text-accent-blue p-1.5 rounded transition cursor-pointer"
+                                  title="Edit Card"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                {!card.isPredefined && (
+                                  <button
+                                    onClick={() => handleDeletePrebuiltForm(card._id)}
+                                    className="text-gray-500 hover:text-red-400 p-1.5 rounded transition cursor-pointer"
+                                    title="Delete Card"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {card.inputs && card.inputs.length > 0 && (
+                              <div className="flex flex-col gap-2 bg-black/30 p-3 rounded-xl border border-white/5 mt-2">
+                                {card.inputs.map(input => (
+                                  <div key={input.name} className="flex flex-col gap-1 text-xs">
+                                    <label className="text-gray-400 font-medium">{input.label}</label>
+                                    <input
+                                      type={input.type || 'text'}
+                                      value={formInputsValues[card._id]?.[input.name] ?? ''}
+                                      onChange={e => handleInputChange(card._id, input.name, e.target.value)}
+                                      placeholder={input.defaultValue || ''}
+                                      className="px-2.5 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/40 font-mono"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => handleRunActionCard(card)}
+                            className="mt-2 flex items-center justify-center gap-1.5 px-4 py-2 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-sm"
+                          >
+                            <PlayCircle size={14} />
+                            Run Action
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : activeView === 'overview' ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start w-full">
                   {/* Left Column (2/3 width): Aggregate charts and statistics */}
                   <div className="lg:col-span-2 flex flex-col gap-6">

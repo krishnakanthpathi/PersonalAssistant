@@ -1508,6 +1508,10 @@ function MainApp() {
         loadChatSession={loadChatSession}
         handleDeleteChat={handleDeleteChat}
         fetchSystemPrompt={fetchSystemPrompt}
+        onOpenQuickActions={() => {
+          setShowQuickActionsPopover(true);
+          fetchQuickActionForms();
+        }}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
       />
@@ -1872,29 +1876,39 @@ function MainApp() {
         </div>
       </main>
 
-      {/* Quick Actions Popover Modal */}
+      {/* Quick Actions Side Panel Drawer */}
       {showQuickActionsPopover && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-bg-card border border-border-color rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-fadeIn"
+            onClick={() => setShowQuickActionsPopover(false)}
+          />
+
+          {/* Drawer Panel */}
+          <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-bg-secondary border-l border-border-color shadow-2xl flex flex-col h-full transform transition-transform duration-300 ease-in-out animate-slideLeft">
             
-            {/* Modal Header */}
-            <div className="p-5 border-b border-border-color flex items-center justify-between bg-bg-secondary/20">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-border-color flex items-center justify-between bg-bg-secondary/40 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <PlayCircle className="w-5 h-5 text-accent-emerald animate-pulse" />
-                <h3 className="font-bold text-sm text-white uppercase tracking-wider">Quick Actions Shortcuts</h3>
+                <div>
+                  <h3 className="font-bold text-sm text-white uppercase tracking-wider">Quick Actions Panel</h3>
+                  <p className="text-[10px] text-gray-400">Prebuilt shortcuts & prompt templates</p>
+                </div>
               </div>
               <button
                 onClick={() => setShowQuickActionsPopover(false)}
-                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition cursor-pointer"
+                className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="flex-grow overflow-y-auto p-5 flex flex-col gap-4 select-none">
+            {/* Panel Content */}
+            <div className="flex-grow overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 select-none">
               {quickActionForms.length === 0 ? (
-                <div className="text-gray-500 text-xs text-center py-8">
+                <div className="text-gray-500 text-xs text-center py-12 border border-dashed border-white/5 rounded-xl">
                   Loading available shortcuts...
                 </div>
               ) : (() => {
@@ -1939,7 +1953,7 @@ function MainApp() {
 
                     <button
                       onClick={() => handleRunQuickAction(card)}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-lg text-xs transition cursor-pointer"
+                      className="w-full flex items-center justify-center gap-1.5 py-2 bg-accent-emerald hover:bg-accent-emerald/90 text-white font-bold rounded-lg text-xs transition cursor-pointer shadow-sm"
                     >
                       <PlayCircle size={13} />
                       Run Prompt
@@ -2005,7 +2019,7 @@ function MainApp() {
               })()}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

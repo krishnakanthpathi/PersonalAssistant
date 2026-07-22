@@ -8,7 +8,8 @@ import {
   CheckCircle,
   AlertCircle,
   Trash2,
-  X
+  X,
+  PlayCircle
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -24,6 +25,7 @@ export default function Sidebar({
   loadChatSession,
   handleDeleteChat,
   fetchSystemPrompt,
+  onOpenQuickActions,
   // Mobile drawer props
   mobileOpen,
   onMobileClose,
@@ -100,6 +102,16 @@ export default function Sidebar({
           >
             <Settings className="w-4 h-4" />
             Settings
+          </button>
+          <button
+            onClick={() => {
+              if (onOpenQuickActions) onOpenQuickActions();
+              if (onMobileClose) onMobileClose();
+            }}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 border border-transparent transition-all duration-200 cursor-pointer"
+          >
+            <PlayCircle className="w-4 h-4 text-accent-emerald" />
+            Quick Actions Panel
           </button>
         </div>
 
