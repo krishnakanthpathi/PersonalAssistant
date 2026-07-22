@@ -30,12 +30,13 @@ import {
   Trash,
   PlayCircle,
   Edit3,
-  Star
+  Star,
+  MessageSquare
 } from 'lucide-react';
-import SkillsPanel from './SkillsPanel.jsx';
 
 // Helper to get tool icons dynamically
 const getToolIcon = (name) => {
+  if (!name || typeof name !== 'string') return <Wrench className="w-4 h-4 text-gray-400" />;
   const lowercase = name.toLowerCase();
   if (lowercase.includes('volume')) return <Volume2 className="w-4 h-4 text-accent-blue" />;
   if (lowercase.includes('notion') || lowercase.includes('file')) return <FileText className="w-4 h-4 text-accent-mono" />;
@@ -71,6 +72,7 @@ export default function AdminDashboard() {
 
   const [tools, setTools] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedHistoryRequest, setSelectedHistoryRequest] = useState(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
   const [isFetchingTools, setIsFetchingTools] = useState(false);
   const [config, setConfig] = useState({
@@ -916,15 +918,15 @@ export default function AdminDashboard() {
                     Test Center
                   </button>
                   <button
-                    onClick={() => { setActiveView('skills'); setSelectedRequest(null); }}
+                    onClick={() => { setActiveView('chat-history'); setSelectedRequest(null); }}
                     className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
-                      activeView === 'skills'
+                      activeView === 'chat-history'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    <Code size={13} />
-                    Custom Skills
+                    <History size={13} />
+                    Chat History & Metrics
                   </button>
                   <button
                     onClick={() => { setActiveView('quick-actions'); setSelectedRequest(null); }}
@@ -1830,15 +1832,193 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
-              ) : activeView === 'skills' ? (
-                <SkillsPanel 
-                  generatedFromChart={location.state?.generatedFromChart}
-                  chatHistory={location.state?.chatHistory}
-                  generateFromChatOnly={location.state?.generateFromChatOnly}
-                  onClearGeneratedState={() => {
-                    navigate('/admin', { state: { ...location.state, generatedFromChart: null, chatHistory: null, generateFromChatOnly: null }, replace: true });
-                  }}
-                />
+              ) : activeView === 'chat-history' ? (
+                <div className="flex flex-col gap-4 w-full h-[calc(100vh-170px)] overflow-hidden">
+                  {/* Chat History Header */}
+                  <div className="flex items-center justify-between pb-3 border-b border-border-color flex-shrink-0">
+                    <div>
+                      <h2 className="text-md font-semibold text-white font-sans flex items-center gap-2">
+                        <History size={18} className="text-accent-blue" />
+                        Chat History & Tool Execution Inspector
+                      </h2>
+                      <p className="text-xs text-gray-400">
+                        Select any chat query from the history list to inspect its specific LLM latency, context eval duration, tool parameters passed, and output received.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={fetchMetrics}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-xs font-medium transition cursor-pointer"
+                      >
+                        <RefreshCw size={12} className={isLoadingMetrics ? 'animate-spin' : ''} /> Refresh
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Split Master-Detail Layout */}
+                  <div className="flex-grow flex gap-5 overflow-hidden">
+                    {/* Left Pane: Chat Sessions / Queries List */}
+                    <div className="w-80 sm:w-96 flex-shrink-0 bg-white/5 border border-white/10 rounded-2xl flex flex-col overflow-hidden">
+                      <div className="p-3 border-b border-white/10 bg-bg-secondary/40 flex items-center justify-between flex-shrink-0">
+                        <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <MessageSquare size={13} className="text-accent-blue" />
+                          Chat Queries ({metrics.requests?.length || 0})
+                        </span>
+                      </div>
+
+                      <div className="flex-grow overflow-y-auto p-2 flex flex-col gap-2">
+                        {metrics.requests?.length === 0 ? (
+                          <div className="text-center py-12 text-gray-500 text-xs italic">
+                            No chat history recorded yet.
+                          </div>
+                        ) : (
+                          metrics.requests.map((req) => {
+                            const isSelected = selectedHistoryRequest?.id === req.id;
+                            return (
+                              <div
+                                key={req.id}
+                                onClick={() => setSelectedHistoryRequest(req)}
+                                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1.5 ${
+                                  isSelected
+                                    ? 'bg-accent-blue/15 border-accent-blue/40 shadow-sm'
+                                    : 'bg-black/30 hover:bg-white/5 border-white/5'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase font-mono ${
+                                    req.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'
+                                  }`}>
+                                    {req.success ? 'Success' : 'Failed'}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-mono">
+                                    ⏱️ {((req.totalDuration || 0) / 1000).toFixed(1)}s
+                                  </span>
+                                </div>
+                                <p className="text-xs font-semibold text-gray-200 line-clamp-2 select-none" title={req.prompt}>
+                                  {req.prompt}
+                                </p>
+                                <div className="flex items-center justify-between text-[9px] text-gray-500 font-mono pt-1 border-t border-white/5 mt-0.5">
+                                  <span>{req.timestamp ? new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                  <span>{req.toolCalls?.length || 0} tool calls</span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Pane: Selected Chat Details & Tools Inspection */}
+                    <div className="flex-grow bg-white/5 border border-white/10 rounded-2xl flex flex-col overflow-hidden p-5">
+                      {selectedHistoryRequest ? (
+                        <div className="flex flex-col gap-5 h-full overflow-y-auto pr-1">
+                          {/* Top Bar for Selected Request */}
+                          <div className="pb-3 border-b border-white/10 flex flex-col gap-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${
+                                selectedHistoryRequest.success ? 'bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                              }`}>
+                                {selectedHistoryRequest.success ? 'Success' : 'Failed'}
+                              </span>
+                              <span className="text-xs text-gray-400 font-mono">
+                                Request ID: {selectedHistoryRequest.id} • {selectedHistoryRequest.timestamp ? new Date(selectedHistoryRequest.timestamp).toLocaleString() : ''}
+                              </span>
+                            </div>
+                            <h3 className="text-base font-bold text-white select-text font-sans leading-relaxed">
+                              {selectedHistoryRequest.prompt}
+                            </h3>
+                          </div>
+
+                          {/* Message Metrics Breakdown */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="bg-black/30 border border-white/5 rounded-xl p-3 flex flex-col gap-1">
+                              <span className="text-[10px] text-gray-400 font-semibold uppercase">Total Duration</span>
+                              <span className="text-lg font-mono font-bold text-white">{((selectedHistoryRequest.totalDuration || 0) / 1000).toFixed(2)}s</span>
+                            </div>
+                            <div className="bg-black/30 border border-white/5 rounded-xl p-3 flex flex-col gap-1">
+                              <span className="text-[10px] text-gray-400 font-semibold uppercase">LLM Gen Latency</span>
+                              <span className="text-lg font-mono font-bold text-accent-mono">{selectedHistoryRequest.generationTime || 0} ms</span>
+                            </div>
+                            <div className="bg-black/30 border border-white/5 rounded-xl p-3 flex flex-col gap-1">
+                              <span className="text-[10px] text-gray-400 font-semibold uppercase">Prompt Eval Time</span>
+                              <span className="text-lg font-mono font-bold text-purple-400">{selectedHistoryRequest.contextProcessingTime || 0} ms</span>
+                            </div>
+                            <div className="bg-black/30 border border-white/5 rounded-xl p-3 flex flex-col gap-1">
+                              <span className="text-[10px] text-gray-400 font-semibold uppercase">OKF Memory Time</span>
+                              <span className="text-lg font-mono font-bold text-accent-emerald">{selectedHistoryRequest.retrievalTime || 0} ms</span>
+                            </div>
+                          </div>
+
+                          {/* Tool Calls List */}
+                          <div className="flex flex-col gap-3">
+                            <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                              Tool Calls Executed ({selectedHistoryRequest.toolCalls?.length || 0})
+                            </h4>
+
+                            {selectedHistoryRequest.toolCalls && selectedHistoryRequest.toolCalls.length > 0 ? (
+                              <div className="flex flex-col gap-3">
+                                {selectedHistoryRequest.toolCalls.map((tool, tIdx) => (
+                                  <div
+                                    key={tIdx}
+                                    className="bg-black/40 border border-white/10 rounded-xl p-4 flex flex-col gap-3 font-mono text-xs shadow-inner"
+                                  >
+                                    <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                                      <div className="flex items-center gap-2 font-sans font-bold text-accent-blue">
+                                        {getToolIcon(tool.name)}
+                                        <span>{tool.name || 'Unnamed Tool'}</span>
+                                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono ${
+                                          tool.success ? 'bg-accent-emerald/10 text-accent-emerald' : 'bg-red-500/10 text-red-400'
+                                        }`}>
+                                          {tool.success ? 'Success' : 'Failed'}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                                        <span>Latency: <strong className="text-white">{tool.latency || 0} ms</strong></span>
+                                        <span>Offset: <strong className="text-gray-300">+{tool.latencyFromRequestStart || 0} ms</strong></span>
+                                      </div>
+                                    </div>
+
+                                    {/* Parameters passed */}
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[10px] text-gray-500 font-bold uppercase font-sans">Parameters Passed (args):</span>
+                                      <pre className="p-2.5 bg-black/60 border border-white/5 rounded-lg text-[11px] text-accent-mono overflow-x-auto whitespace-pre-wrap select-text">
+                                        {tool.args ? JSON.stringify(tool.args, null, 2) : '{}'}
+                                      </pre>
+                                    </div>
+
+                                    {/* Output received */}
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[10px] text-gray-500 font-bold uppercase font-sans">Output Received (result):</span>
+                                      <pre className="p-2.5 bg-black/60 border border-white/5 rounded-lg text-[11px] text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-48 select-text">
+                                        {tool.result ? (typeof tool.result === 'object' ? JSON.stringify(tool.result, null, 2) : tool.result) : (tool.resultSummary || 'None / Empty response')}
+                                      </pre>
+                                    </div>
+
+                                    {tool.error && (
+                                      <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-[11px] font-sans">
+                                        <strong>Error:</strong> {tool.error}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-gray-500 italic py-6 text-center border border-dashed border-white/5 rounded-xl">
+                                No tools were invoked for this query.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="m-auto text-center py-16 px-4 text-gray-500 text-xs flex flex-col items-center gap-2">
+                          <MessageSquare size={24} className="text-gray-600 mb-1" />
+                          <p className="font-semibold text-gray-400">No Chat Query Selected</p>
+                          <p>Click on any chat request in the list on the left to inspect its latencies, parameters passed, and output received.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               ) : (
                 /* ================= TEST CENTER VIEW ================= */
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">

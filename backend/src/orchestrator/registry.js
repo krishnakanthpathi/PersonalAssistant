@@ -50,25 +50,7 @@ class ToolRegistry {
 			serverName: tool.serverName // Preserve serverName metadata
 		}));
 
-		// 3. Gather custom dynamic skills from MongoDB
-		let mappedDbSkills = [];
-		try {
-			const { getDB } = await import('../config/mongodb.js');
-			const db = getDB();
-			const dbSkills = await db.collection('skills').find().toArray();
-			mappedDbSkills = dbSkills.map(skill => ({
-				type: 'function',
-				function: {
-					name: skill.name,
-					description: skill.description,
-					parameters: skill.parameters
-				}
-			}));
-		} catch (err) {
-			logger.warn(`Could not load custom dynamic skills for LLM tools list: ${err.message}`);
-		}
-
-		return [...localTools, ...mappedMcpTools, ...mappedDbSkills];
+		return [...localTools, ...mappedMcpTools];
 	}
 
 	// Dynamic filtering of tools based on matched OKF catalog documents
@@ -305,21 +287,6 @@ class ToolRegistry {
 				return result.content.map(c => c.text).join('\n');
 			}
 			return JSON.stringify(result);
-		}
-
-		// 3. Fallback to custom dynamic skills from MongoDB
-		try {
-			const { getDB } = await import('../config/mongodb.js');
-			const db = getDB();
-			const skill = await db.collection('skills').findOne({ name });
-			if (skill) {
-				logger.info(`Executing custom dynamic skill: ${name}`);
-				const { executeDynamicSkill } = await import('../utils/skillEvaluator.js');
-				return await executeDynamicSkill(skill, args, toolContext);
-			}
-		} catch (err) {
-			logger.error(`Failed to execute dynamic skill ${name}: ${err.message}`);
-			throw err;
 		}
 
 		throw new Error(`Tool ${name} does not exist.`);

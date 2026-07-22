@@ -8,7 +8,6 @@ import { updateMcpProgress, getMcpStatus } from '../controllers/mcpStatusControl
 import { getGoogleAuthUrl, handleGoogleCallback, getGoogleAuthStatus, disconnectGoogle } from '../controllers/authController.js';
 import { streamLogs } from '../controllers/logsController.js';
 import { searchPersonalDb, testOkfRetrieval } from '../controllers/personalDbController.js';
-import { getSkills, createSkill, updateSkill, deleteSkill, testSkill, generateSkill } from '../controllers/skillsController.js';
 import { getPrebuiltForms, createPrebuiltForm, deletePrebuiltForm, updatePrebuiltForm, toggleFavoritePrebuiltForm } from '../controllers/prebuiltFormsController.js';
 import { getMcpConfig, saveMcpServer, deleteMcpServer, reconnectMcpServer, toggleMcpServer } from '../controllers/mcpConfigController.js';
 import { getEnvConfig, saveEnvConfig } from '../controllers/envController.js';
@@ -29,15 +28,6 @@ router.post("/api/tools/run-tests", runRagTests);
 router.post("/api/tools/stop-tests", stopRagTests);
 router.get("/api/personal-db/search", searchPersonalDb);
 router.get("/api/okf/test-retrieval", testOkfRetrieval);
-
-// Custom Dynamic Skills
-router.get("/api/skills", getSkills);
-router.post("/api/skills", createSkill);
-router.put("/api/skills/:id", updateSkill);
-router.delete("/api/skills/:id", deleteSkill);
-router.post("/api/skills/test", testSkill);
-router.post("/api/skills/generate", generateSkill);
-
 
 // Prebuilt Action Cards / Forms
 router.get("/api/prebuilt-forms", getPrebuiltForms);
