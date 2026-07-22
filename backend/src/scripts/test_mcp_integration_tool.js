@@ -53,7 +53,7 @@ await server.connect(transport);
 			name: testServerName,
 			type: 'stdio',
 			command: 'node',
-			args: [path.resolve(__dirname, `../../../mcps/${testServerName}/index.js`)],
+			args: [path.resolve(__dirname, `../../mcps/${testServerName}/index.js`)],
 			localCode
 		});
 
@@ -96,7 +96,7 @@ await server.connect(transport);
 		}
 
 		// Remove test directory if created
-		const testDir = path.resolve(__dirname, `../../../mcps/${testServerName}`);
+		const testDir = path.resolve(__dirname, `../../mcps/${testServerName}`);
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true, force: true });
 		}

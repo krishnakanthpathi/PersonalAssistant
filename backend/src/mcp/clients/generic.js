@@ -1,7 +1,42 @@
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { logger } from '../../utils/logger.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const backendRootDir = path.resolve(__dirname, '../../..');
+
+export function resolveMcpPath(inputPath) {
+	if (typeof inputPath !== 'string' || !inputPath) return inputPath;
+
+	// Resolve tilde home directory (~/...)
+	if (inputPath.startsWith('~/') || inputPath === '~') {
+		return path.join(os.homedir(), inputPath.slice(1));
+	}
+
+	// If already absolute path, return as is
+	if (path.isAbsolute(inputPath)) {
+		return inputPath;
+	}
+
+	// Resolve relative paths relative to backend root directory
+	const resolvedFromBackend = path.resolve(backendRootDir, inputPath);
+	if (
+		inputPath.startsWith('./') ||
+		inputPath.startsWith('../') ||
+		inputPath.startsWith('mcps/') ||
+		inputPath.startsWith('data/') ||
+		fs.existsSync(resolvedFromBackend)
+	) {
+		return resolvedFromBackend;
+	}
+
+	return inputPath;
+}
 
 export class GenericStdioClient {
 	constructor(name, config) {
@@ -14,21 +49,24 @@ export class GenericStdioClient {
 	async connect() {
 		logger.info(`Initializing Generic Stdio MCP transport for "${this.name}"...`);
 
-		// Resolve placeholders (e.g. YOUR_API_KEY_HERE) using process.env keys
+		const command = resolveMcpPath(this.config.command);
+		const args = (this.config.args || []).map(resolveMcpPath);
+
+		// Resolve placeholders (e.g. YOUR_API_KEY_HERE) using process.env keys & resolve relative paths in env
 		const resolvedEnv = {};
 		if (this.config.env) {
 			for (const [key, value] of Object.entries(this.config.env)) {
-				if (typeof value === 'string' && value.startsWith('YOUR_') && process.env[key]) {
-					resolvedEnv[key] = process.env[key];
-				} else {
-					resolvedEnv[key] = value;
+				let finalVal = value;
+				if (typeof finalVal === 'string' && finalVal.startsWith('YOUR_') && process.env[key]) {
+					finalVal = process.env[key];
 				}
+				resolvedEnv[key] = typeof finalVal === 'string' ? resolveMcpPath(finalVal) : finalVal;
 			}
 		}
 
 		this.transport = new StdioClientTransport({
-			command: this.config.command,
-			args: this.config.args || [],
+			command,
+			args,
 			env: {
 				...process.env,
 				...resolvedEnv

@@ -100,7 +100,7 @@ export const integrateMcpServerTool = {
 
 			const mainFilename = localCode.filename || (cleanName.endsWith('.py') ? 'server.py' : 'index.js');
 			const filePath = path.join(serverFolder, mainFilename);
-			
+
 			if (localCode.content) {
 				fs.writeFileSync(filePath, localCode.content, 'utf8');
 				logger.info(`Created local MCP server file at: ${filePath}`);
@@ -161,10 +161,10 @@ export const integrateMcpServerTool = {
 		} else {
 			newServerConfig.command = finalCommand;
 			newServerConfig.args = finalArgs;
-			
+
 			const envVars = { ...env };
 			if (finalCommand === 'node' || finalCommand === 'npx' || finalCommand.endsWith('/node')) {
-				envVars.NODE_PATH = envVars.NODE_PATH 
+				envVars.NODE_PATH = envVars.NODE_PATH
 					? `${envVars.NODE_PATH}:${backendNodeModules}`
 					: backendNodeModules;
 			}

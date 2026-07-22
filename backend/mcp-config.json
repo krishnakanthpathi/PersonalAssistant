@@ -5,7 +5,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "/Users/krishnakanth"
+        "~"
       ],
       "enabled": false
     },
@@ -23,14 +23,14 @@
         "@cocal/google-calendar-mcp"
       ],
       "env": {
-        "GOOGLE_OAUTH_CREDENTIALS": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/gcp-oauth.keys.json",
-        "GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/google-calendar-token.json"
+        "GOOGLE_OAUTH_CREDENTIALS": "./gcp-oauth.keys.json",
+        "GOOGLE_CALENDAR_MCP_TOKEN_PATH": "./data/google-calendar-token.json"
       }
     },
     "youtube": {
-      "command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/.venv/bin/python",
+      "command": "./mcps/youtube-mcp/.venv/bin/python",
       "args": [
-        "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/youtube-mcp/youtube_server.py"
+        "./mcps/youtube-mcp/youtube_server.py"
       ],
       "env": {
         "YOUTUBE_API_KEY": "YOUR_YOUTUBE_API_KEY_HERE"
@@ -71,11 +71,11 @@
         "@modelcontextprotocol/server-memory"
       ],
       "env": {
-        "MEMORY_FILE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/data/memory.json"
+        "MEMORY_FILE_PATH": "./data/memory.json"
       }
     },
     "video-converter": {
-      "command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/mcp-video-converter/mcp-video-converter/.venv/bin/python",
+      "command": "./mcps/mcp-video-converter/mcp-video-converter/.venv/bin/python",
       "args": [
         "-m",
         "mcp_video_converter.server"
@@ -85,16 +85,16 @@
     "terminal": {
       "command": "node",
       "args": [
-        "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/terminal-mcp/index.js"
+        "./mcps/terminal-mcp/index.js"
       ],
       "env": {
         "ALLOWED_COMMANDS": "npm,node,git,ls,echo,cat,pwd"
       }
     },
     "native-assistant": {
-      "command": "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/native-assistant-mcp/.venv/bin/python",
+      "command": "./mcps/native-assistant-mcp/.venv/bin/python",
       "args": [
-        "/Users/krishnakanth/Projects/PersonalAssisstent/mcps/native-assistant-mcp/server.py"
+        "./mcps/native-assistant-mcp/server.py"
       ],
       "enabled": true
     }

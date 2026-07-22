@@ -1,18 +1,40 @@
 # Dependencies
 node_modules/
+**/node_modules/
 
-# Production / Build
+# Python Virtual Environments & Caches
+.venv/
+venv/
+**/.venv/
+**/venv/
+__pycache__/
+/**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local MCP Dependencies & Storage
+mcps/**/.venv/
+mcps/**/venv/
+mcps/**/node_modules/
+mcps/**/__pycache__/
+mcps/**/*.egg-info/
+
+# Production / Build / Local Data
 data/*
+!data/.gitkeep
 data/screenshots/
 data/downloads/
 dist/
 out/
 build/
 
-# Environment files
+# Environment files & Credentials
 .env
 .env.local
 .env.*.local
+gcp-oauth.keys.json
+google-credentials.json
+data/google-calendar-token.json
 
 # Logs
 logs/
@@ -30,9 +52,6 @@ data/tool_embeddings.json
 *.db-wal
 *.sqlite
 
-
 # OS Files
 .DS_Store
 Thumbs.db
-gcp-oauth.keys.json
-google-credentials.json
