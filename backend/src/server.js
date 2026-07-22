@@ -9,7 +9,7 @@ import { logger } from './utils/logger.js';
 import { env } from './config/env.js';
 import { connectToMongoDB } from './config/mongodb.js';
 import apiRoutes from './routes/api.js';
-import { OKFEngine } from './rag/okfEngine.js';
+import { OKFEngine } from './okf/okfEngine.js';
 import { registry } from './orchestrator/registry.js';
 
 import path from 'path';

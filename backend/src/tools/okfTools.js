@@ -1,4 +1,4 @@
-import { OKFEngine } from '../rag/okfEngine.js';
+import { OKFEngine } from '../okf/okfEngine.js';
 import { catchErrors } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import fs from 'fs';

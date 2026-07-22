@@ -45,7 +45,7 @@ export const runRagTests = async (req, res) => {
 		logger.info('Manually triggering RAG test suite execution...');
 		const { spawn } = await import('child_process');
 		
-		activeTestProcess = spawn('node', ['src/rag/test_rag_tools.js']);
+		activeTestProcess = spawn('node', ['src/okf/test_rag_tools.js']);
 		
 		let stdout = '';
 		let stderr = '';

@@ -1,4 +1,4 @@
-import { OKFEngine } from '../rag/okfEngine.js';
+import { OKFEngine } from '../okf/okfEngine.js';
 import { registry } from '../orchestrator/registry.js';
 
 export const searchPersonalDb = async (req, res) => {

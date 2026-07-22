@@ -12,7 +12,7 @@ import { metricsService } from '../utils/metrics.js';
 import { env } from '../config/env.js';
 import { getDB } from '../config/mongodb.js';
 import { getToolCallingCapability, standardizeToolSchema, injectXmlToolsInstructions, prepareMessagesPayload } from './toolCallFilter.js';
-import { OKFEngine } from '../rag/okfEngine.js';
+import { OKFEngine } from '../okf/okfEngine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROMPT_FILE_PATH = path.join(__dirname, '../config/system_prompt.md');

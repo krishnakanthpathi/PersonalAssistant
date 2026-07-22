@@ -5,12 +5,12 @@
 import { rdsQueryTool } from '../tools/rdsQuery.js';
 import { getKnowledgeDocumentTool, updateKnowledgeDocumentTool } from '../tools/okfTools.js';
 import { createPrebuiltFormTool } from '../tools/prebuiltFormTools.js';
-
+import { integrateMcpServerTool } from '../tools/mcpIntegrationTool.js';
 
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import { OKFEngine } from '../rag/okfEngine.js';
+import { OKFEngine } from '../okf/okfEngine.js';
 
 class ToolRegistry {
 	constructor() {
@@ -23,6 +23,7 @@ class ToolRegistry {
 		this.tools.set(getKnowledgeDocumentTool.definition.name, getKnowledgeDocumentTool);
 		this.tools.set(updateKnowledgeDocumentTool.definition.name, updateKnowledgeDocumentTool);
 		this.tools.set(createPrebuiltFormTool.definition.name, createPrebuiltFormTool);
+		this.tools.set(integrateMcpServerTool.definition.name, integrateMcpServerTool);
 	}
 
 	// Dynamic, asynchronous fetch of all available tools (Local + MCP)
