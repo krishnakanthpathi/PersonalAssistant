@@ -13,29 +13,41 @@ const backendRootDir = path.resolve(__dirname, '../../..');
 export function resolveMcpPath(inputPath) {
 	if (typeof inputPath !== 'string' || !inputPath) return inputPath;
 
+	let processedPath = inputPath;
+	if (process.platform === 'win32') {
+		if (processedPath.includes('.venv/bin/python') || processedPath.includes('.venv\\bin\\python')) {
+			const winVenvPath = processedPath.replace(/\.venv[/\\]bin[/\\]python/g, '.venv\\Scripts\\python.exe');
+			const absWinVenv = path.resolve(backendRootDir, winVenvPath);
+			if (fs.existsSync(absWinVenv)) {
+				return absWinVenv;
+			}
+			return 'python';
+		}
+	}
+
 	// Resolve tilde home directory (~/...)
-	if (inputPath.startsWith('~/') || inputPath === '~') {
-		return path.join(os.homedir(), inputPath.slice(1));
+	if (processedPath.startsWith('~/') || processedPath === '~') {
+		return path.join(os.homedir(), processedPath.slice(1));
 	}
 
 	// If already absolute path, return as is
-	if (path.isAbsolute(inputPath)) {
-		return inputPath;
+	if (path.isAbsolute(processedPath)) {
+		return processedPath;
 	}
 
 	// Resolve relative paths relative to backend root directory
-	const resolvedFromBackend = path.resolve(backendRootDir, inputPath);
+	const resolvedFromBackend = path.resolve(backendRootDir, processedPath);
 	if (
-		inputPath.startsWith('./') ||
-		inputPath.startsWith('../') ||
-		inputPath.startsWith('mcps/') ||
-		inputPath.startsWith('data/') ||
+		processedPath.startsWith('./') ||
+		processedPath.startsWith('../') ||
+		processedPath.startsWith('mcps/') ||
+		processedPath.startsWith('data/') ||
 		fs.existsSync(resolvedFromBackend)
 	) {
 		return resolvedFromBackend;
 	}
 
-	return inputPath;
+	return processedPath;
 }
 
 export class GenericStdioClient {
