@@ -22,8 +22,11 @@ mcps/**/*.egg-info/
 # Production / Build / Local Data
 data/*
 !data/.gitkeep
+!data/knowledge_catalog/
+data/knowledge_catalog/user/
 data/screenshots/
 data/downloads/
+data/attachments/
 dist/
 out/
 build/

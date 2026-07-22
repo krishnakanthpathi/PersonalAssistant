@@ -56,12 +56,80 @@ class OKFEngineClass {
 		this.initialized = false;
 	}
 
+	async ensureDefaultCatalogs() {
+		const toolsDir = path.join(CATALOG_DIR, 'tools');
+		if (!fs.existsSync(toolsDir)) {
+			fs.mkdirSync(toolsDir, { recursive: true });
+		}
+
+		const mcpMgmtPath = path.join(toolsDir, 'mcp_management.md');
+		if (!fs.existsSync(mcpMgmtPath)) {
+			const content = `---
+type: tool_group
+title: MCP Server Management & Dynamic Tool Integration
+description: Utilities to connect, configure, manage, and execute dynamic Model Context Protocol (MCP) servers.
+tags: [mcp, server, integration, tools, dynamic, connect]
+tools: [integrate_mcp_server, get_knowledge_document, update_knowledge_document, create_prebuilt_form, rds_query]
+timestamp: ${new Date().toISOString()}
+---
+
+# MCP Server Management & Dynamic Tool Integration
+
+Provides system capabilities to register, connect, manage, and query dynamic MCP servers and system tools.
+
+### Available Tools
+- **\`integrate_mcp_server\`**: Add, edit, test, enable, disable, or delete MCP servers dynamically.
+- **\`get_knowledge_document\`**: Fetch knowledge documents from the OKF catalog.
+- **\`update_knowledge_document\`**: Update or append content to an OKF catalog document.
+- **\`create_prebuilt_form\`**: Create structured UI form inputs for users.
+- **\`rds_query\`**: Query relational database systems.
+`;
+			fs.writeFileSync(mcpMgmtPath, content, 'utf8');
+		}
+
+		const mcpIntegPath = path.join(CATALOG_DIR, 'mcp_integrations.md');
+		if (!fs.existsSync(mcpIntegPath)) {
+			const content = `---
+type: integration
+title: MCP & Workspace Integrations
+description: Active Model Context Protocol integrations, Notion configs, YouTube requirements, and Gmail details.
+tags: [integration, configs, mcp]
+timestamp: ${new Date().toISOString()}
+---
+
+# MCP & Workspace Integrations
+
+Default integration configs for MCP servers and workspace integrations.
+`;
+			fs.writeFileSync(mcpIntegPath, content, 'utf8');
+		}
+
+		const sysEnvPath = path.join(CATALOG_DIR, 'system_environment.md');
+		if (!fs.existsSync(sysEnvPath)) {
+			const content = `---
+type: system_environment
+title: System Environment
+description: Home lab setup, devices, network configuration, and local server setups.
+tags: [systems, hardware, network]
+timestamp: ${new Date().toISOString()}
+---
+
+# System Environment
+
+System environment configuration and host details.
+`;
+			fs.writeFileSync(sysEnvPath, content, 'utf8');
+		}
+	}
+
 	async initialize() {
 		try {
 			if (!fs.existsSync(CATALOG_DIR)) {
 				logger.info(`Creating OKF catalog directory at: ${CATALOG_DIR}`);
 				fs.mkdirSync(CATALOG_DIR, { recursive: true });
 			}
+
+			await this.ensureDefaultCatalogs();
 
 			logger.info(`Initializing OKF Knowledge Engine from ${CATALOG_DIR}...`);
 			const mdFilepaths = await getMarkdownFilesRecursively(CATALOG_DIR);
