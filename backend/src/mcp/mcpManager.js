@@ -244,6 +244,50 @@ ${toolsSummaryMarkdown}
 			logger.info(`MCP server "${serverName}" is disabled. Skipped connection load.`);
 		}
 	}
+
+	/**
+	 * Full sync of MCP servers and OKF catalog against current mcp-config.json file
+	 */
+	syncConfigState = catchErrors(async () => {
+		if (!fs.existsSync(configPath)) {
+			logger.warn('mcp-config.json not found during config sync.');
+			return;
+		}
+
+		const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+		const configuredServers = config.mcpServers || {};
+
+		// Disconnect active servers that are missing from config or disabled
+		for (const serverName of Array.from(this.servers.keys())) {
+			const serverConfig = configuredServers[serverName];
+			if (!serverConfig || serverConfig.enabled === false) {
+				logger.info(`Disconnecting server "${serverName}" as it is disabled or removed from config.`);
+				const client = this.servers.get(serverName);
+				if (client && client.client) {
+					try { await client.client.close(); } catch (e) {}
+				}
+				this.servers.delete(serverName);
+			}
+		}
+
+		// Connect configured enabled servers not currently in memory
+		for (const [serverName, serverConfig] of Object.entries(configuredServers)) {
+			if (serverConfig.enabled !== false) {
+				if (!this.servers.has(serverName)) {
+					try {
+						logger.info(`Syncing config: Connecting MCP server "${serverName}"...`);
+						await this.connectServer(serverName, serverConfig);
+					} catch (err) {
+						logger.warn(`Failed to connect MCP server "${serverName}" during sync: ${err.message}`);
+					}
+				}
+			}
+		}
+
+		// Sync OKF Knowledge Catalog documents & re-index RAG engine
+		await this.syncOkfCatalog();
+		logger.info('Completed MCP config state sync and OKF catalog update.');
+	}, 'Failed to sync MCP configuration state');
 }
 
 export const mcpManager = new MCPManager();

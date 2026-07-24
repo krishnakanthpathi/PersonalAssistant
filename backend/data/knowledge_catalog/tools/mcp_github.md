@@ -4,7 +4,7 @@ title: MCP Server - github
 description: Integrated MCP server providing tools for github.
 tags: [github, create, update, file, search, repositories, repository, get, contents, push, files, issue, pull, request, fork, branch, list, commits, issues, add, comment, code, users, requests, review, merge, status, comments, reviews]
 tools: [create_or_update_file, search_repositories, create_repository, get_file_contents, push_files, create_issue, create_pull_request, fork_repository, create_branch, list_commits, list_issues, update_issue, add_issue_comment, search_code, search_issues, search_users, get_issue, get_pull_request, list_pull_requests, create_pull_request_review, merge_pull_request, get_pull_request_files, get_pull_request_status, update_pull_request_branch, get_pull_request_comments, get_pull_request_reviews]
-timestamp: 2026-07-22T16:48:51.324Z
+timestamp: 2026-07-24T16:39:09.087Z
 ---
 
 # MCP Server - github

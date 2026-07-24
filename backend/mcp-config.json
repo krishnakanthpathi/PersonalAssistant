@@ -97,6 +97,29 @@
         "./mcps/native-assistant-mcp/server.py"
       ],
       "enabled": true
+    },
+    "mcp-mathematics": {
+      "command": "uvx",
+      "args": [
+        "mcp-mathematics"
+      ]
+    },
+    "sympy-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "einsteinpy",
+        "--with",
+        "mcp[cli]",
+        "--with",
+        "pydantic",
+        "--with",
+        "sympy",
+        "mcp",
+        "run",
+        "/ABSOLUTE_PATH_TO_SYMPY_MCP/server.py"
+      ]
     }
   }
 }

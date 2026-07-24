@@ -192,3 +192,13 @@ export const reconnectMcpServer = catchErrors(async (req, res) => {
 		res.status(500).json({ error: `Failed to reconnect: ${err.message}` });
 	}
 }, 'Failed to reconnect MCP server');
+
+/**
+ * POST /api/mcp/config/sync
+ * Reads mcp-config.json, connects/disconnects servers to match config, and auto-generates OKF RAG catalog docs
+ */
+export const syncMcpConfig = catchErrors(async (req, res) => {
+	logger.info('Manual MCP config sync requested via API...');
+	await mcpManager.syncConfigState();
+	res.json({ success: true, message: 'MCP config and Knowledge Catalog synchronized successfully.' });
+}, 'Failed to sync MCP configuration');

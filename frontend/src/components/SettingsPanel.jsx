@@ -44,6 +44,7 @@ export default function SettingsPanel({
   // MCP State
   const [mcpServers, setMcpServers] = useState([]);
   const [isLoadingMcp, setIsLoadingMcp] = useState(false);
+  const [isSyncingMcp, setIsSyncingMcp] = useState(false);
   const [mcpError, setMcpError] = useState('');
   const [mcpSuccess, setMcpSuccess] = useState('');
   
@@ -296,6 +297,28 @@ export default function SettingsPanel({
       }
     } catch (err) {
       setMcpError('Network error reconnecting MCP server');
+    }
+  };
+
+  const handleSyncMcpConfig = async () => {
+    setMcpError('');
+    setMcpSuccess('');
+    setIsSyncingMcp(true);
+    try {
+      const response = await fetch('http://localhost:3000/api/mcp/config/sync', {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setMcpSuccess('MCP config & Knowledge Catalog synced successfully!');
+        fetchMcpServers();
+      } else {
+        setMcpError(data.error || 'Failed to sync MCP config');
+      }
+    } catch (err) {
+      setMcpError('Network error syncing MCP config');
+    } finally {
+      setIsSyncingMcp(false);
     }
   };
 
@@ -886,13 +909,24 @@ export default function SettingsPanel({
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">Configured MCP Servers</h3>
               <p className="text-[10px] text-gray-400 mt-1">Manage, add, and reload model context protocol hosts dynamically.</p>
             </div>
-            <button
-              onClick={handleOpenAddModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all shadow-glow cursor-pointer"
-            >
-              <Plus size={13} />
-              Add Server
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSyncMcpConfig}
+                disabled={isSyncingMcp}
+                title="Re-read mcp-config.json, connect new servers, and sync Knowledge Catalog RAG entries"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-gray-200 border border-white/10 rounded-xl text-xs font-semibold hover:bg-white/20 hover:text-white transition-all cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={isSyncingMcp ? 'animate-spin' : ''} />
+                <span>{isSyncingMcp ? 'Syncing...' : 'Sync Config'}</span>
+              </button>
+              <button
+                onClick={handleOpenAddModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all shadow-glow cursor-pointer"
+              >
+                <Plus size={13} />
+                Add Server
+              </button>
+            </div>
           </div>
 
           {/* Servers List */}

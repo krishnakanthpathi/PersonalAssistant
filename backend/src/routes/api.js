@@ -9,7 +9,7 @@ import { getGoogleAuthUrl, handleGoogleCallback, getGoogleAuthStatus, disconnect
 import { streamLogs } from '../controllers/logsController.js';
 import { searchPersonalDb, testOkfRetrieval } from '../controllers/personalDbController.js';
 import { getPrebuiltForms, createPrebuiltForm, deletePrebuiltForm, updatePrebuiltForm, toggleFavoritePrebuiltForm } from '../controllers/prebuiltFormsController.js';
-import { getMcpConfig, saveMcpServer, deleteMcpServer, reconnectMcpServer, toggleMcpServer } from '../controllers/mcpConfigController.js';
+import { getMcpConfig, saveMcpServer, deleteMcpServer, reconnectMcpServer, toggleMcpServer, syncMcpConfig } from '../controllers/mcpConfigController.js';
 import { getEnvConfig, saveEnvConfig } from '../controllers/envController.js';
 
 const router = Router();
@@ -49,6 +49,7 @@ router.get("/api/mcp/status", getMcpStatus);
 // MCP configuration management
 router.get("/api/mcp/config", getMcpConfig);
 router.post("/api/mcp/config", saveMcpServer);
+router.post("/api/mcp/config/sync", syncMcpConfig);
 router.delete("/api/mcp/config/:name", deleteMcpServer);
 router.post("/api/mcp/config/:name/reconnect", reconnectMcpServer);
 router.post("/api/mcp/config/:name/toggle", toggleMcpServer);

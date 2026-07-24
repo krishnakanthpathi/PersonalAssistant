@@ -4,7 +4,7 @@ title: MCP Server - native-assistant
 description: Integrated MCP server providing tools for native-assistant.
 tags: [native-assistant, native, assistant, volume, set, get, active, window, list, applications, open, application, close, iphone, mirror, dark, mode, empty, trash, system, stats, lock, screen, say, speech, power, take, screenshot, notify, prompt, user, date, time, clipboard, read, write, mouse, move, click, drag, scroll, key, press, type, text, keystroke, action, media, control, many, edit, pdf, stat, copy, make, dir, delete, watch, once, xattr, process, run, start, output, input, terminate, kill, shortcut, wait, apps, windows, focus, app, resize, space, mail, calendar, messages, safari, notes, terminal, applescript]
 tools: [volume_set, get_volume, get_active_window, list_applications, open_application, close_application, iphone_mirror, set_dark_mode, empty_trash, get_system_stats, lock_screen, say_speech, system_power, take_screenshot, notify, prompt_user, get_date_time, clipboard_read, clipboard_write, mouse_move, mouse_click, mouse_drag, mouse_scroll, key_press, type_text, keystroke_action, media_control, fs_read, fs_read_many, fs_write, fs_edit, fs_write_pdf, fs_list, fs_stat, fs_copy, fs_move, fs_make_dir, fs_delete, fs_watch_once, fs_xattr_get, fs_xattr_set, process_run, process_start, process_read_output, process_write_input, process_terminate, process_list, process_kill, shortcut_list, shortcut_run, wait_ms, list_apps, list_windows, focus_app, focus_window, move_window, resize_window, set_space, mail, calendar, messages, safari, notes, terminal, run_applescript]
-timestamp: 2026-07-22T16:48:51.409Z
+timestamp: 2026-07-24T16:39:09.120Z
 ---
 
 # MCP Server - native-assistant
