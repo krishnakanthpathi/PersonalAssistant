@@ -4,7 +4,7 @@ title: MCP Server - memory
 description: Integrated MCP server providing tools for memory.
 tags: [memory, create, entities, relations, add, observations, delete, read, graph, search, nodes, open]
 tools: [create_entities, create_relations, add_observations, delete_entities, delete_observations, delete_relations, read_graph, search_nodes, open_nodes]
-timestamp: 2026-07-24T16:39:09.098Z
+timestamp: 2026-07-24T18:10:18.529Z
 ---
 
 # MCP Server - memory

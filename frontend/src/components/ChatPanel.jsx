@@ -19,6 +19,7 @@ import {
   File,
   Loader2
 } from 'lucide-react';
+import McpToolResponsePanel from './McpToolResponsePanel.jsx';
 
 const getToolNameFromLog = (log) => {
   if (!log) return null;
@@ -358,29 +359,14 @@ export default function ChatPanel({
                 </button>
               )}
 
-              {/* Active loop status display */}
-              {msg.role === 'assistant' && msg.logs && msg.logs.length > 0 && (() => {
-                const toolNames = msg.logs
-                  .filter(log => log.startsWith('Calling tool:'))
-                  .map(getToolNameFromLog)
-                  .filter(Boolean);
-                
-                if (toolNames.length === 0) return null;
-
-                return (
-                  <div className="flex items-start gap-2 mt-2 px-1 text-[11px] text-gray-500 font-mono max-w-full">
-                    {isProcessing && idx === messages.length - 1 && <span className="w-1.5 h-1.5 rounded-full bg-accent-mono animate-ping mt-1 shrink-0"></span>}
-                    <div className="min-w-0 flex-wrap">
-                      <strong className="text-gray-400 font-medium">Reasoning path:</strong>{' '}
-                      {toolNames.map((name, nIdx) => (
-                        <span key={nIdx}>
-                          {nIdx > 0 && ' → '}<span className="text-accent-blue font-bold break-words">{name}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              {/* MCP Tool Responses & Thinking Steps Panel */}
+              {msg.role === 'assistant' && (
+                <McpToolResponsePanel
+                  toolExecutions={msg.toolExecutions || []}
+                  logs={msg.logs || []}
+                  isProcessing={isProcessing && idx === messages.length - 1}
+                />
+              )}
             </div>
           ))
         )}

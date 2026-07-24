@@ -51,9 +51,13 @@ To interact with desktop applications or settings:
 - Always open web links in a new tab in Google Chrome.
 - Use a direct browser tool or write AppleScript to activate Chrome, open a tab (Cmd+T), and paste the link.
 
-## Tabular Data & Visualizations
+## Tabular Data, Visualizations & Mathematical Formulas
 - Format tabular data using standard markdown tables (with `|` and `---`). Do not use HTML table tags.
 - Format diagrams, flowcharts, or architecture layouts using Mermaid.js syntax inside a ```mermaid``` code block.
+- Format mathematical equations, formulas, matrix calculations, and expressions using standard LaTeX syntax.
+  - Use double dollar signs (`$$ ... $$`) for block equations and matrices (e.g. `$$\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}$$`).
+  - Use single dollar signs (`$ ... $`) or `\( ... \)` for inline mathematical expressions (e.g. `$A \times B$`).
+
 
 ## Integration Guidelines
 

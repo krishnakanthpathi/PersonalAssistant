@@ -4,7 +4,7 @@ title: MCP Server - gmail
 description: Integrated MCP server providing tools for gmail.
 tags: [gmail, create, draft, delete, get, list, drafts, send, label, labels, patch, update, batch, messages, modify, message, trash, untrash, attachment, thread, threads, auto, forwarding, imap, language, pop, vacation, add, delegate, remove, delegates, filter, filters, address, addresses, verify, smime, info, insert, set, default, profile, watch, mailbox, stop, mail]
 tools: [create_draft, delete_draft, get_draft, list_drafts, send_draft, create_label, delete_label, get_label, list_labels, patch_label, update_label, batch_delete_messages, batch_modify_messages, delete_message, get_message, list_messages, modify_message, send_message, trash_message, untrash_message, get_attachment, delete_thread, get_thread, list_threads, modify_thread, trash_thread, untrash_thread, get_auto_forwarding, get_imap, get_language, get_pop, get_vacation, update_auto_forwarding, update_imap, update_language, update_pop, update_vacation, add_delegate, remove_delegate, get_delegate, list_delegates, create_filter, delete_filter, get_filter, list_filters, create_forwarding_address, delete_forwarding_address, get_forwarding_address, list_forwarding_addresses, create_send_as, delete_send_as, get_send_as, list_send_as, patch_send_as, update_send_as, verify_send_as, delete_smime_info, get_smime_info, insert_smime_info, list_smime_info, set_default_smime_info, get_profile, watch_mailbox, stop_mail_watch]
-timestamp: 2026-07-24T16:39:09.084Z
+timestamp: 2026-07-24T18:10:18.505Z
 ---
 
 # MCP Server - gmail

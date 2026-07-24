@@ -26,8 +26,10 @@ export class Agent {
 		const requestId = metricsService.startRequest(prompt);
 		const logs = [];
 		const triggerStatusUpdate = (status) => {
-			if (status && !logs.includes(status)) {
-				logs.push(status);
+			if (status) {
+				if (typeof status === 'string' && !logs.includes(status)) {
+					logs.push(status);
+				}
 			}
 			if (onStatusUpdate) {
 				onStatusUpdate(status);
@@ -78,6 +80,8 @@ export class Agent {
 			// Parse XML tool calls in the initial response
 			parseXmlToolCalls(message, tools);
 
+			const toolExecutions = [];
+
 			// Keep executing tool calls as long as the model requests them (Reasoning Loop)
 			while (message.tool_calls && message.tool_calls.length > 0) {
 				checkAborted();
@@ -98,7 +102,11 @@ export class Agent {
 					const toolContext = createToolContext(toolName, triggerStatusUpdate);
 
 					const toolCallStart = Date.now();
-					const { success, result, error } = await executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart, triggerStatusUpdate);
+					const { success, result, error, toolExec } = await executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart, triggerStatusUpdate);
+
+					if (toolExec) {
+						toolExecutions.push(toolExec);
+					}
 
 					if (success) {
 						appendToolSuccessMessage(messages, call, result, toolName);
@@ -127,6 +135,7 @@ export class Agent {
 			return {
 				...parsed,
 				logs,
+				toolExecutions,
 				ragFacts: ragFacts || [],
 				relevantTools: tools ? tools.map(t => ({
 					name: t.name || t.function?.name,

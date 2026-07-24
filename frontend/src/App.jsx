@@ -36,6 +36,7 @@ import ChatPanel from './components/ChatPanel.jsx';
 import SystemPromptPanel from './components/SystemPromptPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import hljs from 'highlight.js';
+import katex from 'katex';
 
 // --- Code Syntax Highlight Themes (loaded as raw CSS strings via Vite) ---
 import monokaiCss from 'highlight.js/styles/monokai.css?inline';
@@ -151,7 +152,7 @@ const parseTables = (text) => {
 // Global cache for rendered Mermaid SVGs to prevent them from being lost on React re-renders
 const mermaidSvgCache = new Map();
 
-// Markdown parser with simple regex
+// Markdown parser with KaTeX math & matrix support
 const parseMarkdown = (text) => {
   if (!text) return '';
   // Ensure text is always a string — msg.content can sometimes be an object
@@ -191,13 +192,7 @@ const parseMarkdown = (text) => {
     return id;
   });
 
-  // Escape HTML entities to prevent XSS
-  html = html
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
-  // Extract and stash code blocks — apply highlight.js Monokai coloring
+  // Extract and stash fenced code blocks
   const codeBlocks = [];
   html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
     const id = `__CODE_BLOCK_${codeBlocks.length}__`;
@@ -242,6 +237,55 @@ const parseMarkdown = (text) => {
     inlineCodes.push(`<code class="inline-code">${code}</code>`);
     return id;
   });
+
+  // Extract and stash KaTeX Display/Block Math: $$ ... $$ or \[ ... \]
+  const mathBlocks = [];
+  html = html.replace(/(?:\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\])/g, (match, block1, block2) => {
+    const mathCode = (block1 !== undefined ? block1 : block2).trim();
+    if (!mathCode) return match;
+    const id = `__MATH_BLOCK_${mathBlocks.length}__`;
+    let renderedMath = '';
+    try {
+      renderedMath = katex.renderToString(mathCode, {
+        displayMode: true,
+        throwOnError: false
+      });
+    } catch {
+      renderedMath = mathCode;
+    }
+    mathBlocks.push(
+      `<div class="katex-block-wrapper my-4 flex justify-center overflow-x-auto p-3 bg-white/[0.02] border border-white/10 rounded-xl shadow-inner text-gray-100">${renderedMath}</div>`
+    );
+    return id;
+  });
+
+  // Extract and stash KaTeX Inline Math: \( ... \) or $ ... $
+  const mathInlines = [];
+  html = html.replace(/(?:\\\(([\s\S]*?)\\\)|(?<!\\)\$([^\$\n]+?)(?<!\\)\$)/g, (match, inline1, inline2) => {
+    const mathCode = (inline1 !== undefined ? inline1 : inline2).trim();
+    // Skip if it looks like plain currency (e.g. "$10" or "$ 50.00") without math symbols
+    if (!mathCode || /^\d+([\.,]\d+)?$/.test(mathCode)) {
+      return match;
+    }
+    const id = `__MATH_INLINE_${mathInlines.length}__`;
+    let renderedMath = '';
+    try {
+      renderedMath = katex.renderToString(mathCode, {
+        displayMode: false,
+        throwOnError: false
+      });
+    } catch {
+      renderedMath = mathCode;
+    }
+    mathInlines.push(`<span class="katex-inline px-1 font-mono">${renderedMath}</span>`);
+    return id;
+  });
+
+  // Escape HTML entities to prevent XSS
+  html = html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
   // Parse raw HTML tables: match escaped table tags, decode them, and inject premium Tailwind classes
   html = html.replace(/&lt;table([\s\S]*?)&lt;\/table&gt;/gi, (match) => {
@@ -321,6 +365,16 @@ const parseMarkdown = (text) => {
     // Strip trailing punctuation from the url text for clean link boundaries
     const cleanUrl = url.replace(/[.,;:)]$^/, '');
     return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="text-accent-blue hover:underline font-medium">${cleanUrl}</a>`;
+  });
+
+  // Restore inline math
+  mathInlines.forEach((math, idx) => {
+    html = html.replace(`__MATH_INLINE_${idx}__`, math);
+  });
+
+  // Restore math blocks
+  mathBlocks.forEach((math, idx) => {
+    html = html.replace(`__MATH_BLOCK_${idx}__`, math);
   });
 
   // Restore inline codes
@@ -1364,17 +1418,36 @@ function MainApp() {
                   return updated;
                 });
               } else if (type === 'status') {
-                setCurrentStatusLog(content);
-                setMessages(prev => {
-                  const updated = [...prev];
-                  if (updated[assistantMsgIndex]) {
-                    const currentLogs = updated[assistantMsgIndex].logs || [];
-                    if (!currentLogs.includes(content)) {
-                      updated[assistantMsgIndex].logs = [...currentLogs, content];
+                if (typeof content === 'object' && content !== null && content.type === 'tool_execution') {
+                  const execData = content.data;
+                  setMessages(prev => {
+                    const updated = [...prev];
+                    if (updated[assistantMsgIndex]) {
+                      const currentExecs = updated[assistantMsgIndex].toolExecutions || [];
+                      const existingIdx = currentExecs.findIndex(e => e.id === execData.id || (e.toolName === execData.toolName && e.status === 'running'));
+                      if (existingIdx >= 0) {
+                        currentExecs[existingIdx] = { ...currentExecs[existingIdx], ...execData };
+                        updated[assistantMsgIndex].toolExecutions = [...currentExecs];
+                      } else {
+                        updated[assistantMsgIndex].toolExecutions = [...currentExecs, execData];
+                      }
                     }
-                  }
-                  return updated;
-                });
+                    return updated;
+                  });
+                } else {
+                  const statusStr = typeof content === 'string' ? content : JSON.stringify(content);
+                  setCurrentStatusLog(statusStr);
+                  setMessages(prev => {
+                    const updated = [...prev];
+                    if (updated[assistantMsgIndex]) {
+                      const currentLogs = updated[assistantMsgIndex].logs || [];
+                      if (!currentLogs.includes(statusStr)) {
+                        updated[assistantMsgIndex].logs = [...currentLogs, statusStr];
+                      }
+                    }
+                    return updated;
+                  });
+                }
               } else if (type === 'result') {
                 console.log('[CHAT] Received final result.');
                 let speechText = '';
@@ -1386,6 +1459,7 @@ function MainApp() {
                       updated[assistantMsgIndex].speech = content.speech || '';
                       updated[assistantMsgIndex].ragFacts = content.ragFacts || [];
                       updated[assistantMsgIndex].relevantTools = content.relevantTools || [];
+                      updated[assistantMsgIndex].toolExecutions = content.toolExecutions || updated[assistantMsgIndex].toolExecutions || [];
                       speechText = content.speech || content.content || '';
                       if (content.sessionId) {
                         setCurrentSessionId(content.sessionId);

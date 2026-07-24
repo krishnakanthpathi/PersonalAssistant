@@ -164,6 +164,7 @@ export const handleChat = async (req, res) => {
 			content: response.content || (typeof response === 'string' ? response : ''),
 			speech: response.speech || null,
 			logs: response.logs || [],
+			toolExecutions: response.toolExecutions || [],
 			ragFacts: response.ragFacts || [],
 			relevantTools: response.relevantTools || [],
 			isError: false,
@@ -267,6 +268,7 @@ export const getChatMessages = async (req, res) => {
 			speech: m.speech,
 			isError: m.isError === true,
 			logs: m.logs || [],
+			toolExecutions: m.toolExecutions || [],
 			ragFacts: m.ragFacts || [],
 			relevantTools: m.relevantTools || []
 		}));

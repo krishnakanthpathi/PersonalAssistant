@@ -337,5 +337,35 @@ body {
   animation: slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* KaTeX custom math rendering styles for dark theme */
+.katex-block-wrapper {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.katex {
+  font-size: 1.15em !important;
+  color: #f3f4f6 !important;
+}
+
+.katex-display {
+  margin: 0.25em 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.katex-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+
 
 

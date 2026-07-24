@@ -765,7 +765,23 @@ export function createToolContext(toolName, onStatusUpdate) {
 
 export async function executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart, onStatusUpdate = null) {
 	logger.info(`Agent calling tool: "${toolName}" with arguments: ${JSON.stringify(toolArgs)}`);
+	
+	const toolExec = {
+		id: `exec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+		toolName,
+		toolArgs,
+		status: 'running',
+		result: null,
+		error: null,
+		latency: null,
+		timestamp: toolCallStart
+	};
+
 	if (onStatusUpdate) {
+		onStatusUpdate({
+			type: 'tool_execution',
+			data: toolExec
+		});
 		onStatusUpdate(`Calling tool: ${toolName} (Args: ${JSON.stringify(toolArgs)})`);
 	}
 
@@ -782,11 +798,20 @@ export async function executeToolWithLogging(toolName, toolArgs, toolContext, re
 		if (resultString.length > MAX_RESULT_LENGTH) {
 			logger.warn(`Tool "${toolName}" result length (${resultString.length}) exceeds safety limit of ${MAX_RESULT_LENGTH}. Truncating.`);
 			finalResult = resultString.substring(0, MAX_RESULT_LENGTH) +
-				`\n\n[WARNING: Tool result truncated! Total length was ${resultString.length} characters. The remaining output has been omitted to prevent exceeding model context limits. If you need more specific details, please refine your search query or run a more targeted tool.]`;
+				`\n\n[WARNING: Tool result truncated! Total length was ${resultString.length} characters. The remaining output has been omitted to prevent exceeding model context limits.]`;
 		}
 
 		logger.info(`Tool "${toolName}" executed successfully. Result length: ${finalResult.length} characters.`);
+		
+		toolExec.status = 'success';
+		toolExec.result = finalResult;
+		toolExec.latency = toolLatency;
+
 		if (onStatusUpdate) {
+			onStatusUpdate({
+				type: 'tool_execution',
+				data: toolExec
+			});
 			onStatusUpdate(`Tool ${toolName} succeeded (${toolLatency}ms)`);
 		}
 
@@ -799,11 +824,20 @@ export async function executeToolWithLogging(toolName, toolArgs, toolContext, re
 			result: finalResult
 		});
 
-		return { success: true, result: finalResult };
+		return { success: true, result: finalResult, toolExec };
 	} catch (error) {
 		const toolLatency = Date.now() - toolCallStart;
 		logger.error(`Tool "${toolName}" failed to execute: ${error.message}`);
+		
+		toolExec.status = 'failed';
+		toolExec.error = error.message;
+		toolExec.latency = toolLatency;
+
 		if (onStatusUpdate) {
+			onStatusUpdate({
+				type: 'tool_execution',
+				data: toolExec
+			});
 			onStatusUpdate(`Tool ${toolName} failed: ${error.message} (${toolLatency}ms)`);
 		}
 
@@ -816,7 +850,7 @@ export async function executeToolWithLogging(toolName, toolArgs, toolContext, re
 			error: error.message
 		});
 
-		return { success: false, error: error.message };
+		return { success: false, error: error.message, toolExec };
 	}
 }
 

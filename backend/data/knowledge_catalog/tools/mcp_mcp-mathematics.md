@@ -4,7 +4,7 @@ title: MCP Server - mcp-mathematics
 description: Integrated MCP server providing tools for mcp-mathematics.
 tags: [mcp-mathematics, mcp, mathematics, performance, metrics, security, status, memory, statistics, calculate, expression, batch, matrix, operation, convert, units, natural, language, analyze, number, theory, create, session, list, variables, delete, get, calculation, history, clear, optimize, functions]
 tools: [performance_metrics, security_status, memory_statistics, calculate_expression, batch_calculate, calculate_statistics, matrix_operation, convert_units, convert_natural_language, analyze_number_theory, create_session, session_calculate, list_session_variables, delete_session, get_calculation_history, clear_history, optimize_memory, list_functions]
-timestamp: 2026-07-24T16:39:09.129Z
+timestamp: 2026-07-24T18:10:18.562Z
 ---
 
 # MCP Server - mcp-mathematics

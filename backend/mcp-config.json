@@ -120,6 +120,17 @@
         "run",
         "/ABSOLUTE_PATH_TO_SYMPY_MCP/server.py"
       ]
+    },
+    "sequential-thinking": {
+      "enabled": true,
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "env": {
+        "NODE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/node_modules"
+      }
     }
   }
 }

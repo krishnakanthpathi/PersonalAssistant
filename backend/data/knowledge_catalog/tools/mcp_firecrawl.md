@@ -4,7 +4,7 @@ title: MCP Server - firecrawl
 description: Integrated MCP server providing tools for firecrawl.
 tags: [firecrawl, scrape, map, search, feedback, crawl, check, status, extract, agent, interact, stop, parse, monitor, create, list, get, update, delete, run, checks, research, papers, inspect, paper, related, read, github]
 tools: [firecrawl_scrape, firecrawl_map, firecrawl_search, firecrawl_search_feedback, firecrawl_feedback, firecrawl_crawl, firecrawl_check_crawl_status, firecrawl_extract, firecrawl_agent, firecrawl_agent_status, firecrawl_interact, firecrawl_interact_stop, firecrawl_parse, firecrawl_monitor_create, firecrawl_monitor_list, firecrawl_monitor_get, firecrawl_monitor_update, firecrawl_monitor_delete, firecrawl_monitor_run, firecrawl_monitor_checks, firecrawl_monitor_check, firecrawl_research_search_papers, firecrawl_research_inspect_paper, firecrawl_research_related_papers, firecrawl_research_read_paper, firecrawl_research_search_github]
-timestamp: 2026-07-24T16:39:09.080Z
+timestamp: 2026-07-24T18:10:18.494Z
 ---
 
 # MCP Server - firecrawl

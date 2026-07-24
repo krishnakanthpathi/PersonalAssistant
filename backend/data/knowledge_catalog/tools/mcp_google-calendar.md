@@ -4,7 +4,7 @@ title: MCP Server - google-calendar
 description: Integrated MCP server providing tools for google-calendar.
 tags: [google-calendar, google, calendar, list, calendars, events, search, get, event, colors, create, update, delete, freebusy, current, time, respond, manage, accounts]
 tools: [list-calendars, list-events, search-events, get-event, list-colors, create-event, create-events, update-event, delete-event, get-freebusy, get-current-time, respond-to-event, manage-accounts]
-timestamp: 2026-07-24T16:39:09.066Z
+timestamp: 2026-07-24T18:10:18.372Z
 ---
 
 # MCP Server - google-calendar
