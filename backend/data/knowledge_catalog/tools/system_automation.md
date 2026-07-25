@@ -19,7 +19,7 @@ This category provides a powerful collection of automation and integration tools
 ### Knowledge Graph Operations
 - **`create_entities`** / **`delete_entities`**: Manage entities in the knowledge graph.
 - **`create_relations`** / **`delete_relations`**: Manage relationships between entities.
-- **`add_observations`** / **`delete_observations`**: Add or remove entity observations.
+- **`add_memory`** / **`delete_memory`**: Add or remove user memories in Mem0.
 - **`read_graph`** / **`search_nodes`** / **`open_nodes`**: Query and navigate the knowledge graph.
 
 ### GitHub Integration

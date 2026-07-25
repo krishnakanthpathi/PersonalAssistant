@@ -151,11 +151,11 @@ class ToolRegistry {
 		}
 
 		const CORE_TOOLS = new Set([
-			'read_graph',
-			'search_nodes',
-			'open_nodes',
-			'create_entities',
-			'add_observations',
+			'add_memory',
+			'search_memories',
+			'get_memory',
+			'list_memories',
+			'delete_memory',
 			'open_application',
 			'close_application',
 			'run_applescript',

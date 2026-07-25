@@ -1,27 +1,23 @@
 ---
 type: tool_group
-title: Knowledge Graph Memory Tools
-description: Tools for interacting with the local personal knowledge graph memory database to build and manage semantic connections.
-tags: [memory, knowledge-graph, entities, relations, observations, graph, semantic, remember]
-tools: [create_entities, create_relations, add_observations, delete_entities, delete_observations, delete_relations, read_graph, search_nodes, open_nodes]
-timestamp: 2026-07-21T03:39:00.000Z
+title: Mem0 Memory Tools
+description: Tools for interacting with the Mem0 AI long-term memory server to store and search semantic user memories.
+tags: [memory, mem0, user_profile, search_memories, add_memory, list_memories, delete_memory, remember]
+tools: [add_memory, search_memories, list_memories, get_memory, update_memory, delete_memory]
+timestamp: 2026-07-25T10:35:00.000Z
 ---
 
-# Knowledge Graph Memory Tools
+# Mem0 Memory Tools
 
-This tool category enables interaction with the local personal knowledge graph database. It supports creating entities, defining relations, recording observations, and searching semantic graph structures to remember facts and connections.
+This tool category enables interaction with Mem0 AI long-term memory. It supports storing memories, querying semantic user facts, listing stored memories, and updating or deleting memories.
 
 ## Available Tools
 
-### Entity & Relation Management
-- **`create_entities`**: Create new semantic entities.
-- **`create_relations`**: Create connections/relations between entities.
-- **`add_observations`**: Attach new factual observations to entities.
-- **`delete_entities`**: Delete entities.
-- **`delete_relations`**: Delete connections.
-- **`delete_observations`**: Delete specific observations.
+### Memory Storage & Retrieval
+- **`add_memory`**: Store new user facts, preferences, or context as long-term memories.
+- **`search_memories`**: Query and retrieve semantically relevant user memories.
+- **`list_memories`**: List stored user memories with optional filters.
+- **`get_memory`**: Retrieve a specific memory entry by ID.
+- **`update_memory`**: Update an existing memory record.
+- **`delete_memory`**: Delete a memory entry by ID.
 
-### Retrieval & Search
-- **`read_graph`**: Retrieve the complete semantic graph map.
-- **`search_nodes`**: Search entity nodes by name or description.
-- **`open_nodes`**: Retrieve detailed observations and attributes for specific nodes.

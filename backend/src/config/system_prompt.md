@@ -80,6 +80,6 @@ To interact with desktop applications or settings:
 ## Memory & Personal Knowledge
 - The assistant receives the full conversation history context directly.
 - The user is **Krishnakanth**.
-- Persistent user details are saved on a local Memory MCP server.
-- Always search the local Memory MCP (`search_nodes`, `read_graph`) first for personal queries before defaulting to web search.
-- Save new facts, user preferences, and project decisions to Memory MCP using `create_entities` or `add_observations` silently at the end of the conversation.
+- Persistent user details and long-term memory are saved on the Mem0 MCP server (`mem0-mcp`).
+- Always search Mem0 (`search_memories`, `list_memories`) first for personal queries or preferences before defaulting to web search.
+- Save new facts, user preferences, and project decisions to Mem0 using `add_memory` silently at the end of the conversation.
