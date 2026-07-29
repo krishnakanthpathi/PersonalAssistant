@@ -5,7 +5,7 @@ import signal
 from fastmcp import FastMCP
 
 DEFAULT_ALLOWED_PROCESSES = [
-    'git', 'rg', 'gh', 'fd', 'python3', 'node', 'npm', 'npx',
+    'git', 'rg', 'gh', 'fd', 'python3', 'node', 'npm', 'npx', 'docker', 'docker-compose',
     'swift', 'swiftc', 'osascript', 'cupsfilter', 'qlmanage',
     'shortcuts', 'open', 'screencapture', 'cat', 'ls', 'echo', 'ps'
 ]

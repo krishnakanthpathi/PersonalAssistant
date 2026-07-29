@@ -4,7 +4,7 @@ title: MCP Server - mem0-mcp
 description: Integrated MCP server providing tools for mem0-mcp.
 tags: [mem0-mcp, mem0, mcp, add, memory, search, memories, list, get, update, delete, history, capabilities, batch, rate, event, events, create, export]
 tools: [add_memory, search_memories, search_memory, list_memories, get_memory, update_memory, delete_memory, get_memory_history, get_memory_capabilities, batch_update_memories, batch_delete_memories, rate_memory, get_memory_event, list_memory_events, create_memory_export, get_memory_export]
-timestamp: 2026-07-25T05:05:47.031Z
+timestamp: 2026-07-29T16:55:05.550Z
 ---
 
 # MCP Server - mem0-mcp

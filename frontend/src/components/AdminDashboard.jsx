@@ -696,18 +696,18 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col h-screen w-screen bg-bg-primary overflow-hidden text-gray-200 font-sans">
       {/* Header */}
-      <header className="flex-shrink-0 h-16 border-b border-border-color bg-bg-secondary/40 backdrop-blur-md px-6 flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
+      <header className="flex-shrink-0 min-h-16 py-2 sm:py-0 border-b border-border-color bg-bg-secondary/40 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between flex-wrap gap-2 z-10">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={handleBack}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition"
           >
-            <ArrowLeft size={14} /> Back to Chat
+            <ArrowLeft size={14} /> <span className="hidden sm:inline">Back to</span> Chat
           </button>
           <div className="h-4 w-px bg-white/10" />
-          <div className="flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5 text-accent-blue" />
-            <h1 className="text-lg font-bold bg-accent-gradient bg-clip-text text-transparent">Antigravity Telemetry</h1>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5 text-accent-blue flex-shrink-0" />
+            <h1 className="text-base sm:text-lg font-bold bg-accent-gradient bg-clip-text text-transparent truncate">Antigravity Telemetry</h1>
           </div>
         </div>
 
@@ -728,7 +728,7 @@ export default function AdminDashboard() {
       <div className="flex flex-grow h-[calc(100vh-64px)] overflow-hidden">
 
         {/* Main Content Area */}
-        <main className="flex-grow flex flex-col h-full overflow-y-auto bg-bg-primary/10 p-6">
+        <main className="flex-grow flex flex-col h-full overflow-y-auto bg-bg-primary/10 p-3 sm:p-6">
           {selectedRequest ? (
             /* ================= REQUEST DETAIL VIEW ================= */
             <div className="flex flex-col gap-6 max-w-6xl mx-auto w-full">
@@ -857,11 +857,11 @@ export default function AdminDashboard() {
             /* ================= METRICS AGGREGATES VIEW ================= */
             <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full flex-grow overflow-hidden">
               {/* Tab Header Selector */}
-              <div className="flex border-b border-white/5 pb-0 items-center justify-between flex-shrink-0">
-                <div className="flex gap-1">
+              <div className="flex border-b border-white/5 pb-0 items-center justify-between flex-shrink-0 w-full overflow-hidden">
+                <div className="flex gap-1 overflow-x-auto whitespace-nowrap scrollbar-none max-w-full pb-0.5">
                   <button
                     onClick={() => { setActiveView('overview'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       activeView === 'overview'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -872,7 +872,7 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => { setActiveView('logs'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       activeView === 'logs'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -886,7 +886,7 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => { setActiveView('tools'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       activeView === 'tools'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -897,7 +897,7 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => { setActiveView('personal-db'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       activeView === 'personal-db'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -908,7 +908,7 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => { setActiveView('test'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       activeView === 'test'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -919,7 +919,7 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => { setActiveView('chat-history'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       activeView === 'chat-history'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -930,7 +930,7 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => { setActiveView('quick-actions'); setSelectedRequest(null); }}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       activeView === 'quick-actions'
                         ? 'border-accent-blue text-white font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -1340,7 +1340,7 @@ export default function AdminDashboard() {
                 </div>
               ) : activeView === 'logs' ? (
                 /* ================= LIVE LOGS VIEW ================= */
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-3 sm:p-5 flex flex-col h-auto min-h-[500px] lg:h-[calc(100vh-210px)] w-full overflow-hidden">
                   {/* Header / Toolbar */}
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
                     <div>
@@ -1362,14 +1362,14 @@ export default function AdminDashboard() {
                     {/* Filter controls */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       {/* Search bar */}
-                      <div className="relative">
+                      <div className="relative w-full sm:w-auto">
                         <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
                         <input
                           type="text"
                           placeholder="Search logs..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-44 transition-all"
+                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-full sm:w-44 transition-all"
                         />
                         {searchQuery && (
                           <button
@@ -1483,7 +1483,7 @@ export default function AdminDashboard() {
                 </div>
               ) : activeView === 'tools' ? (
                 /* ================= TOOLS EXPLORER VIEW ================= */
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-3 sm:p-5 flex flex-col h-auto min-h-[500px] lg:h-[calc(100vh-210px)] w-full overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
                     <div>
                       <h3 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -1492,7 +1492,7 @@ export default function AdminDashboard() {
                       <p className="text-[11px] text-gray-500">Search and explore the assistant's capability registry in real-time.</p>
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 text-xs">
                       <label className="flex items-center gap-1.5 cursor-pointer text-gray-400 select-none">
                         <input
                           type="checkbox"
@@ -1503,14 +1503,14 @@ export default function AdminDashboard() {
                         <span className={useSemanticSearch ? 'text-accent-blue font-bold' : ''}>Smart Tool Selection (OKF)</span>
                       </label>
 
-                      <div className="relative">
+                      <div className="relative w-full sm:w-auto">
                         <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
                         <input
                           type="text"
-                          placeholder={useSemanticSearch ? "Type a capability to search (e.g. 'capture screen')..." : "Search tools by name/description..."}
+                          placeholder={useSemanticSearch ? "Type a capability to search..." : "Search tools by name..."}
                           value={toolsSearchQuery}
                           onChange={(e) => setToolsSearchQuery(e.target.value)}
-                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-72 transition-all"
+                          className="pl-8 pr-7 py-1.5 bg-black/40 border border-white/5 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 w-full sm:w-64 lg:w-72 transition-all"
                         />
                         {toolsSearchQuery && (
                           <button
@@ -1524,9 +1524,9 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex-grow flex gap-6 overflow-hidden mt-4">
+                  <div className="flex-grow flex flex-col lg:flex-row gap-4 lg:gap-6 overflow-y-auto lg:overflow-hidden mt-4">
                     {/* Left Pane: Tools list */}
-                    <div className="w-1/3 flex flex-col gap-2 overflow-y-auto pr-1">
+                    <div className="w-full lg:w-1/3 flex flex-col gap-2 h-64 lg:h-auto overflow-y-auto pr-1 border-b lg:border-b-0 border-white/5 pb-4 lg:pb-0">
                       {isSearchingTools ? (
                         <div className="text-gray-500 text-xs text-center py-8">
                           <RefreshCw size={14} className="animate-spin inline mr-2 text-accent-blue" /> Searching ChromaDB...
@@ -1577,7 +1577,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Right Pane: Selected Tool Details */}
-                    <div className="w-2/3 bg-black/20 border border-white/5 rounded-xl p-5 overflow-y-auto flex flex-col gap-4">
+                    <div className="w-full lg:w-2/3 bg-black/20 border border-white/5 rounded-xl p-3 sm:p-5 overflow-y-auto flex flex-col gap-4 min-h-[300px]">
                       {selectedExplorerTool ? (
                         <>
                           <div>
@@ -1697,7 +1697,7 @@ export default function AdminDashboard() {
                 </div>
               ) : activeView === 'personal-db' ? (
                 /* ================= OKF RETRIEVAL TESTER VIEW ================= */
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-3 sm:p-5 flex flex-col h-auto min-h-[500px] lg:h-[calc(100vh-210px)] w-full overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
                     <div>
                       <h3 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -1709,12 +1709,12 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Input Form */}
-                  <form onSubmit={handleTestOkf} className="flex gap-3 mt-4 flex-shrink-0">
+                  <form onSubmit={handleTestOkf} className="flex flex-col sm:flex-row gap-3 mt-4 flex-shrink-0">
                     <div className="relative flex-grow">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                       <input
                         type="text"
-                        placeholder="Type a test prompt (e.g. 'go to my files and view everything' or 'what is my car model?')..."
+                        placeholder="Type a test prompt (e.g. 'go to my files and view everything')..."
                         value={okfTestQuery}
                         onChange={(e) => setOkfTestQuery(e.target.value)}
                         className="w-full pl-9 pr-7 py-2.5 bg-black/40 border border-white/5 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue/50 transition-all"
@@ -1732,7 +1732,7 @@ export default function AdminDashboard() {
                     <button
                       type="submit"
                       disabled={isTestingOkf || !okfTestQuery.trim()}
-                      className="px-5 py-2.5 bg-accent-blue hover:bg-accent-blue/90 disabled:bg-accent-blue/40 disabled:text-white/40 text-white font-semibold rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer"
+                      className="px-5 py-2.5 bg-accent-blue hover:bg-accent-blue/90 disabled:bg-accent-blue/40 disabled:text-white/40 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer w-full sm:w-auto"
                     >
                       {isTestingOkf ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}
                       Test OKF Retrieval
@@ -1746,9 +1746,9 @@ export default function AdminDashboard() {
                   )}
 
                   {/* Results Panel */}
-                  <div className="flex-grow flex gap-4 overflow-hidden mt-4">
+                  <div className="flex-grow flex flex-col lg:flex-row gap-4 overflow-y-auto lg:overflow-hidden mt-4">
                     {/* Left Panel: Profile / Memory Documents */}
-                    <div className="w-1/2 flex flex-col bg-black/20 border border-white/5 rounded-xl p-4 overflow-hidden">
+                    <div className="w-full lg:w-1/2 flex flex-col bg-black/20 border border-white/5 rounded-xl p-3 sm:p-4 min-h-[220px] overflow-hidden">
                       <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 flex-shrink-0">
                         <span>Profile & Memories Retrieved</span>
                         {okfMatchedDocs.length > 0 && (
@@ -1794,7 +1794,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Right Panel: Tools Loaded */}
-                    <div className="w-1/2 flex flex-col bg-black/20 border border-white/5 rounded-xl p-4 overflow-hidden">
+                    <div className="w-full lg:w-1/2 flex flex-col bg-black/20 border border-white/5 rounded-xl p-3 sm:p-4 min-h-[220px] overflow-hidden">
                       <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 flex-shrink-0">
                         <span>Tools retrieved for prompt</span>
                         {okfSelectedTools.length > 0 && (
@@ -1833,9 +1833,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ) : activeView === 'chat-history' ? (
-                <div className="flex flex-col gap-4 w-full h-[calc(100vh-170px)] overflow-hidden">
+                <div className="flex flex-col gap-4 w-full h-auto min-h-[500px] lg:h-[calc(100vh-170px)] overflow-hidden">
                   {/* Chat History Header */}
-                  <div className="flex items-center justify-between pb-3 border-b border-border-color flex-shrink-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-color flex-shrink-0">
                     <div>
                       <h2 className="text-md font-semibold text-white font-sans flex items-center gap-2">
                         <History size={18} className="text-accent-blue" />
@@ -1856,9 +1856,9 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Split Master-Detail Layout */}
-                  <div className="flex-grow flex gap-5 overflow-hidden">
+                  <div className="flex-grow flex flex-col lg:flex-row gap-4 lg:gap-5 overflow-y-auto lg:overflow-hidden">
                     {/* Left Pane: Chat Sessions / Queries List */}
-                    <div className="w-80 sm:w-96 flex-shrink-0 bg-white/5 border border-white/10 rounded-2xl flex flex-col overflow-hidden">
+                    <div className="w-full lg:w-96 flex-shrink-0 h-64 lg:h-auto bg-white/5 border border-white/10 rounded-2xl flex flex-col overflow-hidden">
                       <div className="p-3 border-b border-white/10 bg-bg-secondary/40 flex items-center justify-between flex-shrink-0">
                         <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
                           <MessageSquare size={13} className="text-accent-blue" />
@@ -1909,7 +1909,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Right Pane: Selected Chat Details & Tools Inspection */}
-                    <div className="flex-grow bg-white/5 border border-white/10 rounded-2xl flex flex-col overflow-hidden p-5">
+                    <div className="flex-grow bg-white/5 border border-white/10 rounded-2xl flex flex-col overflow-hidden p-3 sm:p-5 min-h-[400px] lg:min-h-0">
                       {selectedHistoryRequest ? (
                         <div className="flex flex-col gap-5 h-full overflow-y-auto pr-1">
                           {/* Top Bar for Selected Request */}
@@ -2021,7 +2021,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 /* ================= TEST CENTER VIEW ================= */
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col h-[calc(100vh-210px)] min-h-[450px] w-full overflow-hidden">
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-3 sm:p-5 flex flex-col h-auto min-h-[500px] lg:h-[calc(100vh-210px)] w-full overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5 flex-shrink-0">
                     <div>
                       <h3 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -2031,9 +2031,9 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex-grow flex gap-6 overflow-hidden mt-4">
+                  <div className="flex-grow flex flex-col lg:flex-row gap-6 overflow-y-auto lg:overflow-hidden mt-4">
                     {/* Left Pane: OKF Test suite */}
-                    <div className="w-1/2 flex flex-col gap-4 border-r border-white/5 pr-6 h-full overflow-hidden">
+                    <div className="w-full lg:w-1/2 flex flex-col gap-4 border-b lg:border-b-0 lg:border-r border-white/5 pb-6 lg:pb-0 pr-0 lg:pr-6 h-auto lg:h-full">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">OKF Test Runner</span>
                         <div className="flex gap-2">
@@ -2056,13 +2056,13 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex-grow bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap select-text">
+                      <div className="flex-grow bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-gray-400 overflow-y-auto whitespace-pre-wrap select-text min-h-[160px]">
                         {ragTestOutput || 'Click "Run OKF Test Suite" to verify tool OKF indexes and execute automated tests.'}
                       </div>
                     </div>
 
                     {/* Right Pane: Manual Tool execution */}
-                    <div className="w-1/2 flex flex-col gap-4 h-full overflow-y-auto pl-2">
+                    <div className="w-full lg:w-1/2 flex flex-col gap-4 h-auto lg:h-full overflow-y-auto pl-0 lg:pl-2">
                       <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Manual Tool Tester</span>
                       
                       <div className="flex flex-col gap-2">
@@ -2100,7 +2100,7 @@ export default function AdminDashboard() {
 
                       <div className="flex flex-col gap-2 flex-grow">
                         <label className="text-[10px] text-gray-500 font-bold uppercase">Execution Output</label>
-                        <div className="bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-gray-300 overflow-y-auto whitespace-pre-wrap select-text leading-relaxed">
+                        <div className="bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-gray-300 overflow-y-auto whitespace-pre-wrap select-text leading-relaxed min-h-[120px]">
                           {manualToolResult || 'Execution result will be displayed here.'}
                         </div>
                       </div>

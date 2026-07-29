@@ -154,7 +154,7 @@ if sys.platform == 'darwin':
     reg_notes(mcp)
     reg_terminal(mcp)
     
-    reg_applescript(mcp)
+    # reg_applescript(mcp) # Disabled / paused osascript execution
     
 elif sys.platform == 'win32':
     from tools.windows.volume.volume_set import register as reg_win_vol_set

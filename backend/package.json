@@ -10,6 +10,7 @@
 		"build": "node esbuild.config.js"
 	},
 	"dependencies": {
+		"@0xshariq/docker-mcp-server": "^2.0.4",
 		"@chroma-core/default-embed": "^0.1.9",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"@pinkpixel/mem0-mcp": "^0.8.0",

@@ -7,7 +7,7 @@
         "@modelcontextprotocol/server-filesystem",
         "~"
       ],
-      "enabled": false
+      "enabled": true
     },
     "notion": {
       "command": "npx",
@@ -63,6 +63,13 @@
         "-y",
         "@modelcontextprotocol/server-github"
       ]
+    },
+    "docker": {
+      "command": "node",
+      "args": [
+        "./node_modules/@0xshariq/docker-mcp-server/dist/index.js"
+      ],
+      "enabled": true
     },
     "mem0-mcp": {
       "command": "node",
