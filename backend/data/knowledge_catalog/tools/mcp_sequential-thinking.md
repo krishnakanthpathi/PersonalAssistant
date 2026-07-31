@@ -4,7 +4,7 @@ title: MCP Server - sequential-thinking
 description: Integrated MCP server providing tools for sequential-thinking.
 tags: [sequential-thinking, sequential, thinking, sequentialthinking]
 tools: [sequentialthinking]
-timestamp: 2026-07-29T16:55:05.579Z
+timestamp: 2026-07-31T13:47:03.267Z
 ---
 
 # MCP Server - sequential-thinking

@@ -450,7 +450,8 @@ function MainApp() {
   const [quickActionForms, setQuickActionForms] = useState([]);
   const [quickActionInputs, setQuickActionInputs] = useState({});
   const [favoritesSectionOpen, setFavoritesSectionOpen] = useState(true);
-  const [othersSectionOpen, setOthersSectionOpen] = useState(false);
+  const [othersSectionOpen, setOthersSectionOpen] = useState(true);
+  const [quickActionSearch, setQuickActionSearch] = useState('');
 
   const fetchQuickActionForms = async () => {
     try {
@@ -1957,29 +1958,58 @@ function MainApp() {
               </button>
             </div>
 
+            {/* Quick Search */}
+            <div className="p-3 border-b border-border-color bg-black/20 flex-shrink-0">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Filter cards by title or keyword..."
+                  value={quickActionSearch}
+                  onChange={(e) => setQuickActionSearch(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-emerald/50 select-text"
+                />
+                {quickActionSearch && (
+                  <button
+                    onClick={() => setQuickActionSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold font-mono cursor-pointer"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Panel Content */}
-            <div className="flex-grow overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 select-none">
+            <div className="flex-grow overflow-y-auto min-h-0 p-4 sm:p-5 flex flex-col gap-4 select-text overscroll-contain">
               {quickActionForms.length === 0 ? (
                 <div className="text-gray-500 text-xs text-center py-12 border border-dashed border-white/5 rounded-xl">
                   Loading available shortcuts...
                 </div>
               ) : (() => {
-                const favoriteForms = quickActionForms.filter(f => f.isFavorite);
-                const otherForms = quickActionForms.filter(f => !f.isFavorite);
+                const searchLower = quickActionSearch.toLowerCase().trim();
+                const filteredForms = quickActionForms.filter(f => 
+                  !searchLower || 
+                  (f.title && f.title.toLowerCase().includes(searchLower)) ||
+                  (f.description && f.description.toLowerCase().includes(searchLower))
+                );
+
+                const favoriteForms = filteredForms.filter(f => f.isFavorite);
+                const otherForms = filteredForms.filter(f => !f.isFavorite);
 
                 const renderCard = (card) => (
                   <div
                     key={card._id}
-                    className="p-4 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl flex flex-col gap-3 transition-all animate-slideUp text-left"
+                    className="p-4 bg-white/5 border border-white/10 hover:border-accent-emerald/30 rounded-xl flex flex-col gap-3 transition-all animate-slideUp text-left select-text"
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-bold text-xs text-white">{card.title}</h4>
-                        <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">{card.description}</p>
+                        <h4 className="font-bold text-xs text-white select-text">{card.title}</h4>
+                        <p className="text-[10px] text-gray-400 mt-1 leading-relaxed select-text">{card.description}</p>
                       </div>
                       <button
                         onClick={(e) => handleToggleFavoriteQuickAction(card._id, e)}
-                        className={`p-1.5 hover:bg-white/5 rounded transition cursor-pointer flex-shrink-0 ${card.isFavorite ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-300'}`}
+                        className={`p-1.5 hover:bg-white/10 rounded transition cursor-pointer flex-shrink-0 ${card.isFavorite ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-300'}`}
                         title={card.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
                       >
                         <Star size={13} fill={card.isFavorite ? 'currentColor' : 'none'} />
@@ -1987,16 +2017,17 @@ function MainApp() {
                     </div>
 
                     {card.inputs && card.inputs.length > 0 && (
-                      <div className="flex flex-col gap-2.5 bg-black/35 p-3 rounded-lg border border-white/5">
+                      <div className="flex flex-col gap-2.5 bg-black/40 p-3 rounded-lg border border-white/5 select-text">
                         {card.inputs.map(input => (
-                          <div key={input.name} className="flex flex-col gap-1 text-[10px]">
-                            <label className="text-gray-400 font-medium text-left">{input.label}</label>
+                          <div key={input.name} className="flex flex-col gap-1 text-[10px] select-text">
+                            <label className="text-gray-400 font-medium text-left select-text">{input.label}</label>
                             <input
                               type={input.type || 'text'}
                               value={quickActionInputs[card._id]?.[input.name] ?? ''}
                               onChange={e => handleQuickActionInputChange(card._id, input.name, e.target.value)}
+                              onClick={e => e.stopPropagation()}
                               placeholder={input.defaultValue || ''}
-                              className="px-2.5 py-1.5 bg-black/40 border border-white/5 rounded-md text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/40 font-mono"
+                              className="px-2.5 py-1.5 bg-black/50 border border-white/10 rounded-md text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/60 font-mono select-text"
                             />
                           </div>
                         ))}
@@ -2014,7 +2045,7 @@ function MainApp() {
                 );
 
                 return (
-                  <div className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-5 select-text">
                     {/* Favorites Dropdown Section (Open by default) */}
                     <div className="flex flex-col gap-2.5">
                       <button
@@ -2032,7 +2063,7 @@ function MainApp() {
                         <div className="flex flex-col gap-3 pl-1">
                           {favoriteForms.length === 0 ? (
                             <div className="text-gray-500 text-xs italic py-4 text-center bg-white/[0.01] border border-dashed border-white/5 rounded-xl">
-                              No favorites selected yet. Click the star icon on any card to add it here.
+                              {searchLower ? "No favorite cards match search." : "No favorites selected yet. Click the star icon on any card to add it here."}
                             </div>
                           ) : (
                             favoriteForms.map(renderCard)
@@ -2041,7 +2072,7 @@ function MainApp() {
                       )}
                     </div>
 
-                    {/* All Shortcuts Dropdown Section (Closed by default) */}
+                    {/* All Shortcuts Dropdown Section (Open by default) */}
                     <div className="flex flex-col gap-2.5">
                       <button
                         onClick={() => setOthersSectionOpen(!othersSectionOpen)}
@@ -2058,7 +2089,7 @@ function MainApp() {
                         <div className="flex flex-col gap-3 pl-1">
                           {otherForms.length === 0 ? (
                             <div className="text-gray-500 text-xs italic py-4 text-center bg-white/[0.01] border border-dashed border-white/5 rounded-xl">
-                              No additional shortcuts found.
+                              {searchLower ? "No cards match search criteria." : "No additional shortcuts found."}
                             </div>
                           ) : (
                             otherForms.map(renderCard)

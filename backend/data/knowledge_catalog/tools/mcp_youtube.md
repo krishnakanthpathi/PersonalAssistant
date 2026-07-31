@@ -4,7 +4,7 @@ title: MCP Server - youtube
 description: Integrated MCP server providing tools for youtube.
 tags: [youtube, search, videos, get, transcript, download, video, play, audio, stop]
 tools: [search_youtube_videos, get_youtube_transcript, download_youtube_video, play_youtube_audio, stop_youtube_audio]
-timestamp: 2026-07-29T16:55:05.525Z
+timestamp: 2026-07-31T13:47:03.154Z
 ---
 
 # MCP Server - youtube

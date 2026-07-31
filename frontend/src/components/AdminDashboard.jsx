@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -143,6 +143,8 @@ export default function AdminDashboard() {
     }
   };
 
+  const actionCardFormRef = useRef(null);
+
   const handleEditPrebuiltForm = (card) => {
     setEditingFormId(card._id);
     setNewFormTitle(card.title);
@@ -150,6 +152,9 @@ export default function AdminDashboard() {
     setNewFormPrompt(card.prompt);
     setNewFormInputs(card.inputs || []);
     setShowAddForm(true);
+    setTimeout(() => {
+      actionCardFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const handleCreatePrebuiltForm = async (e) => {
@@ -967,7 +972,7 @@ export default function AdminDashboard() {
 
                   {/* Creation / Edit Form */}
                   {showAddForm && (
-                    <form onSubmit={handleCreatePrebuiltForm} className="p-5 bg-white/5 border border-accent-emerald/30 rounded-2xl flex flex-col gap-4 animate-fadeIn max-w-2xl">
+                    <form ref={actionCardFormRef} onSubmit={handleCreatePrebuiltForm} className="p-5 bg-white/5 border border-accent-emerald/30 rounded-2xl flex flex-col gap-4 animate-fadeIn max-w-2xl">
                       <span className="text-xs font-bold text-accent-emerald uppercase tracking-wider block">
                         {editingFormId ? 'Edit Action Card' : 'New Action Card'}
                       </span>
@@ -1128,7 +1133,7 @@ export default function AdminDashboard() {
                                       value={formInputsValues[card._id]?.[input.name] ?? ''}
                                       onChange={e => handleInputChange(card._id, input.name, e.target.value)}
                                       placeholder={input.defaultValue || ''}
-                                      className="px-2.5 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/40 font-mono"
+                                      className="px-2.5 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-accent-emerald/40 font-mono select-text"
                                     />
                                   </div>
                                 ))}

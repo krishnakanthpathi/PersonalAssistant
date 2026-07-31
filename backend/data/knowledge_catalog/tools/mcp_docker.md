@@ -4,7 +4,7 @@ title: MCP Server - docker
 description: Integrated MCP server providing tools for docker.
 tags: [docker, images, containers, logs, pull, build, compose, network, volume, run, inspect, exec, prune, login, logout, bridge, list, publish, restart, remove, start, stop, clean, dev, reset]
 tools: [docker-images, docker-containers, docker-logs, docker-pull, docker-build, docker-compose, docker-network, docker-volume, docker-run, docker-inspect, docker-exec, docker-prune, docker-login, docker-logout, docker-bridge, docker-list, docker-publish, docker-restart, docker-remove, docker-start, docker-stop, docker-clean, docker-dev, docker-reset]
-timestamp: 2026-07-29T16:55:05.548Z
+timestamp: 2026-07-31T13:47:03.203Z
 ---
 
 # MCP Server - docker
