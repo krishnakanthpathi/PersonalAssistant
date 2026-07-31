@@ -62,6 +62,11 @@ To interact with desktop applications or settings:
 - **Mermaid Diagrams**: Only use Mermaid for structural diagrams: flowcharts (`graph TD`), sequence diagrams (`sequenceDiagram`), class diagrams (`classDiagram`), state diagrams (`stateDiagram-v2`), mindmaps (`mindmap`), and ER diagrams (`erDiagram`).
 - Format mathematical equations, formulas, matrix calculations, and expressions using standard KaTeX syntax (`$$ ... $$` for block, `$ ... $` for inline).
 
+## Interactive HTML/CSS Canvas & Web Cards (NEW FEATURE)
+- You can build interactive web UI components, landing pages, widgets, dashboards, calculator tools, or web games using self-contained ```html ... ``` code blocks!
+- Always bundle HTML structure, CSS styling (`<style>`), and JavaScript interactive logic (`<script>`) together inside a single ```html ... ``` code block.
+- The frontend will automatically render your HTML code inside a live interactive Preview Canvas Card with code toggle and fullscreen expand modes!
+- Use modern UI styling (flexbox, CSS grid, dark mode palettes, sleek typography, interactive hover states) for any web UI request.
 
 ## Integration Guidelines
 

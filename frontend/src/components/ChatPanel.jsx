@@ -19,12 +19,14 @@ import {
   Volume2,
   VolumeX,
   Square,
-  MessageSquareQuote
+  MessageSquareQuote,
+  Layers
 } from 'lucide-react';
 import ToolCard from './cards/ToolCard';
 import ChartCard from './cards/ChartCard';
 import MermaidCard from './cards/MermaidCard';
 import HtmlSandboxCard from './cards/HtmlSandboxCard';
+import PrebuiltFormsModal from './cards/PrebuiltFormsModal';
 
 function extractChartFromContent(content) {
   if (!content || typeof content !== 'string') return null;
@@ -53,6 +55,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
   const [statusMessage, setStatusMessage] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [copiedIdx, setCopiedIdx] = useState(null);
+  const [isCardsModalOpen, setIsCardsModalOpen] = useState(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -551,6 +554,16 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
               <Paperclip className="w-5 h-5" />
             </button>
 
+            {/* Quick Cards & Actions Extension Launcher */}
+            <button
+              type="button"
+              onClick={() => setIsCardsModalOpen(true)}
+              className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-[#2f2f2f] transition-colors cursor-pointer"
+              title="Action Cards & Quick Library"
+            >
+              <Layers className="w-5 h-5 text-slate-300 hover:text-white" />
+            </button>
+
             {/* Mic Dictation Toggle Button */}
             <button
               type="button"
@@ -609,6 +622,15 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
           </p>
         </div>
       </div>
+
+      {/* Action Cards Library Modal Launcher */}
+      <PrebuiltFormsModal
+        isOpen={isCardsModalOpen}
+        onClose={() => setIsCardsModalOpen(false)}
+        onSelectForm={(form) => {
+          handleSubmit(null, form.promptTemplate || form.prompt);
+        }}
+      />
     </div>
   );
 }

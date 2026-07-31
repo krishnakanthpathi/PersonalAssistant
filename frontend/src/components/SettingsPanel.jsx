@@ -14,7 +14,8 @@ import {
   Layers,
   Star,
   Trash2,
-  Plus
+  Plus,
+  Edit3
 } from 'lucide-react';
 
 export default function SettingsPanel({ onConfigUpdated }) {
@@ -101,22 +102,36 @@ export default function SettingsPanel({ onConfigUpdated }) {
     } catch (e) {}
   };
 
-  const handleCreateActionCard = async (e) => {
+  const [editingCardId, setEditingCardId] = useState(null);
+
+  const handleCreateOrUpdateActionCard = async (e) => {
     e.preventDefault();
     if (!newCardTitle.trim() || !newCardPrompt.trim()) return;
     try {
-      const res = await fetch('/api/prebuilt-forms', {
-        method: 'POST',
+      const isEdit = Boolean(editingCardId);
+      const url = isEdit ? `/api/prebuilt-forms/${editingCardId}` : '/api/prebuilt-forms';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newCardTitle, promptTemplate: newCardPrompt, category: 'General' })
+        body: JSON.stringify({ title: newCardTitle, promptTemplate: newCardPrompt, prompt: newCardPrompt, category: 'General' })
       });
       const data = await res.json();
       if (data.success) {
         setNewCardTitle('');
         setNewCardPrompt('');
+        setEditingCardId(null);
         fetchActionCards();
       }
     } catch (e) {}
+  };
+
+  const handleStartEditCard = (card) => {
+    const id = card._id || card.id;
+    setEditingCardId(id);
+    setNewCardTitle(card.title || '');
+    setNewCardPrompt(card.promptTemplate || card.prompt || '');
   };
 
   const handleDeleteCard = async (id) => {
@@ -348,8 +363,26 @@ export default function SettingsPanel({ onConfigUpdated }) {
       {/* Tab 2: Action Cards Manager */}
       {activeTab === 'cards' && (
         <div className="space-y-4">
-          <form onSubmit={handleCreateActionCard} className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
-            <h3 className="text-sm font-semibold text-white">Create New Action Card</h3>
+          <form onSubmit={handleCreateOrUpdateActionCard} className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white">
+                {editingCardId ? 'Edit Action Card' : 'Create New Action Card'}
+              </h3>
+              {editingCardId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCardId(null);
+                    setNewCardTitle('');
+                    setNewCardPrompt('');
+                  }}
+                  className="text-xs text-slate-400 hover:text-white"
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <input
                 type="text"
@@ -373,7 +406,7 @@ export default function SettingsPanel({ onConfigUpdated }) {
                 type="submit"
                 className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 shadow cursor-pointer"
               >
-                Add Action Card
+                {editingCardId ? 'Update Action Card' : 'Add Action Card'}
               </button>
             </div>
           </form>
@@ -387,14 +420,24 @@ export default function SettingsPanel({ onConfigUpdated }) {
                   <div key={id} className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] flex items-center justify-between">
                     <div>
                       <div className="text-xs font-semibold text-white">{card.title}</div>
-                      <div className="text-[11px] text-slate-400 line-clamp-1">{card.promptTemplate || card.description}</div>
+                      <div className="text-[11px] text-slate-400 line-clamp-1">{card.promptTemplate || card.prompt || card.description}</div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteCard(id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626]"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => handleStartEditCard(card)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626] cursor-pointer"
+                        title="Edit Card"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCard(id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626] cursor-pointer"
+                        title="Delete Card"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}

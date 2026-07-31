@@ -54,9 +54,10 @@ export const getPrebuiltForms = async (req, res) => {
 
 export const createPrebuiltForm = async (req, res) => {
 	try {
-		const { title, description, prompt, inputs = [] } = req.body;
+		const { title, description, prompt, promptTemplate, category = 'General', inputs = [] } = req.body;
+		const finalPrompt = promptTemplate || prompt;
 		
-		if (!title || !description || !prompt) {
+		if (!title || !description || !finalPrompt) {
 			throw new Error('title, description, and prompt are required');
 		}
 
@@ -66,7 +67,9 @@ export const createPrebuiltForm = async (req, res) => {
 		const newForm = {
 			title,
 			description,
-			prompt,
+			prompt: finalPrompt,
+			promptTemplate: finalPrompt,
+			category,
 			inputs,
 			isPredefined: false,
 			createdAt: new Date()
@@ -101,7 +104,7 @@ export const deletePrebuiltForm = async (req, res) => {
 export const updatePrebuiltForm = async (req, res) => {
 	try {
 		const { id } = req.params;
-		const { title, description, prompt, inputs } = req.body;
+		const { title, description, prompt, promptTemplate, category, inputs } = req.body;
 
 		if (!id) throw new Error('ID is required');
 
@@ -112,6 +115,11 @@ export const updatePrebuiltForm = async (req, res) => {
 		if (title !== undefined) updateData.title = title;
 		if (description !== undefined) updateData.description = description;
 		if (prompt !== undefined) updateData.prompt = prompt;
+		if (promptTemplate !== undefined) {
+			updateData.promptTemplate = promptTemplate;
+			updateData.prompt = promptTemplate;
+		}
+		if (category !== undefined) updateData.category = category;
 		if (inputs !== undefined) updateData.inputs = inputs;
 
 		const result = await collection.updateOne(

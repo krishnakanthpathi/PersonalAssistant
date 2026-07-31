@@ -12,16 +12,11 @@ import {
   Activity,
   Wrench,
   Play,
-  Layers,
-  Star,
   Globe
 } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('cards'); // 'cards', 'prompts', 'mcp', 'rag', 'metrics'
-
-  // Action Cards State
-  const [forms, setForms] = useState([]);
+  const [activeTab, setActiveTab] = useState('prompts'); // 'prompts', 'mcp', 'rag', 'metrics'
 
   // System Prompts State
   const [promptInput, setPromptInput] = useState('');
@@ -49,36 +44,11 @@ export default function AdminDashboard() {
   const [googleStatus, setGoogleStatus] = useState({ connected: false, email: '' });
 
   useEffect(() => {
-    fetchActionCards();
     fetchPrompts();
     fetchMcpData();
     fetchMetrics();
     fetchGoogleStatus();
   }, []);
-
-  const fetchActionCards = async () => {
-    try {
-      const res = await fetch('/api/prebuilt-forms');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.forms)) setForms(data.forms);
-    } catch (e) {}
-  };
-
-  const handleToggleFavorite = async (id) => {
-    try {
-      const res = await fetch(`/api/prebuilt-forms/${id}/toggle-favorite`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) fetchActionCards();
-    } catch (e) {}
-  };
-
-  const handleDeleteCard = async (id) => {
-    try {
-      const res = await fetch(`/api/prebuilt-forms/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) fetchActionCards();
-    } catch (e) {}
-  };
 
   const fetchPrompts = async () => {
     try {
@@ -99,22 +69,25 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        setPromptMsg('System prompt saved!');
+        setPromptMsg('System prompt updated successfully.');
         setTimeout(() => setPromptMsg(''), 3000);
       }
-    } catch (e) {} finally { setPromptLoading(false); }
+    } catch (e) {
+      setPromptMsg('Failed to update system prompt.');
+    } finally {
+      setPromptLoading(false);
+    }
   };
 
   const fetchMcpData = async () => {
     try {
-      const [configRes, toolsRes] = await Promise.all([
-        fetch('/api/mcp/config'),
-        fetch('/api/tools')
-      ]);
-      const configData = await configRes.json();
-      const toolsData = await toolsRes.json();
-      if (configData.success) setMcpConfig(configData.config || { mcpServers: {} });
-      if (toolsData.success) setMcpTools(toolsData.tools || []);
+      const resConfig = await fetch('/api/mcp/config');
+      const dataConfig = await resConfig.json();
+      if (dataConfig.success && dataConfig.config) setMcpConfig(dataConfig.config);
+
+      const resTools = await fetch('/api/tools');
+      const dataTools = await resTools.json();
+      if (dataTools.success && Array.isArray(dataTools.tools)) setMcpTools(dataTools.tools);
     } catch (e) {}
   };
 
@@ -124,25 +97,45 @@ export default function AdminDashboard() {
       setTestingTool(true);
       setTestToolResult(null);
       let parsedArgs = {};
-      try { parsedArgs = JSON.parse(testToolArgs); } catch (e) {}
+      try {
+        parsedArgs = JSON.parse(testToolArgs);
+      } catch (err) {
+        setTestToolResult({ error: 'Invalid JSON arguments format.' });
+        setTestingTool(false);
+        return;
+      }
 
       const res = await fetch('/api/tools/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: testToolName, args: parsedArgs })
+        body: JSON.stringify({ toolName: testToolName, args: parsedArgs })
       });
       const data = await res.json();
       setTestToolResult(data);
-    } catch (e) {
-      setTestToolResult({ success: false, error: e.message });
-    } finally { setTestingTool(false); }
+    } catch (err) {
+      setTestToolResult({ error: err.message });
+    } finally {
+      setTestingTool(false);
+    }
+  };
+
+  const handleRunRagTest = async () => {
+    if (!ragQuery.trim()) return;
+    try {
+      setRagLoading(true);
+      const res = await fetch(`/api/okf/test-retrieval?query=${encodeURIComponent(ragQuery)}`);
+      const data = await res.json();
+      setRagResults(data);
+    } catch (e) {} finally {
+      setRagLoading(false);
+    }
   };
 
   const fetchGoogleStatus = async () => {
     try {
       const res = await fetch('/api/auth/google/status');
       const data = await res.json();
-      if (data.success) setGoogleStatus({ connected: data.connected, email: data.email || '' });
+      if (data.success) setGoogleStatus(data);
     } catch (e) {}
   };
 
@@ -168,11 +161,11 @@ export default function AdminDashboard() {
             <Sliders className="w-5 h-5 text-white" />
             <span>Enterprise Systems & Admin Panel</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Management for action cards, MCP tools, system prompts, Google OAuth, and memory</p>
+          <p className="text-xs text-slate-400 mt-1">Management for MCP tools, system prompts, Google OAuth, memory, and telemetry</p>
         </div>
 
         <button
-          onClick={() => { fetchActionCards(); fetchPrompts(); fetchMcpData(); fetchMetrics(); }}
+          onClick={() => { fetchPrompts(); fetchMcpData(); fetchMetrics(); }}
           className="px-3 py-1.5 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] text-xs font-medium flex items-center space-x-1.5 transition-colors border border-white/5 cursor-pointer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -182,16 +175,6 @@ export default function AdminDashboard() {
 
       {/* Navigation */}
       <div className="flex space-x-2 border-b border-[#262626] pb-1 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('cards')}
-          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
-            activeTab === 'cards' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Action Cards</span>
-        </button>
-
         <button
           onClick={() => setActiveTab('prompts')}
           className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
@@ -209,7 +192,7 @@ export default function AdminDashboard() {
           }`}
         >
           <Cpu className="w-4 h-4" />
-          <span>MCP Tools</span>
+          <span>MCP Tools Sandbox</span>
         </button>
 
         <button
@@ -219,7 +202,7 @@ export default function AdminDashboard() {
           }`}
         >
           <Database className="w-4 h-4" />
-          <span>RAG Memory</span>
+          <span>OKF RAG Search</span>
         </button>
 
         <button
@@ -229,99 +212,63 @@ export default function AdminDashboard() {
           }`}
         >
           <Activity className="w-4 h-4" />
-          <span>Metrics & Integrations</span>
+          <span>Metrics & Telemetry</span>
         </button>
       </div>
 
-      {/* Tab 1: Cards */}
-      {activeTab === 'cards' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Configured Action Cards ({forms.length})</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {forms.map((form) => {
-              const id = form._id || form.id;
-              return (
-                <div key={id} className="p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold text-xs text-white">{form.title}</span>
-                      {form.isFavorite && <Star className="w-3.5 h-3.5 text-white fill-current" />}
-                    </div>
-                    <p className="text-[11px] text-slate-400 line-clamp-1">{form.description || form.promptTemplate}</p>
-                  </div>
-
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => handleToggleFavorite(id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#212121]"
-                    >
-                      <Star className={`w-3.5 h-3.5 ${form.isFavorite ? 'text-white fill-current' : ''}`} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCard(id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#212121]"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 2: System Prompts */}
+      {/* Tab 1: System Prompt Manager */}
       {activeTab === 'prompts' && (
-        <div className="space-y-4">
-          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
-            <div className="flex items-center justify-between">
+        <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
               <h3 className="text-sm font-semibold text-white">Active System Prompt</h3>
-              {promptMsg && <span className="text-xs text-white flex items-center"><Check className="w-3.5 h-3.5 mr-1" /> {promptMsg}</span>}
+              <p className="text-xs text-slate-400">Master directive prompt passed to LLM reasoning engine</p>
             </div>
 
-            <textarea
-              rows={12}
-              value={promptInput}
-              onChange={(e) => setPromptInput(e.target.value)}
-              className="w-full p-4 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200 focus:outline-none focus:border-[#555555] leading-relaxed"
-            />
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleSavePrompt}
-                disabled={promptLoading}
-                className="px-4 py-2 rounded-xl bg-white text-black hover:bg-slate-200 font-semibold text-xs flex items-center space-x-2 shadow transition-all cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Prompt</span>
-              </button>
-            </div>
+            <button
+              onClick={handleSavePrompt}
+              disabled={promptLoading}
+              className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 shadow flex items-center space-x-1.5 cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save System Prompt</span>
+            </button>
           </div>
+
+          {promptMsg && (
+            <div className="p-3 rounded-xl bg-[#212121] border border-white/10 text-xs font-medium text-white">
+              {promptMsg}
+            </div>
+          )}
+
+          <textarea
+            rows={14}
+            value={promptInput}
+            onChange={(e) => setPromptInput(e.target.value)}
+            className="w-full p-4 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200 focus:outline-none focus:border-white leading-relaxed"
+          />
         </div>
       )}
 
-      {/* Tab 3: MCP Tools & Sandbox */}
+      {/* Tab 2: MCP Tools Sandbox */}
       {activeTab === 'mcp' && (
         <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
-            <h3 className="text-sm font-semibold text-white flex items-center space-x-2">
+          {/* Direct Tool Execution Tester */}
+          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
+            <div className="flex items-center space-x-2">
               <Wrench className="w-4 h-4 text-white" />
-              <span>Direct Tool Execution Sandbox</span>
-            </h3>
+              <h3 className="text-sm font-semibold text-white">Direct MCP Tool Execution Sandbox</h3>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Select Tool</label>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Select Registered Tool</label>
                 <select
                   value={testToolName}
                   onChange={(e) => setTestToolName(e.target.value)}
-                  className="w-full p-2 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200"
+                  className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
                 >
-                  <option value="">Select a tool to test...</option>
+                  <option value="">Select tool...</option>
                   {mcpTools.map((t, idx) => {
                     const name = t.name || t.function?.name;
                     return <option key={idx} value={name}>{name}</option>;
@@ -330,61 +277,64 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">JSON Arguments</label>
+                <label className="text-xs font-medium text-slate-300 block mb-1">JSON Arguments</label>
                 <input
                   type="text"
                   value={testToolArgs}
                   onChange={(e) => setTestToolArgs(e.target.value)}
-                  className="w-full p-2 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200"
                   placeholder='{"query": "test"}'
+                  className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <button
-                onClick={handleRunToolTest}
-                disabled={testingTool || !testToolName}
-                className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 shadow flex items-center space-x-1.5 cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-black" />
-                <span>Test Tool Call</span>
-              </button>
-            </div>
+            <button
+              onClick={handleRunToolTest}
+              disabled={testingTool || !testToolName}
+              className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 shadow flex items-center space-x-1.5 cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5 fill-black" />
+              <span>Execute Tool</span>
+            </button>
 
             {testToolResult && (
-              <pre className="p-3 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200 max-h-60 overflow-y-auto">
+              <pre className="p-3 rounded-xl bg-[#0c0c0c] border border-[#262626] overflow-x-auto text-xs font-mono text-slate-300 max-h-60">
                 {JSON.stringify(testToolResult, null, 2)}
               </pre>
             )}
           </div>
 
+          {/* Registered Tools Catalog List */}
           <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-white">Registered MCP Tools ({mcpTools.length})</h3>
-              </div>
-
+              <h3 className="text-sm font-semibold text-white">Registered Tools Catalog ({filteredTools.length})</h3>
               <div className="relative w-64">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                 <input
                   type="text"
-                  placeholder="Search tools..."
+                  placeholder="Filter tool by name..."
                   value={mcpSearch}
                   onChange={(e) => setMcpSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-200 focus:outline-none placeholder-slate-500"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-200"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
               {filteredTools.map((tool, idx) => {
                 const name = tool.name || tool.function?.name;
                 const desc = tool.description || tool.function?.description;
                 return (
-                  <div key={idx} className="p-3 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a]">
-                    <div className="font-mono font-semibold text-xs text-white">{name}</div>
-                    <div className="text-[11px] text-slate-400 mt-1 line-clamp-2">{desc}</div>
+                  <div key={idx} className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold font-mono text-white">{name}</span>
+                      {tool.serverName && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#262626] text-slate-300 border border-white/5">
+                          {tool.serverName}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2">{desc || 'No description available.'}</p>
                   </div>
                 );
               })}
@@ -393,31 +343,24 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Tab 4: RAG Memory */}
+      {/* Tab 3: OKF RAG Tester */}
       {activeTab === 'rag' && (
         <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-white">RAG Memory Search</h3>
+            <h3 className="text-sm font-semibold text-white">Open Knowledge Format (OKF) Memory Retrieval Test</h3>
+            <p className="text-xs text-slate-400">Test keyword and semantic matching against loaded catalog documents</p>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex space-x-2">
             <input
               type="text"
-              placeholder="Search vector database..."
+              placeholder="Enter search query (e.g. gmail, notion, ssh terminal)..."
               value={ragQuery}
               onChange={(e) => setRagQuery(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-200 focus:outline-none"
+              className="flex-1 p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-100"
             />
             <button
-              onClick={async () => {
-                if (!ragQuery.trim()) return;
-                setRagLoading(true);
-                try {
-                  const res = await fetch(`/api/personal-db/search?query=${encodeURIComponent(ragQuery)}`);
-                  const data = await res.json();
-                  setRagResults(data);
-                } catch (e) {} finally { setRagLoading(false); }
-              }}
+              onClick={handleRunRagTest}
               disabled={ragLoading}
               className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 cursor-pointer"
             >
@@ -433,7 +376,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Tab 5: Metrics & Integrations */}
+      {/* Tab 4: Metrics & Telemetry */}
       {activeTab === 'metrics' && (
         <div className="space-y-4">
           <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center justify-between">
