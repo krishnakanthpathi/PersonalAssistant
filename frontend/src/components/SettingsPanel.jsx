@@ -1,1261 +1,508 @@
 import React, { useState, useEffect } from 'react';
 import { 
+  Settings, 
+  Cpu, 
+  Database, 
+  Key, 
+  Check, 
+  RefreshCw, 
   Save, 
-  AlertCircle, 
-  CheckCircle, 
-  Sparkles,
-  Link2,
-  Settings,
-  Palette,
-  RefreshCw,
-  Loader2,
-  Plus,
+  AlertCircle,
+  Eye,
+  ToggleLeft,
+  ToggleRight,
+  Layers,
+  Star,
   Trash2,
-  Edit,
-  X
+  Plus
 } from 'lucide-react';
 
-export default function SettingsPanel({
-  settingsForm,
-  setSettingsForm,
-  isSavingSettings,
-  settingsSuccess,
-  settingsError,
-  handleSaveSettings,
-  googleConnected,
-  googleEmail,
-  handleConnectGoogle,
-  handleDisconnectGoogle,
-  codeTheme,
-  setCodeTheme,
-  codeThemes = [],
-  availableModels = [],
-  fetchAvailableModels
-}) {
-  const [openaiModels, setOpenaiModels] = useState([]);
-  const [grokModels, setGrokModels] = useState([]);
-  const [ollamaModels, setOllamaModels] = useState([]);
-  const [fetchingStatus, setFetchingStatus] = useState({ openai: false, grok: false, ollama: false });
-  const [showManualInput, setShowManualInput] = useState({ openai: false, grok: false, ollama: false, multimedia: false });
+export default function SettingsPanel({ onConfigUpdated }) {
+  const [activeTab, setActiveTab] = useState('models'); // 'models', 'cards', 'multimedia', 'embeddings', 'env'
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
 
-  // Tab State
-  const [settingsTab, setSettingsTab] = useState('general'); // 'general', 'mcp', 'env'
+  // Settings state
+  const [form, setForm] = useState({
+    provider: 'grok',
+    openaiApiKey: '',
+    openaiBaseUrl: '',
+    openaiModel: '',
+    ollamaUrl: 'http://localhost:11434',
+    ollamaModel: '',
+    grokApiKey: '',
+    grokBaseUrl: '',
+    grokModel: '',
+    useMultimediaModel: false,
+    multimediaProvider: 'ollama',
+    multimediaModel: '',
+    multimediaApiKey: '',
+    multimediaBaseUrl: '',
+    embeddingProvider: 'ollama',
+    embeddingApiKey: '',
+    embeddingBaseUrl: '',
+    openaiEmbeddingModel: '',
+    ollamaEmbeddingModel: ''
+  });
 
-  // MCP State
-  const [mcpServers, setMcpServers] = useState([]);
-  const [isLoadingMcp, setIsLoadingMcp] = useState(false);
-  const [isSyncingMcp, setIsSyncingMcp] = useState(false);
-  const [mcpError, setMcpError] = useState('');
-  const [mcpSuccess, setMcpSuccess] = useState('');
-  
-  // Modal states
-  const [showModal, setShowModal] = useState(false);
-  const [editingServer, setEditingServer] = useState(null); // null if adding
-  const [formName, setFormName] = useState('');
-  const [formType, setFormType] = useState('stdio');
-  const [formUrl, setFormUrl] = useState('');
-  const [formCommand, setFormCommand] = useState('');
-  const [formArgs, setFormArgs] = useState('');
-  const [formEnv, setFormEnv] = useState([{ key: '', value: '' }]);
-  const [formEnabled, setFormEnabled] = useState(true);
+  const [availableModels, setAvailableModels] = useState([]);
+  const [multimediaModels, setMultimediaModels] = useState([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
 
-  // Env State
+  // Action Cards state
+  const [actionCards, setActionCards] = useState([]);
+  const [newCardTitle, setNewCardTitle] = useState('');
+  const [newCardPrompt, setNewCardPrompt] = useState('');
+
+  // Env state
   const [envContent, setEnvContent] = useState('');
-  const [isLoadingEnv, setIsLoadingEnv] = useState(false);
-  const [isSavingEnv, setIsSavingEnv] = useState(false);
-  const [envError, setEnvError] = useState('');
-  const [envSuccess, setEnvSuccess] = useState('');
+  const [envLoading, setEnvLoading] = useState(false);
 
-  // Sync loaded/fetched models for the current active provider
   useEffect(() => {
-    if (availableModels && availableModels.length > 0) {
-      if (settingsForm.provider === 'openai') setOpenaiModels(availableModels);
-      if (settingsForm.provider === 'grok') setGrokModels(availableModels);
-      if (settingsForm.provider === 'ollama') setOllamaModels(availableModels);
-    }
-  }, [availableModels, settingsForm.provider]);
-
-  // Load MCP servers and Env config on boot
-  useEffect(() => {
-    fetchMcpServers();
-    fetchEnvConfig();
+    fetchConfig();
+    fetchActionCards();
   }, []);
 
-  const fetchEnvConfig = async () => {
-    setIsLoadingEnv(true);
-    setEnvError('');
+  useEffect(() => {
+    fetchModelsForProvider(form.provider, false);
+  }, [form.provider]);
+
+  useEffect(() => {
+    if (form.useMultimediaModel) {
+      fetchModelsForProvider(form.multimediaProvider, true);
+    }
+  }, [form.multimediaProvider, form.useMultimediaModel]);
+
+  const fetchConfig = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/env');
-      const data = await response.json();
-      if (response.ok) {
-        setEnvContent(data.content || '');
-      } else {
-        setEnvError(data.error || 'Failed to load system environment settings.');
+      setLoading(true);
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setForm(prev => ({
+          ...prev,
+          provider: data.provider || 'grok',
+          ...data.settings
+        }));
       }
-    } catch (err) {
-      setEnvError('Network error loading system environment settings.');
+    } catch (e) {
+      console.error('Failed to fetch config:', e);
     } finally {
-      setIsLoadingEnv(false);
+      setLoading(false);
     }
   };
 
-  const handleSaveEnvConfig = async (e) => {
-    e.preventDefault();
-    setIsSavingEnv(true);
-    setEnvError('');
-    setEnvSuccess('');
+  const fetchActionCards = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/env', {
+      const res = await fetch('/api/prebuilt-forms');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.forms)) setActionCards(data.forms);
+    } catch (e) {}
+  };
+
+  const handleCreateActionCard = async (e) => {
+    e.preventDefault();
+    if (!newCardTitle.trim() || !newCardPrompt.trim()) return;
+    try {
+      const res = await fetch('/api/prebuilt-forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newCardTitle, promptTemplate: newCardPrompt, category: 'General' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewCardTitle('');
+        setNewCardPrompt('');
+        fetchActionCards();
+      }
+    } catch (e) {}
+  };
+
+  const handleDeleteCard = async (id) => {
+    try {
+      const res = await fetch(`/api/prebuilt-forms/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) fetchActionCards();
+    } catch (e) {}
+  };
+
+  const fetchModelsForProvider = async (targetProvider, isMultimedia = false) => {
+    try {
+      setFetchingModels(true);
+      const res = await fetch(`/api/models?provider=${targetProvider}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.models)) {
+        if (isMultimedia) setMultimediaModels(data.models);
+        else setAvailableModels(data.models);
+      }
+    } catch (e) {
+      if (isMultimedia) setMultimediaModels([]);
+      else setAvailableModels([]);
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
+  const handleSaveConfig = async () => {
+    try {
+      setLoading(true);
+      setMsg('');
+      setErr('');
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMsg('Configuration saved successfully!');
+        setTimeout(() => setMsg(''), 3000);
+        if (onConfigUpdated) onConfigUpdated(data.config);
+      } else {
+        setErr(data.error || 'Failed to update configuration');
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEnv = async () => {
+    try {
+      setEnvLoading(true);
+      const res = await fetch('/api/env');
+      const data = await res.json();
+      if (data.content) setEnvContent(data.content);
+    } catch (e) {} finally { setEnvLoading(false); }
+  };
+
+  const handleSaveEnv = async () => {
+    try {
+      setEnvLoading(true);
+      const res = await fetch('/api/env', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: envContent })
       });
-      const data = await response.json();
-      if (response.ok) {
-        setEnvSuccess('System environment (.env) successfully saved and hot-reloaded.');
-      } else {
-        setEnvError(data.error || 'Failed to save environment settings.');
-      }
-    } catch (err) {
-      setEnvError('Network error saving environment settings.');
-    } finally {
-      setIsSavingEnv(false);
-    }
-  };
-
-  const fetchMcpServers = async () => {
-    setIsLoadingMcp(true);
-    setMcpError('');
-    try {
-      const response = await fetch('http://localhost:3000/api/mcp/config');
-      const data = await response.json();
-      if (response.ok) {
-        setMcpServers(data.servers || []);
-      } else {
-        setMcpError(data.error || 'Failed to load MCP servers');
-      }
-    } catch (err) {
-      setMcpError('Network error loading MCP servers');
-    } finally {
-      setIsLoadingMcp(false);
-    }
-  };
-
-  const handleToggleServer = async (name, currentEnabled) => {
-    setMcpError('');
-    setMcpSuccess('');
-    const newEnabled = !currentEnabled;
-    
-    // Optimistic UI update
-    setMcpServers(prev => prev.map(server => 
-      server.name === name ? { ...server, enabled: newEnabled, status: newEnabled ? 'connecting' : 'disabled' } : server
-    ));
-    
-    try {
-      const response = await fetch(`http://localhost:3000/api/mcp/config/${name}/toggle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: newEnabled })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMcpSuccess(`Server "${name}" successfully ${newEnabled ? 'enabled' : 'disabled'}.`);
-        fetchMcpServers();
-      } else {
-        setMcpError(data.error || 'Failed to toggle server');
-        fetchMcpServers();
-      }
-    } catch (err) {
-      setMcpError('Network error toggling MCP server');
-      fetchMcpServers();
-    }
-  };
-
-  const handleOpenAddModal = () => {
-    setEditingServer(null);
-    setFormName('');
-    setFormType('stdio');
-    setFormUrl('');
-    setFormCommand('');
-    setFormArgs('');
-    setFormEnv([{ key: '', value: '' }]);
-    setFormEnabled(true);
-    setShowModal(true);
-  };
-
-  const handleOpenEditModal = (server) => {
-    setEditingServer(server);
-    setFormName(server.name);
-    setFormType(server.type);
-    setFormUrl(server.url || '');
-    setFormCommand(server.command || '');
-    setFormArgs(server.args ? server.args.join(' ') : '');
-    setFormEnabled(server.enabled !== false);
-    
-    // Map env object to key-value row array
-    const mappedEnv = Object.entries(server.env || {}).map(([key, value]) => ({ key, value }));
-    setFormEnv(mappedEnv.length > 0 ? mappedEnv : [{ key: '', value: '' }]);
-    
-    setShowModal(true);
-  };
-
-  const handleAddEnvRow = () => {
-    setFormEnv(prev => [...prev, { key: '', value: '' }]);
-  };
-
-  const handleRemoveEnvRow = (index) => {
-    setFormEnv(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleEnvChange = (index, field, value) => {
-    setFormEnv(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
-  };
-
-  const handleSaveMcpServer = async (e) => {
-    e.preventDefault();
-    setMcpError('');
-    setMcpSuccess('');
-
-    // Reconstruct env object
-    const envObj = {};
-    formEnv.forEach(row => {
-      if (row.key.trim()) {
-        envObj[row.key.trim()] = row.value;
-      }
-    });
-
-    // Parse command line arguments
-    const parsedArgs = formArgs.trim() ? formArgs.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g).map(arg => {
-      if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
-        return arg.slice(1, -1);
-      }
-      return arg;
-    }) : [];
-
-    const payload = {
-      name: formName.trim(),
-      type: formType,
-      url: formType === 'sse' ? formUrl.trim() : undefined,
-      command: formType === 'stdio' ? formCommand.trim() : undefined,
-      args: formType === 'stdio' ? parsedArgs : undefined,
-      env: formType === 'stdio' ? envObj : undefined,
-      enabled: formEnabled
-    };
-
-    try {
-      const response = await fetch('http://localhost:3000/api/mcp/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMcpSuccess(`Server "${formName}" successfully saved and status updated.`);
-        setShowModal(false);
-        fetchMcpServers();
-      } else {
-        setMcpError(data.error || 'Failed to save server');
-      }
-    } catch (err) {
-      setMcpError('Network error saving MCP server');
-    }
-  };
-
-  const handleDeleteServer = async (name) => {
-    if (!window.confirm(`Are you sure you want to delete and stop MCP server "${name}"?`)) return;
-    setMcpError('');
-    setMcpSuccess('');
-    try {
-      const response = await fetch(`http://localhost:3000/api/mcp/config/${name}`, {
-        method: 'DELETE'
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMcpSuccess(`Server "${name}" successfully deleted.`);
-        fetchMcpServers();
-      } else {
-        setMcpError(data.error || 'Failed to delete server');
-      }
-    } catch (err) {
-      setMcpError('Network error deleting MCP server');
-    }
-  };
-
-  const handleReconnectServer = async (name) => {
-    setMcpError('');
-    setMcpSuccess('');
-    try {
-      const response = await fetch(`http://localhost:3000/api/mcp/config/${name}/reconnect`, {
-        method: 'POST'
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMcpSuccess(`Server "${name}" successfully reconnected.`);
-        fetchMcpServers();
-      } else {
-        setMcpError(data.error || 'Failed to reconnect server');
-      }
-    } catch (err) {
-      setMcpError('Network error reconnecting MCP server');
-    }
-  };
-
-  const handleSyncMcpConfig = async () => {
-    setMcpError('');
-    setMcpSuccess('');
-    setIsSyncingMcp(true);
-    try {
-      const response = await fetch('http://localhost:3000/api/mcp/config/sync', {
-        method: 'POST'
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMcpSuccess('MCP config & Knowledge Catalog synced successfully!');
-        fetchMcpServers();
-      } else {
-        setMcpError(data.error || 'Failed to sync MCP config');
-      }
-    } catch (err) {
-      setMcpError('Network error syncing MCP config');
-    } finally {
-      setIsSyncingMcp(false);
-    }
-  };
-
-  const handleFetchModels = async (providerName) => {
-    setFetchingStatus(prev => ({ ...prev, [providerName]: true }));
-    try {
-      const list = await fetchAvailableModels(providerName, settingsForm);
-      if (providerName === 'openai') {
-        setOpenaiModels(list || []);
-        if (list && list.length > 0 && !showManualInput.openai) {
-          if (!settingsForm.openaiModel) {
-            setSettingsForm(prev => ({ ...prev, openaiModel: list[0] }));
-          }
-        }
-      } else if (providerName === 'grok') {
-        setGrokModels(list || []);
-        if (list && list.length > 0 && !showManualInput.grok) {
-          if (!settingsForm.grokModel) {
-            setSettingsForm(prev => ({ ...prev, grokModel: list[0] }));
-          }
-        }
-      } else if (providerName === 'ollama') {
-        setOllamaModels(list || []);
-        if (list && list.length > 0 && !showManualInput.ollama) {
-          if (!settingsForm.ollamaModel) {
-            setSettingsForm(prev => ({ ...prev, ollamaModel: list[0] }));
-          }
-        }
+      const data = await res.json();
+      if (data.success) {
+        setMsg('System .env updated!');
+        setTimeout(() => setMsg(''), 3000);
       }
     } catch (e) {
-      console.error('Error fetching models for ' + providerName, e);
+      setErr('Failed to save environment file');
     } finally {
-      setFetchingStatus(prev => ({ ...prev, [providerName]: false }));
+      setEnvLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-6 relative">
-      {/* Page Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-border-color mb-6 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <Settings className="w-5 h-5 text-accent-blue" />
-          <div>
-            <h2 className="text-md font-semibold text-white font-sans">Settings &amp; Configurations</h2>
-            <p className="text-xs text-gray-400">Configure LLM active models, API endpoints, and third-party account integrations.</p>
-          </div>
+    <div className="max-w-4xl mx-auto space-y-6 font-sans text-slate-100 pb-12">
+      {/* Top Bar */}
+      <div className="flex items-center justify-between border-b border-[#262626] pb-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-white flex items-center space-x-2">
+            <Settings className="w-5 h-5 text-white" />
+            <span>Settings & Control Panel</span>
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">Configure LLM models, action cards, vision models, and system environment</p>
         </div>
-      </div>
 
-      {/* Sub Tabs */}
-      <div className="flex gap-6 border-b border-white/10 mb-6 flex-shrink-0 select-none">
         <button
-          type="button"
-          onClick={() => setSettingsTab('general')}
-          className={`pb-3 text-xs font-bold tracking-wider uppercase border-b-2 transition-all cursor-pointer ${
-            settingsTab === 'general' ? 'border-accent-blue text-white' : 'border-transparent text-gray-400 hover:text-gray-200'
-          }`}
+          onClick={handleSaveConfig}
+          disabled={loading}
+          className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs flex items-center space-x-2 shadow hover:bg-slate-200 transition-all cursor-pointer"
         >
-          General Settings
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setSettingsTab('mcp');
-            fetchMcpServers();
-          }}
-          className={`pb-3 text-xs font-bold tracking-wider uppercase border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-            settingsTab === 'mcp' ? 'border-accent-blue text-white' : 'border-transparent text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          MCP Servers
-          <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-white/10 text-gray-300 font-bold">
-            {mcpServers.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setSettingsTab('env');
-            fetchEnvConfig();
-          }}
-          className={`pb-3 text-xs font-bold tracking-wider uppercase border-b-2 transition-all cursor-pointer ${
-            settingsTab === 'env' ? 'border-accent-blue text-white' : 'border-transparent text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          System Environment (.env)
+          <Save className="w-4 h-4" />
+          <span>Save Settings</span>
         </button>
       </div>
 
-      {/* Dynamic Settings Tabs Rendering */}
-      {settingsTab === 'general' ? (
-        <>
-          {settingsError && (
-            <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
-              <AlertCircle size={14} className="flex-shrink-0" />
-              <span>{settingsError}</span>
-            </div>
-          )}
-          {settingsSuccess && (
-            <div className="mb-4 p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center animate-fadeIn">
-              <CheckCircle size={14} className="flex-shrink-0" />
-              <span>{settingsSuccess}</span>
-            </div>
-          )}
+      {msg && <div className="p-3 rounded-xl bg-[#212121] border border-[#2a2a2a] text-white text-xs flex items-center"><Check className="w-4 h-4 mr-2" /> {msg}</div>}
+      {err && <div className="p-3 rounded-xl bg-[#212121] border border-[#2a2a2a] text-slate-300 text-xs flex items-center"><AlertCircle className="w-4 h-4 mr-2" /> {err}</div>}
 
-          {/* Two Column Settings Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn">
-            
-            {/* Left Column: LLM configurations (Span 2) */}
-            <div className="lg:col-span-2 space-y-6">
-              <form onSubmit={handleSaveSettings} className="space-y-6">
-                
-                {/* Provider Selector */}
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Active LLM Provider</label>
-                  <select
-                    value={settingsForm.provider}
-                    onChange={(e) => setSettingsForm(prev => ({ ...prev, provider: e.target.value }))}
-                    className="w-full md:w-1/2 p-3 bg-black/40 border border-white/10 rounded-xl text-xs text-gray-200 outline-none focus:border-accent-blue/50"
-                  >
-                    <option value="ollama">Ollama (Local API)</option>
-                    <option value="openai">OpenAI SDK (Cloud / compatible API)</option>
-                    <option value="grok">Grok API (x.ai)</option>
-                  </select>
-                  <p className="text-[10px] text-gray-500 mt-2">
-                    Choosing Grok or OpenAI requires internet connectivity and API keys. Ollama runs fully offline.
-                  </p>
-                </div>
+      {/* Tabs Header */}
+      <div className="flex space-x-2 border-b border-[#262626] pb-1 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('models')}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
+            activeTab === 'models' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+          }`}
+        >
+          <Cpu className="w-4 h-4" />
+          <span>LLM Models</span>
+        </button>
 
-                {/* Provider Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  
-                  {/* OpenAI Card */}
-                  <div className={`bg-white/5 border rounded-2xl p-5 transition-all duration-200 ${settingsForm.provider === 'openai' ? 'border-accent-blue/40 bg-accent-blue/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-white/5 opacity-60'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold uppercase tracking-wider text-white">OpenAI Settings</span>
-                      {settingsForm.provider === 'openai' && <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>}
-                    </div>
-                    <div className="space-y-3 text-xs">
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px]">API Key</label>
-                        <input type="password" placeholder="sk-..." value={settingsForm.openaiApiKey || ''}
-                          onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiApiKey: e.target.value }))}
-                          className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                      </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                        <input type="text" placeholder="https://api.openai.com/v1" value={settingsForm.openaiBaseUrl || ''}
-                          onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiBaseUrl: e.target.value }))}
-                          className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-gray-400 text-[10px]">Model Name</label>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleFetchModels('openai')}
-                              disabled={fetchingStatus.openai}
-                              className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
-                              title="Fetch available models from OpenAI URL"
-                            >
-                              {fetchingStatus.openai ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              ) : (
-                                <RefreshCw className="w-2.5 h-2.5" />
-                              )}
-                              Fetch
-                            </button>
-                            {openaiModels.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setShowManualInput(prev => ({ ...prev, openai: !prev.openai }))}
-                                className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
-                                title="Toggle manual input"
-                              >
-                                {showManualInput.openai ? 'Select List' : 'Type Name'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {(!showManualInput.openai && openaiModels.length > 0) ? (
-                          <select
-                            value={settingsForm.openaiModel}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
-                          >
-                            {!openaiModels.includes(settingsForm.openaiModel) && settingsForm.openaiModel && (
-                              <option value={settingsForm.openaiModel}>{settingsForm.openaiModel}</option>
-                            )}
-                            {openaiModels.map(m => (
-                              <option key={m} value={m}>{m}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input type="text" placeholder="gpt-4o" value={settingsForm.openaiModel || ''}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, openaiModel: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
+        <button
+          onClick={() => setActiveTab('cards')}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
+            activeTab === 'cards' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Action Cards</span>
+        </button>
 
-                  {/* Ollama Card */}
-                  <div className={`bg-white/5 border rounded-2xl p-5 transition-all duration-200 ${settingsForm.provider === 'ollama' ? 'border-accent-blue/40 bg-accent-blue/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-white/5 opacity-60'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold uppercase tracking-wider text-white">Ollama Settings</span>
-                      {settingsForm.provider === 'ollama' && <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>}
-                    </div>
-                    <div className="space-y-3 text-xs">
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px]">Ollama URL</label>
-                        <input type="text" placeholder="http://localhost:11434" value={settingsForm.ollamaUrl || ''}
-                          onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaUrl: e.target.value }))}
-                          className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-gray-400 text-[10px]">Model Name</label>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleFetchModels('ollama')}
-                              disabled={fetchingStatus.ollama}
-                              className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
-                              title="Fetch locally running Ollama models"
-                            >
-                              {fetchingStatus.ollama ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              ) : (
-                                <RefreshCw className="w-2.5 h-2.5" />
-                              )}
-                              Fetch
-                            </button>
-                            {ollamaModels.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setShowManualInput(prev => ({ ...prev, ollama: !prev.ollama }))}
-                                className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
-                                title="Toggle manual input"
-                              >
-                                {showManualInput.ollama ? 'Select List' : 'Type Name'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {(!showManualInput.ollama && ollamaModels.length > 0) ? (
-                          <select
-                            value={settingsForm.ollamaModel}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
-                          >
-                            {!ollamaModels.includes(settingsForm.ollamaModel) && settingsForm.ollamaModel && (
-                              <option value={settingsForm.ollamaModel}>{settingsForm.ollamaModel}</option>
-                            )}
-                            {ollamaModels.map(m => (
-                              <option key={m} value={m}>{m}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input type="text" placeholder="llama3" value={settingsForm.ollamaModel || ''}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, ollamaModel: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
+        <button
+          onClick={() => setActiveTab('multimedia')}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
+            activeTab === 'multimedia' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+          }`}
+        >
+          <Eye className="w-4 h-4" />
+          <span>Vision & Multimedia</span>
+        </button>
 
-                  {/* Grok Card */}
-                  <div className={`bg-white/5 border rounded-2xl p-5 transition-all duration-200 ${settingsForm.provider === 'grok' ? 'border-accent-blue/40 bg-accent-blue/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-white/5 opacity-60'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold uppercase tracking-wider text-white">Grok Settings</span>
-                      {settingsForm.provider === 'grok' && <span className="px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold">ACTIVE</span>}
-                    </div>
-                    <div className="space-y-3 text-xs">
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px]">API Key</label>
-                        <input type="password" placeholder="xai-..." value={settingsForm.grokApiKey || ''}
-                          onChange={(e) => setSettingsForm(prev => ({ ...prev, grokApiKey: e.target.value }))}
-                          className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                      </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px]">Base URL</label>
-                        <input type="text" placeholder="https://api.x.ai/v1" value={settingsForm.grokBaseUrl || ''}
-                          onChange={(e) => setSettingsForm(prev => ({ ...prev, grokBaseUrl: e.target.value }))}
-                          className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-gray-400 text-[10px]">Model Name</label>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleFetchModels('grok')}
-                              disabled={fetchingStatus.grok}
-                              className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5"
-                              title="Fetch available models from x.ai"
-                            >
-                              {fetchingStatus.grok ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              ) : (
-                                <RefreshCw className="w-2.5 h-2.5" />
-                              )}
-                              Fetch
-                            </button>
-                            {grokModels.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setShowManualInput(prev => ({ ...prev, grok: !prev.grok }))}
-                                className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
-                                title="Toggle manual input"
-                              >
-                                {showManualInput.grok ? 'Select List' : 'Type Name'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {(!showManualInput.grok && grokModels.length > 0) ? (
-                          <select
-                            value={settingsForm.grokModel}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
-                          >
-                            {!grokModels.includes(settingsForm.grokModel) && settingsForm.grokModel && (
-                              <option value={settingsForm.grokModel}>{settingsForm.grokModel}</option>
-                            )}
-                            {grokModels.map(m => (
-                              <option key={m} value={m}>{m}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input type="text" placeholder="grok-2" value={settingsForm.grokModel || ''}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, grokModel: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
+        <button
+          onClick={() => setActiveTab('embeddings')}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
+            activeTab === 'embeddings' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          <span>Embeddings</span>
+        </button>
 
-                </div>
+        <button
+          onClick={() => { setActiveTab('env'); fetchEnv(); }}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
+            activeTab === 'env' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+          }`}
+        >
+          <Key className="w-4 h-4" />
+          <span>Environment (.env)</span>
+        </button>
+      </div>
 
-                {/* Multimedia API Configuration */}
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Vision / Multimedia LLM Settings</label>
-                      <p className="text-[10px] text-gray-500 mt-1">Used exclusively for processing image attachments and desktop UI screenshot analysis.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="useMultimediaModel"
-                        checked={!!settingsForm.useMultimediaModel}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, useMultimediaModel: e.target.checked }))}
-                        className="w-4 h-4 rounded border-white/10 bg-black/40 outline-none text-accent-blue focus:ring-0 focus:ring-offset-0 cursor-pointer"
-                      />
-                      <label htmlFor="useMultimediaModel" className="text-xs text-white font-medium cursor-pointer select-none">Enable Vision model</label>
-                    </div>
-                  </div>
+      {/* Tab 1: Primary LLM Models */}
+      {activeTab === 'models' && (
+        <div className="space-y-4">
+          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
+            <h3 className="text-sm font-semibold text-white">Primary LLM Provider</h3>
 
-                  {settingsForm.useMultimediaModel && (
-                    <div className="space-y-4 border-t border-white/5 pt-4 animate-slideDown text-xs">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Vision Provider</label>
-                          <select
-                            value={settingsForm.multimediaProvider || 'ollama'}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaProvider: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
-                          >
-                            <option value="ollama">Ollama (Local)</option>
-                            <option value="openai">OpenAI (Cloud)</option>
-                            <option value="grok">Grok (x.ai)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Vision Model Name</label>
-                            {((settingsForm.multimediaProvider === 'openai' && openaiModels.length > 0) ||
-                              (settingsForm.multimediaProvider === 'grok' && grokModels.length > 0) ||
-                              (settingsForm.multimediaProvider === 'ollama' && ollamaModels.length > 0)) && (
-                              <button
-                                type="button"
-                                onClick={() => setShowManualInput(prev => ({ ...prev, multimedia: !prev.multimedia }))}
-                                className="text-[9px] text-gray-400 hover:underline flex items-center gap-0.5"
-                              >
-                                {showManualInput.multimedia ? 'Select List' : 'Type Name'}
-                              </button>
-                            )}
-                          </div>
-                          {!showManualInput.multimedia && (
-                            (settingsForm.multimediaProvider === 'openai' && openaiModels.length > 0) ||
-                            (settingsForm.multimediaProvider === 'grok' && grokModels.length > 0) ||
-                            (settingsForm.multimediaProvider === 'ollama' && ollamaModels.length > 0)
-                          ) ? (
-                            <select
-                              value={settingsForm.multimediaModel || ''}
-                              onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaModel: e.target.value }))}
-                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs cursor-pointer"
-                            >
-                              {(() => {
-                                const modelsList = 
-                                  settingsForm.multimediaProvider === 'openai' ? openaiModels :
-                                  settingsForm.multimediaProvider === 'grok' ? grokModels :
-                                  ollamaModels;
-                                return (
-                                  <>
-                                    {!modelsList.includes(settingsForm.multimediaModel) && settingsForm.multimediaModel && (
-                                      <option value={settingsForm.multimediaModel}>{settingsForm.multimediaModel}</option>
-                                    )}
-                                    {modelsList.map(m => (
-                                      <option key={m} value={m}>{m}</option>
-                                    ))}
-                                  </>
-                                );
-                              })()}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              placeholder="e.g., llama3.2-vision, llava"
-                              value={settingsForm.multimediaModel || ''}
-                              onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaModel: e.target.value }))}
-                              className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
-                            />
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">API Key (OpenAI / Grok Override)</label>
-                          <input
-                            type="password"
-                            placeholder="sk-... (Leave empty to use main API Key)"
-                            value={settingsForm.multimediaApiKey || ''}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaApiKey: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Base URL (Override)</label>
-                          <input
-                            type="text"
-                            placeholder="http://localhost:11434 (Leave empty to use default)"
-                            value={settingsForm.multimediaBaseUrl || ''}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, multimediaBaseUrl: e.target.value }))}
-                            className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
-                  <button
-                    type="submit"
-                    disabled={isSavingSettings}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all disabled:opacity-50 shadow-glow cursor-pointer"
-                  >
-                    <Save size={13} />
-                    {isSavingSettings ? 'Saving...' : 'Save Configuration'}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Right Column: Code Theme + Integrations */}
-            <div className="space-y-6">
-
-              {/* ── Code Highlight Theme Picker ── */}
-              {codeThemes.length > 0 && (
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-4 text-xs font-bold text-white uppercase tracking-wider">
-                    <Palette size={14} className="text-accent-blue" />
-                    <span>Code Theme</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {codeThemes.map(theme => {
-                      const isActive = codeTheme === theme.id;
-                      return (
-                        <button
-                          key={theme.id}
-                          onClick={() => setCodeTheme(theme.id)}
-                          className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
-                            isActive
-                              ? 'border-accent-blue/50 bg-accent-blue/5 shadow-[0_0_12px_rgba(59,130,246,0.12)]'
-                              : 'border-white/5 bg-black/20 hover:bg-white/5 hover:border-white/10'
-                          }`}
-                        >
-                          {/* Colour swatch: bg on top, accent stripe on bottom */}
-                          <div
-                            className="flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden border border-white/10 flex flex-col"
-                            aria-hidden
-                          >
-                            <div className="flex-1" style={{ background: theme.bg }} />
-                            <div className="h-2.5" style={{ background: theme.accent }} />
-                          </div>
-                          <div className="flex-grow min-w-0">
-                            <p className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-gray-300'}`}>
-                              {theme.label}
-                            </p>
-                            <p className="text-[10px] font-mono text-gray-500">{theme.bg}</p>
-                          </div>
-                          {isActive && (
-                            <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-[8px] bg-accent-blue/20 text-accent-blue font-bold border border-accent-blue/20">
-                              ACTIVE
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">
-                    Applied instantly to all code blocks. Saved locally in your browser.
-                  </p>
-                </div>
-              )}
-
-              {/* Google OAuth Card */}
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-4 text-xs font-bold text-white uppercase tracking-wider">
-                  <Link2 size={14} className="text-accent-mono" />
-                  <span>Integrations</span>
-                </div>
-                <div className="bg-black/20 border border-white/5 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3 text-xs font-semibold text-gray-300">
-                    <span>Google Account</span>
-                    <span className="flex items-center gap-1.5 normal-case text-gray-400 font-normal">
-                      <span className={`w-2 h-2 rounded-full ${googleConnected ? 'bg-accent-emerald shadow-[0_0_8px_var(--color-accent-emerald)]' : 'bg-gray-500'}`}></span>
-                      {googleConnected ? 'Connected' : 'Disconnected'}
-                    </span>
-                  </div>
-                  {googleConnected ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="text-[10px] text-gray-400 truncate font-mono bg-white/5 p-2 rounded" title={googleEmail}>
-                        {googleEmail}
-                      </div>
-                      <button
-                        onClick={handleDisconnectGoogle}
-                        className="w-full mt-2 py-1.5 px-2 border border-red-500/20 hover:border-red-500 text-[11px] font-semibold text-red-400 hover:text-red-300 rounded-lg hover:bg-red-500/5 transition-all text-center cursor-pointer"
-                      >
-                        Disconnect Google Account
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-[10px] text-gray-500 mb-3 leading-relaxed">
-                        Connect your Google account to allow the assistant to manage calendar events and draft emails.
-                      </p>
-                      <button
-                        onClick={handleConnectGoogle}
-                        className="w-full py-1.5 px-3 bg-accent-gradient hover:opacity-90 text-[11px] font-semibold text-white rounded-lg transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles size={12} /> Connect Account
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-        </>
-      ) : settingsTab === 'mcp' ? (
-        /* MCP Config Tab view */
-        <div className="space-y-6 flex-grow animate-fadeIn">
-          {mcpError && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center">
-              <AlertCircle size={14} className="flex-shrink-0" />
-              <span>{mcpError}</span>
-            </div>
-          )}
-          {mcpSuccess && (
-            <div className="p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center">
-              <CheckCircle size={14} className="flex-shrink-0" />
-              <span>{mcpSuccess}</span>
-            </div>
-          )}
-
-          {/* Controls Bar */}
-          <div className="flex justify-between items-center bg-white/5 border border-white/5 rounded-2xl p-4 shadow-sm">
-            <div>
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Configured MCP Servers</h3>
-              <p className="text-[10px] text-gray-400 mt-1">Manage, add, and reload model context protocol hosts dynamically.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSyncMcpConfig}
-                disabled={isSyncingMcp}
-                title="Re-read mcp-config.json, connect new servers, and sync Knowledge Catalog RAG entries"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-gray-200 border border-white/10 rounded-xl text-xs font-semibold hover:bg-white/20 hover:text-white transition-all cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={isSyncingMcp ? 'animate-spin' : ''} />
-                <span>{isSyncingMcp ? 'Syncing...' : 'Sync Config'}</span>
-              </button>
-              <button
-                onClick={handleOpenAddModal}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all shadow-glow cursor-pointer"
-              >
-                <Plus size={13} />
-                Add Server
-              </button>
-            </div>
-          </div>
-
-          {/* Servers List */}
-          {isLoadingMcp ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-gray-400">
-              <Loader2 className="w-6 h-6 animate-spin text-accent-blue" />
-              <span>Fetching MCP servers configurations...</span>
-            </div>
-          ) : mcpServers.length === 0 ? (
-            <div className="text-center py-20 border border-dashed border-white/10 rounded-2xl text-gray-500 text-xs">
-              No MCP servers configured yet. Add one to get started!
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {mcpServers.map(server => (
+            <div className="grid grid-cols-3 gap-3">
+              {['grok', 'openai', 'ollama'].map((p) => (
                 <div
-                  key={server.name}
-                  className={`bg-white/5 border rounded-2xl p-5 border-white/5 hover:border-white/10 shadow-sm flex flex-col justify-between min-h-[170px] transition-all`}
+                  key={p}
+                  onClick={() => setForm({ ...form, provider: p })}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all text-center ${
+                    form.provider === p ? 'bg-[#212121] border-white text-white font-semibold' : 'bg-[#1c1c1c] border-[#2a2a2a] text-slate-400 hover:bg-[#212121]'
+                  }`}
                 >
-                  <div>
-                    {/* Header: Status and Title */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-bold text-white truncate max-w-[150px]" title={server.name}>
-                        {server.name}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold border ${
-                          server.status === 'connected'
-                            ? 'bg-accent-emerald/20 border-accent-emerald/20 text-accent-emerald'
-                            : server.status === 'disabled'
-                            ? 'bg-red-500/10 border-red-500/20 text-red-400'
-                            : 'bg-gray-500/20 border-white/10 text-gray-400'
-                        }`}>
-                          {server.status === 'connected' ? 'ONLINE' : server.status === 'disabled' ? 'DISABLED' : 'OFFLINE'}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[8px] bg-white/5 border border-white/5 text-gray-400 uppercase tracking-wider font-bold">
-                          {server.type}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Details */}
-                    <div className="space-y-1.5 text-[10px] text-gray-400 font-mono mb-4">
-                      {server.type === 'sse' ? (
-                        <div className="truncate" title={server.url}>URL: {server.url}</div>
-                      ) : (
-                        <>
-                          <div className="truncate" title={server.command}>CMD: {server.command}</div>
-                          {server.args && server.args.length > 0 && (
-                            <div className="truncate" title={server.args.join(' ')}>
-                              ARGS: {server.args.join(' ')}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {server.status === 'connected' && (
-                        <div className="text-accent-blue font-semibold mt-1">
-                          Tools Exposed: {server.toolsCount}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-between border-t border-white/5 pt-3.5 mt-auto">
-                    {/* Toggle Switch */}
-                    <div className="flex items-center gap-1.5 select-none">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleServer(server.name, server.enabled)}
-                        className={`relative inline-flex h-4.5 w-8.5 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
-                          server.enabled ? 'bg-accent-blue' : 'bg-white/10'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                            server.enabled ? 'translate-x-4.5' : 'translate-x-0.5'
-                          }`}
-                        />
-                      </button>
-                      <span className="text-[9px] text-gray-400 font-semibold tracking-wider uppercase">
-                        {server.enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        disabled={!server.enabled}
-                        onClick={() => handleReconnectServer(server.name)}
-                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
-                        title="Reconnect/Restart Server"
-                      >
-                        <RefreshCw size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleOpenEditModal(server)}
-                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-                        title="Edit Configuration"
-                      >
-                        <Edit size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteServer(server.name)}
-                        className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-                        title="Delete Server"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                  <div className="text-xs font-bold uppercase font-mono">{p}</div>
+                  <div className="text-[10px] mt-1 text-slate-400">
+                    {p === 'grok' ? 'Groq / Grok API' : p === 'openai' ? 'OpenAI / Compatible' : 'Local Ollama'}
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      ) : (
-        /* System Environment (.env) tab */
-        <div className="space-y-6 flex-grow flex flex-col min-h-0 animate-fadeIn">
-          {envError && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex gap-2 items-center flex-shrink-0">
-              <AlertCircle size={14} className="flex-shrink-0" />
-              <span>{envError}</span>
-            </div>
-          )}
-          {envSuccess && (
-            <div className="p-4 bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald rounded-xl text-xs flex gap-2 items-center flex-shrink-0">
-              <CheckCircle size={14} className="flex-shrink-0" />
-              <span>{envSuccess}</span>
-            </div>
-          )}
 
-          {/* Config editor card */}
-          <form onSubmit={handleSaveEnvConfig} className="bg-white/5 border border-white/5 rounded-2xl p-5 shadow-sm flex flex-col flex-grow min-h-0">
-            <div className="flex justify-between items-center mb-4 flex-shrink-0">
-              <div>
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">System Environment Configurations</h3>
-                <p className="text-[10px] text-gray-400 mt-1">Directly edit the backend server environment variables (.env). Changes will automatically hot-reload.</p>
+            <div className="pt-4 border-t border-[#262626] space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-300">Active Running Model</label>
+                <button
+                  type="button"
+                  onClick={() => fetchModelsForProvider(form.provider, false)}
+                  className="text-[11px] text-slate-300 hover:text-white hover:underline flex items-center cursor-pointer font-mono"
+                >
+                  <RefreshCw className={`w-3 h-3 mr-1 ${fetchingModels ? 'animate-spin' : ''}`} /> Refresh Models
+                </button>
               </div>
-            </div>
 
-            {isLoadingEnv ? (
-              <div className="flex flex-col items-center justify-center flex-grow py-20 gap-3 text-xs text-gray-400">
-                <Loader2 className="w-6 h-6 animate-spin text-accent-blue" />
-                <span>Reading system configuration files...</span>
-              </div>
-            ) : (
-              <div className="flex flex-col flex-grow min-h-[300px] border border-white/10 rounded-xl overflow-hidden bg-black/40 mb-4">
-                <textarea
-                  value={envContent}
-                  onChange={(e) => setEnvContent(e.target.value)}
-                  className="w-full h-full p-4 bg-transparent text-xs font-mono text-emerald-400 outline-none resize-none overflow-y-auto leading-relaxed"
-                  placeholder="# Enter environment variables in KEY=VALUE format"
+              {availableModels.length > 0 ? (
+                <select
+                  value={form.provider === 'openai' ? form.openaiModel : form.provider === 'grok' ? form.grokModel : form.ollamaModel}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (form.provider === 'openai') setForm({ ...form, openaiModel: val });
+                    if (form.provider === 'grok') setForm({ ...form, grokModel: val });
+                    if (form.provider === 'ollama') setForm({ ...form, ollamaModel: val });
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100 focus:outline-none"
+                >
+                  {availableModels.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  placeholder="Enter model name..."
+                  value={form.provider === 'openai' ? form.openaiModel : form.provider === 'grok' ? form.grokModel : form.ollamaModel}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (form.provider === 'openai') setForm({ ...form, openaiModel: val });
+                    if (form.provider === 'grok') setForm({ ...form, grokModel: val });
+                    if (form.provider === 'ollama') setForm({ ...form, ollamaModel: val });
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100 focus:outline-none"
                 />
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-white/5 flex-shrink-0">
-              <button
-                type="submit"
-                disabled={isSavingEnv || isLoadingEnv}
-                className="flex items-center gap-1.5 px-4 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/80 transition-all disabled:opacity-50 shadow-glow cursor-pointer"
-              >
-                <Save size={13} />
-                {isSavingEnv ? 'Saving and Reloading...' : 'Save & Reload Environment'}
-              </button>
+              )}
             </div>
-          </form>
+          </div>
         </div>
       )}
 
-      {/* Add/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-bg-secondary border border-white/10 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 shadow-glow animate-scaleIn">
-            <div className="flex justify-between items-center pb-4 border-b border-white/10 mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                {editingServer ? `Edit MCP Server: ${formName}` : 'Add New MCP Server'}
-              </h3>
+      {/* Tab 2: Action Cards Manager */}
+      {activeTab === 'cards' && (
+        <div className="space-y-4">
+          <form onSubmit={handleCreateActionCard} className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
+            <h3 className="text-sm font-semibold text-white">Create New Action Card</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="text"
+                required
+                placeholder="Card Title (e.g. Code Reviewer)"
+                value={newCardTitle}
+                onChange={(e) => setNewCardTitle(e.target.value)}
+                className="p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-100"
+              />
+              <input
+                type="text"
+                required
+                placeholder="Prompt Template..."
+                value={newCardPrompt}
+                onChange={(e) => setNewCardPrompt(e.target.value)}
+                className="p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-100"
+              />
+            </div>
+            <div className="flex justify-end">
               <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 shadow cursor-pointer"
               >
-                <X size={16} />
+                Add Action Card
               </button>
             </div>
-            
-            <form onSubmit={handleSaveMcpServer} className="space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Server Name</label>
-                <input
-                  type="text"
-                  required
-                  disabled={!!editingServer}
-                  placeholder="e.g. weather-mcp"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs disabled:opacity-50 font-sans"
-                />
-              </div>
+          </form>
 
-              {/* Type */}
+          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
+            <h3 className="text-sm font-semibold text-white">Configured Action Cards ({actionCards.length})</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {actionCards.map((card) => {
+                const id = card._id || card.id;
+                return (
+                  <div key={id} className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-white">{card.title}</div>
+                      <div className="text-[11px] text-slate-400 line-clamp-1">{card.promptTemplate || card.description}</div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteCard(id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Vision & Multimedia Settings */}
+      {activeTab === 'multimedia' && (
+        <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-white">Dedicated Vision & Multimedia Model</h3>
+              <p className="text-xs text-slate-400">Use a specialized model for processing images and keyframe extractions</p>
+            </div>
+
+            <button
+              onClick={() => setForm({ ...form, useMultimediaModel: !form.useMultimediaModel })}
+              className="flex items-center space-x-2 text-xs font-semibold cursor-pointer"
+            >
+              {form.useMultimediaModel ? (
+                <ToggleRight className="w-8 h-8 text-white" />
+              ) : (
+                <ToggleLeft className="w-8 h-8 text-slate-600" />
+              )}
+            </button>
+          </div>
+
+          {form.useMultimediaModel && (
+            <div className="space-y-4 pt-3 border-t border-[#262626]">
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Transport Type</label>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Multimedia Provider</label>
                 <select
-                  value={formType}
-                  onChange={(e) => setFormType(e.target.value)}
-                  className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs"
+                  value={form.multimediaProvider}
+                  onChange={(e) => setForm({ ...form, multimediaProvider: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
                 >
-                  <option value="stdio">stdio (Local Command)</option>
-                  <option value="sse">SSE (Web URL)</option>
+                  <option value="ollama">Local Ollama Vision (llava / qwen-vl)</option>
+                  <option value="openai">OpenAI Vision (gpt-4o / gpt-4-turbo)</option>
+                  <option value="grok">Grok Vision (grok-2-vision)</option>
                 </select>
               </div>
 
-              {formType === 'sse' ? (
-                /* SSE URL */
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">SSE URL</label>
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Multimedia Model Name</label>
+                {multimediaModels.length > 0 ? (
+                  <select
+                    value={form.multimediaModel}
+                    onChange={(e) => setForm({ ...form, multimediaModel: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
+                  >
+                    {multimediaModels.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                ) : (
                   <input
-                    type="url"
-                    required
-                    placeholder="http://localhost:8000/sse"
-                    value={formUrl}
-                    onChange={(e) => setFormUrl(e.target.value)}
-                    className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs font-sans"
+                    type="text"
+                    placeholder="e.g. llava:latest or gpt-4o"
+                    value={form.multimediaModel}
+                    onChange={(e) => setForm({ ...form, multimediaModel: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
                   />
-                </div>
-              ) : (
-                /* Stdio command, args, env */
-                <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Command</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. npx, python, node"
-                      value={formCommand}
-                      onChange={(e) => setFormCommand(e.target.value)}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs font-sans"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Arguments</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. -y @modelcontextprotocol/server-filesystem /path/to/folder"
-                      value={formArgs}
-                      onChange={(e) => setFormArgs(e.target.value)}
-                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl outline-none focus:border-accent-blue/50 text-gray-200 text-xs font-sans"
-                    />
-                    <p className="text-[9px] text-gray-500 mt-1">Separate command-line arguments by spaces.</p>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Environment Variables</label>
-                      <button
-                        type="button"
-                        onClick={handleAddEnvRow}
-                        className="text-[9px] text-accent-blue hover:underline flex items-center gap-0.5 cursor-pointer"
-                      >
-                        <Plus size={10} /> Add Variable
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                      {formEnv.map((env, index) => (
-                        <div key={index} className="flex gap-2 items-center">
-                          <input
-                            type="text"
-                            placeholder="KEY"
-                            value={env.key}
-                            onChange={(e) => handleEnvChange(index, 'key', e.target.value)}
-                            className="w-1/2 p-2 bg-black/40 border border-white/10 rounded-lg outline-none focus:border-accent-blue/50 text-gray-200 text-xs font-mono"
-                          />
-                          <input
-                            type="text"
-                            placeholder="VALUE"
-                            value={env.value}
-                            onChange={(e) => handleEnvChange(index, 'value', e.target.value)}
-                            className="w-1/2 p-2 bg-black/40 border border-white/10 rounded-lg outline-none focus:border-accent-blue/50 text-gray-200 text-xs font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEnvRow(index)}
-                            className="p-2 text-gray-500 hover:text-red-400 rounded hover:bg-white/5 cursor-pointer"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Enabled Checkbox */}
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="formEnabled"
-                  checked={formEnabled}
-                  onChange={(e) => setFormEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/10 bg-black/40 outline-none text-accent-blue focus:ring-0 focus:ring-offset-0 cursor-pointer"
-                />
-                <label htmlFor="formEnabled" className="text-xs text-white font-medium cursor-pointer select-none">
-                  Enable this server on startup
-                </label>
+                )}
               </div>
+            </div>
+          )}
+        </div>
+      )}
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-white/10 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 rounded-xl text-xs font-semibold hover:bg-white/5 transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-xl text-xs font-semibold transition-all shadow-glow cursor-pointer"
-                >
-                  Save Configuration
-                </button>
-              </div>
-            </form>
+      {/* Tab 4: Embeddings */}
+      {activeTab === 'embeddings' && (
+        <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
+          <h3 className="text-sm font-semibold text-white">Embedding Provider for RAG</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <select
+              value={form.embeddingProvider}
+              onChange={(e) => setForm({ ...form, embeddingProvider: e.target.value })}
+              className="p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200"
+            >
+              <option value="ollama">Local Ollama Embeddings (nomic-embed-text)</option>
+              <option value="openai">OpenAI Text Embeddings (text-embedding-3-small)</option>
+            </select>
           </div>
+        </div>
+      )}
+
+      {/* Tab 5: Environment (.env) */}
+      {activeTab === 'env' && (
+        <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">System Environment Configuration (.env)</h3>
+            <button
+              onClick={handleSaveEnv}
+              disabled={envLoading}
+              className="px-3 py-1.5 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 cursor-pointer"
+            >
+              Save .env
+            </button>
+          </div>
+
+          <textarea
+            rows={14}
+            value={envContent}
+            onChange={(e) => setEnvContent(e.target.value)}
+            className="w-full p-4 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200 focus:outline-none"
+          />
         </div>
       )}
     </div>

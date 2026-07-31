@@ -24,20 +24,18 @@ const PROMPT_FILE_PATH = path.join(__dirname, '../config/system_prompt.md');
 export async function loadSystemPrompt() {
 	let systemPromptText;
 	try {
-		const db = getDB();
-		const row = await db.collection('system_prompts').findOne({ isActive: true });
-		systemPromptText = row?.prompt;
+		systemPromptText = await fs.promises.readFile(PROMPT_FILE_PATH, 'utf8');
 	} catch (error) {
-		logger.error(`Failed to load system prompt from MongoDB: ${error.message}`);
-	}
-
-	if (!systemPromptText) {
 		try {
-			systemPromptText = await fs.promises.readFile(PROMPT_FILE_PATH, 'utf8');
-		} catch (error) {
-			logger.error(`Failed to read fallback system prompt from file: ${error.message}`);
-			systemPromptText = "You are a local computer personal assistant running on macOS. You have access to tools.";
+			const db = getDB();
+			const row = await db.collection('system_prompts').findOne({ isActive: true });
+			systemPromptText = row?.prompt;
+		} catch (e) {
+			logger.error(`Failed to read system prompt: ${e.message}`);
 		}
+	}
+	if (!systemPromptText) {
+		systemPromptText = "You are a local computer personal assistant running on macOS. You have access to tools.";
 	}
 	return systemPromptText;
 }
@@ -116,6 +114,11 @@ export async function prepareMessages(prompt, history, images = []) {
 		.filter(m => m.role && m.content);
 
 	let systemPromptText = await loadSystemPrompt();
+
+	// Inject real-time system clock so model always knows current date & local time
+	const now = new Date();
+	const realTimeClock = `\n\n## Real-Time System Clock\n- Current Date & Time: ${now.toString()}\n- Local Time: ${now.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'full' })}\n- ISO Timestamp: ${now.toISOString()}\n`;
+	systemPromptText = `${systemPromptText}${realTimeClock}`;
 
 	// Inject matching memory context directly into the system prompt using OKF Catalog
 	const { contextBlock, okfDocs } = await loadOKFContext(prompt);

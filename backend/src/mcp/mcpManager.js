@@ -207,6 +207,23 @@ ${toolsSummaryMarkdown}
 	}, 'Failed to execute MCP tool');
 
 	/**
+	 * Route execution calls by tool name across connected servers
+	 */
+	async executeTool(toolName, args, toolContext = null) {
+		for (const [serverName, client] of this.servers.entries()) {
+			try {
+				const tools = await client.listTools();
+				if (tools.some(t => t.name === toolName)) {
+					return await client.callTool(toolName, args, toolContext);
+				}
+			} catch (e) {
+				// Ignore
+			}
+		}
+		throw new Error(`MCP tool "${toolName}" not found on any connected server.`);
+	}
+
+	/**
 	 * Dynamic shutdown and cleanup of a specific MCP server client
 	 */
 	async disconnectServer(serverName) {
