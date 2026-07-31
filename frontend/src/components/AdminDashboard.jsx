@@ -442,7 +442,7 @@ export default function AdminDashboard() {
                 <Globe className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-white">Google Integration</h4>
+                <h4 className="text-xs font-semibold text-white">Google Workspace Integration</h4>
                 <p className="text-[11px] text-slate-400">{googleStatus.connected ? `Connected: ${googleStatus.email}` : 'Not connected'}</p>
               </div>
             </div>
@@ -469,31 +469,53 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {metrics && (
-            <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
-              <h3 className="text-sm font-semibold text-white">Metrics Summary</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                  <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Total Requests</div>
-                  <div className="text-lg font-bold font-mono text-white mt-1">{metrics.aggregates?.totalRequests || 0}</div>
-                </div>
-                <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                  <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Success Rate</div>
-                  <div className="text-lg font-bold font-mono text-white mt-1">
-                    {metrics.aggregates?.totalRequests ? Math.round((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100) : 100}%
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                  <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Avg Latency</div>
-                  <div className="text-lg font-bold font-mono text-white mt-1">{Math.round(metrics.aggregates?.averageTotalDuration || 0)} ms</div>
-                </div>
-                <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                  <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Retrieval Avg</div>
-                  <div className="text-lg font-bold font-mono text-white mt-1">{Math.round(metrics.aggregates?.averageRetrievalTime || 0)} ms</div>
+          {/* System Telemetry Statistics */}
+          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Activity className="w-4 h-4 text-white" />
+                <h3 className="text-sm font-semibold text-white">System Performance Statistics</h3>
+              </div>
+              <button
+                onClick={fetchMetrics}
+                className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-[#212121] text-xs text-slate-300 hover:text-white border border-[#2a2a2a] cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Stats</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Total Requests</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.totalRequests || metrics?.totalRequests || 0}</div>
+              </div>
+              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Success Rate</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {metrics?.aggregates?.totalRequests ? Math.round((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100) : 100}%
                 </div>
               </div>
+              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Avg Latency</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{Math.round(metrics?.aggregates?.averageTotalDuration || metrics?.avgDuration || 0)} ms</div>
+              </div>
+              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Tool Call Avg</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{Math.round(metrics?.aggregates?.averageToolExecutionTime || 0)} ms</div>
+              </div>
             </div>
-          )}
+
+            {/* Detailed Raw Metrics JSON Log */}
+            {metrics && (
+              <div className="pt-2">
+                <div className="text-[11px] uppercase font-bold text-slate-500 font-mono mb-1.5">Detailed Telemetry Breakdown</div>
+                <pre className="p-3 rounded-xl bg-[#0c0c0c] border border-[#262626] text-[11px] font-mono text-slate-300 max-h-56 overflow-y-auto">
+                  {JSON.stringify(metrics, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

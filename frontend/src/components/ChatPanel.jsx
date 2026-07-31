@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import ToolCard from './cards/ToolCard';
 import ChartCard from './cards/ChartCard';
+import MermaidCard from './cards/MermaidCard';
+import HtmlSandboxCard from './cards/HtmlSandboxCard';
 
 function extractChartFromContent(content) {
   if (!content || typeof content !== 'string') return null;
@@ -311,7 +313,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
 
   return (
     <div className="flex-1 flex flex-col h-full chatgpt-main overflow-hidden relative font-sans">
-      {/* Scrollable Chat Feed Feed */}
+      {/* Scrollable Chat Feed */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {messages.length === 0 ? (
@@ -397,7 +399,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
                           </div>
                         )}
 
-                        {/* ReactMarkdown Parser with Correct Inline Code vs Block Detection */}
+                        {/* ReactMarkdown Parser with Mermaid & HTML Live Sandbox Support */}
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
@@ -410,8 +412,29 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
                             li: ({ children }) => <li className="text-slate-200">{children}</li>,
                             strong: ({ children }) => <strong className="font-semibold text-slate-100">{children}</strong>,
                             code: ({ node, className, children, ...props }) => {
-                              const contentStr = String(children || '');
+                              const contentStr = String(children || '').trim();
                               const hasNewline = contentStr.includes('\n');
+                              const isMermaid = className?.includes('language-mermaid') && 
+                                (contentStr.startsWith('graph ') || 
+                                 contentStr.startsWith('flowchart ') || 
+                                 contentStr.startsWith('sequenceDiagram') || 
+                                 contentStr.startsWith('classDiagram') || 
+                                 contentStr.startsWith('stateDiagram') || 
+                                 contentStr.startsWith('erDiagram') || 
+                                 contentStr.startsWith('gantt') || 
+                                 contentStr.startsWith('mindmap') || 
+                                 contentStr.startsWith('pie'));
+                                
+                              const isHtml = className?.includes('language-html') && (contentStr.includes('<html') || contentStr.includes('<div') || contentStr.includes('<style'));
+
+                              if (isMermaid) {
+                                return <MermaidCard chartCode={contentStr} />;
+                              }
+
+                              if (isHtml && hasNewline) {
+                                return <HtmlSandboxCard codeContent={contentStr} />;
+                              }
+
                               const isBlockCode = hasNewline || (className && className.startsWith('language-'));
 
                               if (!isBlockCode) {

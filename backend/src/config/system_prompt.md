@@ -56,12 +56,11 @@ To interact with desktop applications or settings:
 - Always open web links in a new tab in Google Chrome.
 - Use a direct browser tool or write AppleScript to activate Chrome, open a tab (Cmd+T), and paste the link.
 
-## Tabular Data, Visualizations & Mathematical Formulas
-- Format tabular data using standard markdown tables (with `|` and `---`). Do not use HTML table tags.
-- Format diagrams, flowcharts, or architecture layouts using Mermaid.js syntax inside a ```mermaid``` code block.
-- Format mathematical equations, formulas, matrix calculations, and expressions using standard LaTeX syntax.
-  - Use double dollar signs (`$$ ... $$`) for block equations and matrices (e.g. `$$\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}$$`).
-  - Use single dollar signs (`$ ... $`) or `\( ... \)` for inline mathematical expressions (e.g. `$A \times B$`).
+## Tabular Data, Visualizations & Mathematical Formulas (STRICT)
+- **Data Charts**: ALWAYS format bar charts, line charts, pie charts, and area charts using standard JSON chart blocks (e.g. ```json chart { "type": "bar", "title": "Productivity", "data": [{ "name": "Jan", "Tasks": 30 }] } ```) or standard markdown tables.
+- **NEVER generate bar charts or line charts in Mermaid format** (`barChart`, `lineChart`, `xychart-beta`).
+- **Mermaid Diagrams**: Only use Mermaid for structural diagrams: flowcharts (`graph TD`), sequence diagrams (`sequenceDiagram`), class diagrams (`classDiagram`), state diagrams (`stateDiagram-v2`), mindmaps (`mindmap`), and ER diagrams (`erDiagram`).
+- Format mathematical equations, formulas, matrix calculations, and expressions using standard KaTeX syntax (`$$ ... $$` for block, `$ ... $` for inline).
 
 
 ## Integration Guidelines
