@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -17,9 +17,50 @@ import { BarChart3, LineChart as LineIcon, PieChart as PieIcon, TrendingUp, Maxi
 
 const MONOCHROME_PALETTE = ['#ffffff', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b'];
 
-export default function ChartCard({ chartData, title = 'Data Insights', type: defaultType = 'bar' }) {
+export default function ChartCard({ chartId: propChartId, chartData, title = 'Data Insights', type: defaultType = 'bar' }) {
   const [activeChartType, setActiveChartType] = useState(defaultType || 'bar');
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const fallbackIdRef = useRef(
+    'chart-' + (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : Math.random().toString(36).substring(2, 9))
+  );
+  const chartId = propChartId || fallbackIdRef.current;
+
+  useEffect(() => {
+    const syncWithUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlChartId = params.get('chartId');
+      if (urlChartId && urlChartId === chartId) {
+        setIsFullscreen(true);
+      } else {
+        setIsFullscreen(false);
+      }
+    };
+
+    syncWithUrl();
+    window.addEventListener('popstate', syncWithUrl);
+    window.addEventListener('urlchartchange', syncWithUrl);
+    return () => {
+      window.removeEventListener('popstate', syncWithUrl);
+      window.removeEventListener('urlchartchange', syncWithUrl);
+    };
+  }, [chartId]);
+
+  const openFullscreen = () => {
+    setIsFullscreen(true);
+    const url = new URL(window.location.href);
+    url.searchParams.set('chartId', chartId);
+    window.history.pushState({}, '', url.toString());
+    window.dispatchEvent(new Event('urlchartchange'));
+  };
+
+  const closeFullscreen = () => {
+    setIsFullscreen(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('chartId');
+    window.history.pushState({}, '', url.toString());
+    window.dispatchEvent(new Event('urlchartchange'));
+  };
 
   if (!chartData || !Array.isArray(chartData) || chartData.length === 0) return null;
 
@@ -102,7 +143,7 @@ export default function ChartCard({ chartData, title = 'Data Insights', type: de
   return (
     <>
       {/* Inline Standard View */}
-      <div className="my-4 rounded-2xl bg-[#171717] border border-[#2a2a2a] overflow-hidden shadow-2xl font-sans">
+      <div id={chartId} className="my-4 rounded-2xl bg-[#171717] border border-[#2a2a2a] overflow-hidden shadow-2xl font-sans">
         <div className="p-4 border-b border-[#262626] flex items-center justify-between bg-[#1f1f1f]/50">
           <div>
             <div className="flex items-center space-x-2">
@@ -150,7 +191,7 @@ export default function ChartCard({ chartData, title = 'Data Insights', type: de
 
             {/* Extension Fullscreen Button */}
             <button
-              onClick={() => setIsFullscreen(true)}
+              onClick={openFullscreen}
               className="p-2 rounded-xl bg-[#121212] hover:bg-[#262626] border border-[#2a2a2a] text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Expand Chart View"
             >
@@ -180,19 +221,19 @@ export default function ChartCard({ chartData, title = 'Data Insights', type: de
 
       {/* Expanded Extension Fullscreen Modal */}
       {isFullscreen && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-[#141414] border border-[#2a2a2a] rounded-3xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden shadow-2xl font-sans">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6" onClick={closeFullscreen}>
+          <div className="bg-[#141414] border border-[#2a2a2a] rounded-3xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden shadow-2xl font-sans" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-[#262626] flex items-center justify-between bg-[#1c1c1c]">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center space-x-2">
                   <TrendingUp className="w-5 h-5 text-white" />
                   <span>{title} (Expanded Analytics)</span>
                 </h3>
-                <p className="text-xs text-slate-400 font-mono mt-1">Full screen metric insights for {mainValueKey}</p>
+                <p className="text-xs text-slate-400 font-mono mt-1">Full screen metric insights for {mainValueKey} • ID: {chartId}</p>
               </div>
 
               <button
-                onClick={() => setIsFullscreen(false)}
+                onClick={closeFullscreen}
                 className="p-2 rounded-xl bg-[#262626] hover:bg-[#333333] text-slate-300 hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />

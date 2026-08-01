@@ -4,7 +4,7 @@ title: MCP Server - filesystem
 description: Integrated MCP server providing tools for filesystem.
 tags: [filesystem, read, file, text, media, multiple, files, write, edit, create, directory, list, with, sizes, tree, move, search, get, info, allowed, directories]
 tools: [read_file, read_text_file, read_media_file, read_multiple_files, write_file, edit_file, create_directory, list_directory, list_directory_with_sizes, directory_tree, move_file, search_files, get_file_info, list_allowed_directories]
-timestamp: 2026-07-31T18:03:24.422Z
+timestamp: 2026-08-01T05:54:15.028Z
 ---
 
 # MCP Server - filesystem

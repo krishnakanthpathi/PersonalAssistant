@@ -28,17 +28,24 @@ import MermaidCard from './cards/MermaidCard';
 import HtmlSandboxCard from './cards/HtmlSandboxCard';
 import PrebuiltFormsModal from './cards/PrebuiltFormsModal';
 
-function extractChartFromContent(content) {
+function slugify(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function extractChartFromContent(content, index = 0) {
   if (!content || typeof content !== 'string') return null;
   const match = content.match(/```json\s*chart\s*([\s\S]*?)```/i) || content.match(/```json\s*([\s\S]*?)```/i);
   if (match) {
     try {
       const parsed = JSON.parse(match[1].trim());
       if (parsed && Array.isArray(parsed.data) && parsed.data.length > 0) {
+        const title = parsed.title || 'Analytics Chart';
+        const chartId = parsed.id || `chart-${slugify(title)}-${index}`;
         return {
+          chartId,
           chartData: parsed.data,
           chartType: parsed.type || 'bar',
-          chartTitle: parsed.title || 'Analytics Chart'
+          chartTitle: title
         };
       }
     } catch (e) {
@@ -267,7 +274,8 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
                 const resObj = data.content;
                 const rawContent = resObj.content || (typeof resObj === 'string' ? resObj : '');
                 const speechContent = resObj.speech || '';
-                const chartInfo = extractChartFromContent(rawContent);
+                const lastIdx = messages.length;
+                const chartInfo = extractChartFromContent(rawContent, lastIdx);
 
                 if (ttsEnabled && (speechContent || rawContent)) {
                   speakText(speechContent || rawContent);
@@ -275,13 +283,14 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
 
                 setMessages((prev) => {
                   const updated = [...prev];
-                  const lastIdx = updated.length - 1;
-                  updated[lastIdx] = {
+                  const idx = updated.length - 1;
+                  updated[idx] = {
                     role: 'assistant',
                     content: rawContent,
                     speech: speechContent,
-                    toolExecutions: resObj.toolExecutions || updated[lastIdx].toolExecutions || [],
+                    toolExecutions: resObj.toolExecutions || updated[idx].toolExecutions || [],
                     ragFacts: resObj.ragFacts || [],
+                    chartId: chartInfo?.chartId || null,
                     chartData: chartInfo?.chartData || null,
                     chartType: chartInfo?.chartType || 'bar',
                     chartTitle: chartInfo?.chartTitle || '',
@@ -347,10 +356,11 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
           ) : (
             /* Message Thread */
             messages.map((msg, idx) => {
-              const chartInfo = extractChartFromContent(msg.content);
+              const chartInfo = extractChartFromContent(msg.content, idx);
               const chartData = msg.chartData || chartInfo?.chartData;
               const chartType = msg.chartType || chartInfo?.chartType || 'bar';
               const chartTitle = msg.chartTitle || chartInfo?.chartTitle || 'Analytics Chart';
+              const chartId = msg.chartId || chartInfo?.chartId || `chart-${idx}`;
 
               return (
                 <div key={idx} className="flex flex-col space-y-2 group">
@@ -477,7 +487,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
                         </ReactMarkdown>
 
                         {chartData && (
-                          <ChartCard chartData={chartData} title={chartTitle} type={chartType} />
+                          <ChartCard chartId={chartId} chartData={chartData} title={chartTitle} type={chartType} />
                         )}
 
                         {/* Action buttons */}
