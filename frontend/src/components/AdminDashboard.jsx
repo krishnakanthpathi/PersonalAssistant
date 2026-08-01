@@ -509,6 +509,13 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Tokens / Sec</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {metrics?.aggregates?.averageTokensPerSecond || 0} <span className="text-xs font-normal text-slate-400">t/s</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
                 <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Tool Call Avg</div>
                 <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.averageToolExecutionTime || 0} ms</div>
               </div>
@@ -593,10 +600,15 @@ export default function AdminDashboard() {
                           <span className="font-mono text-[10px] text-slate-500 bg-[#212121] px-1.5 py-0.5 rounded">{req.id}</span>
                         </div>
 
-                        <div className="flex items-center space-x-2 font-mono text-[11px]">
+                        <div className="flex items-center space-x-2 font-mono text-[11px] flex-wrap gap-1">
                           <span className="text-slate-300">Total: <strong className="text-white">{req.totalDuration}ms</strong></span>
                           {req.retrievalTime > 0 && <span className="text-slate-400">• OKF: {req.retrievalTime}ms</span>}
                           {req.generationTime > 0 && <span className="text-slate-400">• LLM: {req.generationTime}ms</span>}
+                          {req.tokensPerSecond > 0 && (
+                            <span className="text-slate-200 font-semibold bg-[#212121] px-1.5 py-0.5 rounded border border-[#333333]">
+                              ⚡ {req.tokensPerSecond} tokens/sec ({req.tokenCount} tokens)
+                            </span>
+                          )}
                         </div>
                       </div>
 

@@ -83,6 +83,11 @@ class MetricsService {
 			req.error = errorMsg;
 		}
 
+		const generatedText = req.generatedContext || '';
+		const tokenCount = Math.round(generatedText.length / 4);
+		const genSeconds = (req.generationTime || 0) / 1000;
+		const tokensPerSecond = genSeconds > 0 && tokenCount > 0 ? parseFloat((tokenCount / genSeconds).toFixed(1)) : 0;
+
 		try {
 			const db = getDB();
 			const collection = db.collection('telemetry_logs');
@@ -98,6 +103,8 @@ class MetricsService {
 				contextProcessingTime: req.contextProcessingTime,
 				givenContext: req.givenContext,
 				generatedContext: req.generatedContext,
+				tokenCount,
+				tokensPerSecond,
 				screenshotCount: req.screenshotCount,
 				appleScriptCount: req.appleScriptCount,
 				toolCalls: req.toolCalls,
@@ -105,7 +112,7 @@ class MetricsService {
 			};
 
 			await collection.insertOne(telemetryDoc);
-			logger.info(`Telemetry metrics saved successfully to MongoDB for request: ${requestId}`);
+			logger.info(`Telemetry metrics saved successfully to MongoDB for request: ${requestId} (${tokensPerSecond} tokens/sec)`);
 
 			// Enforce 100 requests limit by deleting older logs
 			const count = await collection.countDocuments();
@@ -142,6 +149,9 @@ class MetricsService {
 					retrievalTime: 1,
 					generationTime: 1,
 					contextProcessingTime: 1,
+					tokenCount: 1,
+					tokensPerSecond: 1,
+					generatedContext: 1,
 					screenshotCount: 1,
 					appleScriptCount: 1,
 					toolCalls: 1
@@ -155,6 +165,7 @@ class MetricsService {
 			let sumRetrievalTime = 0;
 			let sumGenerationTime = 0;
 			let sumContextProcessingTime = 0;
+			let totalTokensGenerated = 0;
 			let totalScreenshots = 0;
 			let totalAppleScripts = 0;
 			let totalToolCallsCount = 0;
@@ -168,6 +179,9 @@ class MetricsService {
 				} else {
 					failedRequests++;
 				}
+
+				const logTokens = log.tokenCount || Math.round((log.generatedContext || '').length / 4);
+				totalTokensGenerated += logTokens;
 
 				sumTotalDuration += (log.totalDuration || 0);
 				sumRetrievalTime += (log.retrievalTime || 0);
@@ -210,6 +224,9 @@ class MetricsService {
 				delete stats.totalLatency;
 			}
 
+			const totalGenSec = sumGenerationTime / 1000;
+			const averageTokensPerSecond = totalGenSec > 0 ? parseFloat((totalTokensGenerated / totalGenSec).toFixed(1)) : 0;
+
 			const aggregates = {
 				totalRequests: count,
 				successfulRequests,
@@ -220,6 +237,8 @@ class MetricsService {
 				averageGenerationTime: count > 0 ? Math.round(sumGenerationTime / count) : 0,
 				averageContextProcessingTime: count > 0 ? Math.round(sumContextProcessingTime / count) : 0,
 				averageToolExecutionTime: totalToolCallsCount > 0 ? Math.round(totalToolLatencySum / totalToolCallsCount) : 0,
+				averageTokensPerSecond,
+				totalTokensGenerated,
 				totalScreenshots,
 				totalAppleScripts,
 				tools
@@ -231,25 +250,33 @@ class MetricsService {
 				.limit(parsedLimit)
 				.toArray();
 
-			const requests = recentRawLogs.map(log => ({
-				id: log._id,
-				timestamp: log.timestamp ? log.timestamp.toISOString() : new Date().toISOString(),
-				prompt: log.prompt ? (log.prompt.length > 200 ? log.prompt.substring(0, 200) + '...' : log.prompt) : '',
-				success: log.success === true,
-				totalDuration: log.totalDuration || 0,
-				retrievalTime: log.retrievalTime || 0,
-				generationTime: log.generationTime || 0,
-				contextProcessingTime: log.contextProcessingTime || 0,
-				toolCallsCount: (log.toolCalls || []).length,
-				toolCalls: (log.toolCalls || []).map(tc => ({
-					name: tc.name,
-					latency: tc.latency || 0,
-					success: tc.success === true,
-					error: tc.error || null,
-					resultSummary: tc.resultSummary || (tc.result ? String(tc.result).substring(0, 120) : '')
-				})),
-				error: log.error || null
-			}));
+			const requests = recentRawLogs.map(log => {
+				const tokenCount = log.tokenCount || Math.round((log.generatedContext || '').length / 4);
+				const genSec = (log.generationTime || 0) / 1000;
+				const tokensPerSecond = log.tokensPerSecond || (genSec > 0 && tokenCount > 0 ? parseFloat((tokenCount / genSec).toFixed(1)) : 0);
+
+				return {
+					id: log._id,
+					timestamp: log.timestamp ? log.timestamp.toISOString() : new Date().toISOString(),
+					prompt: log.prompt ? (log.prompt.length > 200 ? log.prompt.substring(0, 200) + '...' : log.prompt) : '',
+					success: log.success === true,
+					totalDuration: log.totalDuration || 0,
+					retrievalTime: log.retrievalTime || 0,
+					generationTime: log.generationTime || 0,
+					contextProcessingTime: log.contextProcessingTime || 0,
+					tokenCount,
+					tokensPerSecond,
+					toolCallsCount: (log.toolCalls || []).length,
+					toolCalls: (log.toolCalls || []).map(tc => ({
+						name: tc.name,
+						latency: tc.latency || 0,
+						success: tc.success === true,
+						error: tc.error || null,
+						resultSummary: tc.resultSummary || (tc.result ? String(tc.result).substring(0, 120) : '')
+					})),
+					error: log.error || null
+				};
+			});
 
 			return { limit: parsedLimit, totalLogs: count, requests, aggregates };
 		} catch (error) {
