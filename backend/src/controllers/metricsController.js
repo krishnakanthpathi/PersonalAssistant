@@ -1,7 +1,8 @@
 import { metricsService } from '../utils/metrics.js';
 
 export const getMetrics = async (req, res) => {
-	const metrics = await metricsService.getMetrics();
+	const limit = req.query.limit || 20;
+	const metrics = await metricsService.getMetrics(limit);
 	res.json({
 		success: true,
 		metrics

@@ -12,7 +12,10 @@ import {
   Activity,
   Wrench,
   Play,
-  Globe
+  Globe,
+  Clock,
+  Zap,
+  AlertCircle
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -41,12 +44,13 @@ export default function AdminDashboard() {
 
   // Metrics & Google
   const [metrics, setMetrics] = useState(null);
+  const [metricsLimit, setMetricsLimit] = useState(20);
   const [googleStatus, setGoogleStatus] = useState({ connected: false, email: '' });
 
   useEffect(() => {
     fetchPrompts();
     fetchMcpData();
-    fetchMetrics();
+    fetchMetrics(metricsLimit);
     fetchGoogleStatus();
   }, []);
 
@@ -139,11 +143,20 @@ export default function AdminDashboard() {
     } catch (e) {}
   };
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = async (overrideLimit) => {
     try {
-      const res = await fetch('/api/metrics');
+      const l = overrideLimit || metricsLimit;
+      const res = await fetch(`/api/metrics?limit=${l}`);
       const data = await res.json();
-      if (data.success) setMetrics(data);
+      if (data.success && data.metrics) setMetrics(data.metrics);
+    } catch (e) {}
+  };
+
+  const handleClearMetrics = async () => {
+    if (!window.confirm('Are you sure you want to clear telemetry logs?')) return;
+    try {
+      await fetch('/api/metrics', { method: 'DELETE' });
+      fetchMetrics(metricsLimit);
     } catch (e) {}
   };
 
@@ -413,51 +426,221 @@ export default function AdminDashboard() {
           </div>
 
           {/* System Telemetry Statistics */}
-          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-6">
+            {/* Header & Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#262626] pb-4">
               <div className="flex items-center space-x-2">
-                <Activity className="w-4 h-4 text-white" />
-                <h3 className="text-sm font-semibold text-white">System Performance Statistics</h3>
-              </div>
-              <button
-                onClick={fetchMetrics}
-                className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-[#212121] text-xs text-slate-300 hover:text-white border border-[#2a2a2a] cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Refresh Stats</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Total Requests</div>
-                <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.totalRequests || metrics?.totalRequests || 0}</div>
-              </div>
-              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Success Rate</div>
-                <div className="text-xl font-bold font-mono text-white mt-1">
-                  {metrics?.aggregates?.totalRequests ? Math.round((metrics.aggregates.successfulRequests / metrics.aggregates.totalRequests) * 100) : 100}%
+                <Activity className="w-5 h-5 text-white" />
+                <div>
+                  <h3 className="text-sm font-semibold text-white">System Performance Statistics</h3>
+                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    Calculated telemetry across {metrics?.totalLogs || 0} request records
+                  </p>
                 </div>
               </div>
-              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Avg Latency</div>
-                <div className="text-xl font-bold font-mono text-white mt-1">{Math.round(metrics?.aggregates?.averageTotalDuration || metrics?.avgDuration || 0)} ms</div>
-              </div>
-              <div className="p-4 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Tool Call Avg</div>
-                <div className="text-xl font-bold font-mono text-white mt-1">{Math.round(metrics?.aggregates?.averageToolExecutionTime || 0)} ms</div>
+
+              <div className="flex items-center space-x-2">
+                {/* Limit Selector */}
+                <div className="flex items-center space-x-1 p-1 rounded-xl bg-[#1f1f1f] border border-[#2a2a2a] text-xs">
+                  <span className="px-2 text-[11px] text-slate-400 font-mono">Limit:</span>
+                  {[10, 20, 50].map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => {
+                        setMetricsLimit(l);
+                        fetchMetrics(l);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold font-mono transition-colors cursor-pointer ${
+                        metricsLimit === l ? 'bg-[#2a2a2a] text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => fetchMetrics(metricsLimit)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] text-xs text-slate-200 border border-[#2a2a2a] cursor-pointer transition-colors"
+                  title="Refresh stats"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  onClick={handleClearMetrics}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#212121] hover:bg-red-950/40 text-xs text-red-400 border border-red-900/30 cursor-pointer transition-colors"
+                  title="Clear telemetry logs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear Data</span>
+                </button>
               </div>
             </div>
 
-            {/* Detailed Raw Metrics JSON Log */}
-            {metrics && (
-              <div className="pt-2">
-                <div className="text-[11px] uppercase font-bold text-slate-500 font-mono mb-1.5">Detailed Telemetry Breakdown</div>
-                <pre className="p-3 rounded-xl bg-[#0c0c0c] border border-[#262626] text-[11px] font-mono text-slate-300 max-h-56 overflow-y-auto">
-                  {JSON.stringify(metrics, null, 2)}
-                </pre>
+            {/* Calculated KPI Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Total Requests</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.totalRequests || 0}</div>
               </div>
-            )}
+
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Success Rate</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {metrics?.aggregates?.successRate ?? 100}%
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Avg Latency</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.averageTotalDuration || 0} ms</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">RAG Retrieval</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.averageRetrievalTime || 0} ms</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">LLM Generation</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.averageGenerationTime || 0} ms</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">Tool Call Avg</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.averageToolExecutionTime || 0} ms</div>
+              </div>
+            </div>
+
+            {/* Tool Performance Breakdown Table */}
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-semibold text-white flex items-center space-x-2">
+                  <Wrench className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Tool Performance Breakdown</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  {Object.keys(metrics?.aggregates?.tools || {}).length} tools recorded
+                </span>
+              </div>
+
+              {metrics?.aggregates?.tools && Object.keys(metrics.aggregates.tools).length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-[#2a2a2a] bg-[#171717]">
+                  <table className="w-full text-left text-xs border-collapse font-sans">
+                    <thead className="bg-[#1f1f1f] text-slate-300 font-mono text-[11px] border-b border-[#2a2a2a]">
+                      <tr>
+                        <th className="px-4 py-2.5 font-semibold">Tool Name</th>
+                        <th className="px-4 py-2.5 font-semibold text-center">Total Calls</th>
+                        <th className="px-4 py-2.5 font-semibold text-center">Successes / Failures</th>
+                        <th className="px-4 py-2.5 font-semibold text-center">Success Rate</th>
+                        <th className="px-4 py-2.5 font-semibold text-right">Avg Latency</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#262626]">
+                      {Object.entries(metrics.aggregates.tools).map(([toolName, stats]) => (
+                        <tr key={toolName} className="hover:bg-[#1c1c1c] transition-colors">
+                          <td className="px-4 py-2.5 font-mono text-white font-medium flex items-center space-x-2">
+                            <span className="w-2 h-2 rounded-full bg-white/70" />
+                            <span>{toolName}</span>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-center text-slate-300">{stats.calls}</td>
+                          <td className="px-4 py-2.5 font-mono text-center text-slate-400">
+                            <span className="text-white font-medium">{stats.successes}</span> / <span className="text-slate-500">{stats.failures}</span>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-center">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                              stats.successRate >= 90 ? 'bg-white/10 text-white' : 'bg-red-950/50 text-red-400'
+                            }`}>
+                              {stats.successRate}%
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-right text-slate-200">{stats.averageLatency} ms</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4 text-center rounded-xl bg-[#171717] border border-[#2a2a2a] text-xs text-slate-500 font-mono">
+                  No tool execution statistics logged yet.
+                </div>
+              )}
+            </div>
+
+            {/* Recent Telemetry Request Feed */}
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-semibold text-white flex items-center space-x-2">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Recent Telemetry Requests</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Showing {metrics?.requests?.length || 0} of {metrics?.totalLogs || 0}
+                </span>
+              </div>
+
+              {metrics?.requests && metrics.requests.length > 0 ? (
+                <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                  {metrics.requests.map((req) => (
+                    <div key={req.id} className="p-3.5 rounded-xl bg-[#171717] border border-[#262626] space-y-2 text-xs">
+                      {/* Top Bar */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className={`w-2 h-2 rounded-full ${req.success ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                          <span className="font-mono text-[11px] text-slate-400">{req.timestamp ? new Date(req.timestamp).toLocaleTimeString() : ''}</span>
+                          <span className="font-mono text-[10px] text-slate-500 bg-[#212121] px-1.5 py-0.5 rounded">{req.id}</span>
+                        </div>
+
+                        <div className="flex items-center space-x-2 font-mono text-[11px]">
+                          <span className="text-slate-300">Total: <strong className="text-white">{req.totalDuration}ms</strong></span>
+                          {req.retrievalTime > 0 && <span className="text-slate-400">• RAG: {req.retrievalTime}ms</span>}
+                          {req.generationTime > 0 && <span className="text-slate-400">• LLM: {req.generationTime}ms</span>}
+                        </div>
+                      </div>
+
+                      {/* Prompt */}
+                      {req.prompt && (
+                        <div className="text-slate-300 font-sans text-xs bg-[#121212] p-2 rounded-lg border border-[#212121] truncate">
+                          "{req.prompt}"
+                        </div>
+                      )}
+
+                      {/* Tool Executions Badge List */}
+                      {req.toolCalls && req.toolCalls.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">Tools ({req.toolCalls.length}):</span>
+                          {req.toolCalls.map((tc, tcIdx) => (
+                            <span 
+                              key={tcIdx}
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-mono flex items-center space-x-1 border ${
+                                tc.success ? 'bg-[#212121] text-slate-200 border-[#2a2a2a]' : 'bg-red-950/40 text-red-300 border-red-900/40'
+                              }`}
+                            >
+                              <span>{tc.name}</span>
+                              <span className="text-slate-400">({tc.latency}ms)</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Error details */}
+                      {req.error && (
+                        <div className="p-2 rounded-lg bg-red-950/30 border border-red-900/40 text-red-300 text-[11px] font-mono flex items-start space-x-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+                          <span>{req.error}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center rounded-xl bg-[#171717] border border-[#2a2a2a] text-xs text-slate-500 font-mono">
+                  No telemetry requests recorded yet.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

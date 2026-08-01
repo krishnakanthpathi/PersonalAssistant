@@ -126,101 +126,148 @@ class MetricsService {
 		}
 	}
 
-	async getMetrics() {
+	async getMetrics(limit = 20) {
 		try {
 			const db = getDB();
 			const collection = db.collection('telemetry_logs');
+			const parsedLimit = Math.max(1, Math.min(100, parseInt(limit) || 20));
 
-			// Query requests sorted by timestamp descending
-			const rawLogs = await collection.find()
-				.sort({ timestamp: -1 })
-				.toArray();
+			// Project lightweight log fields across all documents for accurate aggregates
+			const allLogs = await collection.find({}, {
+				projection: {
+					_id: 1,
+					timestamp: 1,
+					success: 1,
+					totalDuration: 1,
+					retrievalTime: 1,
+					generationTime: 1,
+					contextProcessingTime: 1,
+					screenshotCount: 1,
+					appleScriptCount: 1,
+					toolCalls: 1
+				}
+			}).toArray();
 
-			// Format requests list matching original format
-			const requests = rawLogs.map(log => ({
-				id: log._id,
-				timestamp: log.timestamp.toISOString(),
-				prompt: log.prompt,
-				success: log.success,
-				totalDuration: log.totalDuration,
-				retrievalTime: log.retrievalTime,
-				generationTime: log.generationTime,
-				contextProcessingTime: log.contextProcessingTime,
-				givenContext: log.givenContext,
-				generatedContext: log.generatedContext,
-				screenshotCount: log.screenshotCount,
-				appleScriptCount: log.appleScriptCount,
-				toolCalls: log.toolCalls || []
-			}));
+			const count = allLogs.length;
+			let successfulRequests = 0;
+			let failedRequests = 0;
+			let sumTotalDuration = 0;
+			let sumRetrievalTime = 0;
+			let sumGenerationTime = 0;
+			let sumContextProcessingTime = 0;
+			let totalScreenshots = 0;
+			let totalAppleScripts = 0;
+			let totalToolCallsCount = 0;
+			let totalToolLatencySum = 0;
 
-			// Calculate aggregates dynamically
-			const count = rawLogs.length;
-			const aggregates = {
-				totalRequests: count,
-				successfulRequests: rawLogs.filter(log => log.success).length,
-				failedRequests: rawLogs.filter(log => !log.success).length,
-				averageTotalDuration: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.totalDuration || 0), 0) / count) : 0,
-				averageRetrievalTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.retrievalTime || 0), 0) / count) : 0,
-				averageGenerationTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.generationTime || 0), 0) / count) : 0,
-				averageContextProcessingTime: count > 0 ? Math.round(rawLogs.reduce((sum, log) => sum + (log.contextProcessingTime || 0), 0) / count) : 0,
-				totalScreenshots: rawLogs.reduce((sum, log) => sum + (log.screenshotCount || 0), 0),
-				totalAppleScripts: rawLogs.reduce((sum, log) => sum + (log.appleScriptCount || 0), 0),
-				tools: {}
-			};
+			const tools = {};
 
-			// Build tool specific aggregates from nested toolCalls array
-			for (const log of rawLogs) {
+			for (const log of allLogs) {
+				if (log.success) {
+					successfulRequests++;
+				} else {
+					failedRequests++;
+				}
+
+				sumTotalDuration += (log.totalDuration || 0);
+				sumRetrievalTime += (log.retrievalTime || 0);
+				sumGenerationTime += (log.generationTime || 0);
+				sumContextProcessingTime += (log.contextProcessingTime || 0);
+				totalScreenshots += (log.screenshotCount || 0);
+				totalAppleScripts += (log.appleScriptCount || 0);
+
 				const toolCalls = log.toolCalls || [];
 				for (const tool of toolCalls) {
-					if (!aggregates.tools[tool.name]) {
-						aggregates.tools[tool.name] = {
+					totalToolCallsCount++;
+					totalToolLatencySum += (tool.latency || 0);
+
+					if (!tools[tool.name]) {
+						tools[tool.name] = {
 							calls: 0,
 							successes: 0,
 							failures: 0,
 							successRate: 0,
 							averageLatency: 0,
-							averageLatencyFromRequestStart: 0,
-							totalLatency: 0,
-							totalLatencyFromRequestStart: 0
+							totalLatency: 0
 						};
 					}
-					const stats = aggregates.tools[tool.name];
+					const stats = tools[tool.name];
 					stats.calls++;
 					if (tool.success) {
 						stats.successes++;
 					} else {
 						stats.failures++;
 					}
-					stats.successRate = Number((stats.successes / stats.calls).toFixed(4));
-					
 					stats.totalLatency += (tool.latency || 0);
-					stats.averageLatency = Math.round(stats.totalLatency / stats.calls);
-
-					stats.totalLatencyFromRequestStart += (tool.latencyFromRequestStart || 0);
-					stats.averageLatencyFromRequestStart = Math.round(stats.totalLatencyFromRequestStart / stats.calls);
 				}
 			}
 
-			// Remove temp sum properties
-			for (const key of Object.keys(aggregates.tools)) {
-				delete aggregates.tools[key].totalLatency;
-				delete aggregates.tools[key].totalLatencyFromRequestStart;
+			// Finalize per-tool calculations
+			for (const key of Object.keys(tools)) {
+				const stats = tools[key];
+				stats.successRate = stats.calls > 0 ? Math.round((stats.successes / stats.calls) * 100) : 0;
+				stats.averageLatency = stats.calls > 0 ? Math.round(stats.totalLatency / stats.calls) : 0;
+				delete stats.totalLatency;
 			}
 
-			return { requests, aggregates };
+			const aggregates = {
+				totalRequests: count,
+				successfulRequests,
+				failedRequests,
+				successRate: count > 0 ? Math.round((successfulRequests / count) * 100) : 100,
+				averageTotalDuration: count > 0 ? Math.round(sumTotalDuration / count) : 0,
+				averageRetrievalTime: count > 0 ? Math.round(sumRetrievalTime / count) : 0,
+				averageGenerationTime: count > 0 ? Math.round(sumGenerationTime / count) : 0,
+				averageContextProcessingTime: count > 0 ? Math.round(sumContextProcessingTime / count) : 0,
+				averageToolExecutionTime: totalToolCallsCount > 0 ? Math.round(totalToolLatencySum / totalToolCallsCount) : 0,
+				totalScreenshots,
+				totalAppleScripts,
+				tools
+			};
+
+			// Query limited recent logs for detailed table display
+			const recentRawLogs = await collection.find()
+				.sort({ timestamp: -1 })
+				.limit(parsedLimit)
+				.toArray();
+
+			const requests = recentRawLogs.map(log => ({
+				id: log._id,
+				timestamp: log.timestamp ? log.timestamp.toISOString() : new Date().toISOString(),
+				prompt: log.prompt ? (log.prompt.length > 200 ? log.prompt.substring(0, 200) + '...' : log.prompt) : '',
+				success: log.success === true,
+				totalDuration: log.totalDuration || 0,
+				retrievalTime: log.retrievalTime || 0,
+				generationTime: log.generationTime || 0,
+				contextProcessingTime: log.contextProcessingTime || 0,
+				toolCallsCount: (log.toolCalls || []).length,
+				toolCalls: (log.toolCalls || []).map(tc => ({
+					name: tc.name,
+					latency: tc.latency || 0,
+					success: tc.success === true,
+					error: tc.error || null,
+					resultSummary: tc.resultSummary || (tc.result ? String(tc.result).substring(0, 120) : '')
+				})),
+				error: log.error || null
+			}));
+
+			return { limit: parsedLimit, totalLogs: count, requests, aggregates };
 		} catch (error) {
 			logger.error(`Failed to retrieve telemetry metrics from MongoDB: ${error.message}`);
-			// Return empty template to avoid frontend crashes
 			return {
+				limit: 20,
+				totalLogs: 0,
 				requests: [],
 				aggregates: {
 					totalRequests: 0,
 					successfulRequests: 0,
 					failedRequests: 0,
+					successRate: 100,
 					averageTotalDuration: 0,
 					averageRetrievalTime: 0,
 					averageGenerationTime: 0,
 					averageContextProcessingTime: 0,
+					averageToolExecutionTime: 0,
 					totalScreenshots: 0,
 					totalAppleScripts: 0,
 					tools: {}
