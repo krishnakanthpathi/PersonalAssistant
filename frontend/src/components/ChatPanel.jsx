@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -39,9 +39,7 @@ function slugify(text) {
 
 function formatMathDelimiters(text) {
   if (!text || typeof text !== 'string') return '';
-  // Convert LaTeX display math \[ ... \] to $$ ... $$
   let formatted = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => `\n$$\n${math.trim()}\n$$\n`);
-  // Convert LaTeX inline math \( ... \) to $ ... $
   formatted = formatted.replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => `$${math.trim()}$`);
   return formatted;
 }
@@ -68,6 +66,198 @@ function extractChartFromContent(content, index = 0) {
   }
   return null;
 }
+
+// Memoized Individual Message Item component to eliminate input typing lag
+const ChatMessageItem = React.memo(function ChatMessageItem({
+  msg,
+  idx,
+  isMsgStreaming,
+  copiedIdx,
+  onCopy,
+  onSpeak,
+}) {
+  const chartInfo = useMemo(() => extractChartFromContent(msg.content, idx), [msg.content, idx]);
+  const chartData = msg.chartData || chartInfo?.chartData;
+  const chartType = msg.chartType || chartInfo?.chartType || 'bar';
+  const chartTitle = msg.chartTitle || chartInfo?.chartTitle || 'Analytics Chart';
+  const chartId = msg.chartId || chartInfo?.chartId || `chart-${idx}`;
+
+  const markdownComponents = useMemo(() => ({
+    p: ({ children }) => <p className="mb-2 leading-relaxed text-slate-200">{children}</p>,
+    h1: ({ children }) => <h1 className="text-xl font-bold text-slate-100 mt-4 mb-2">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-lg font-bold text-slate-100 mt-3 mb-2">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-base font-semibold text-slate-100 mt-2 mb-1">{children}</h3>,
+    ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-2 text-slate-200">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2 text-slate-200">{children}</ol>,
+    li: ({ children }) => <li className="text-slate-200">{children}</li>,
+    strong: ({ children }) => <strong className="font-semibold text-slate-100">{children}</strong>,
+    code: ({ node, className, children, ...props }) => {
+      const contentStr = String(children || '').trim();
+      const hasNewline = contentStr.includes('\n');
+      const isMermaid = className?.includes('language-mermaid') || 
+        (contentStr.startsWith('graph ') || 
+         contentStr.startsWith('flowchart ') || 
+         contentStr.startsWith('sequenceDiagram') || 
+         contentStr.startsWith('classDiagram') || 
+         contentStr.startsWith('stateDiagram') || 
+         contentStr.startsWith('erDiagram') || 
+         contentStr.startsWith('gantt') || 
+         contentStr.startsWith('mindmap') || 
+         contentStr.startsWith('pie'));
+        
+      const langLower = (className || '').toLowerCase();
+      const isHtmlLang = langLower.includes('html') || langLower.includes('htm') || langLower.includes('markup') || langLower.includes('xml');
+      const containsHtmlTags = /<(!DOCTYPE|html|head|body|div|style|script|svg|canvas|section|main|header|footer|table|form|p|h[1-6]|button)/i.test(contentStr);
+      const startsWithHtml = contentStr.startsWith('<!DOCTYPE') || contentStr.startsWith('<html') || contentStr.startsWith('<div');
+      const isHtml = (isHtmlLang || containsHtmlTags || startsWithHtml) && hasNewline && contentStr.includes('<');
+
+      if (isMermaid) {
+        if (isMsgStreaming) {
+          return (
+            <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300">
+              <RefreshCw className="w-4 h-4 text-white animate-spin" />
+              <span>Generating Mermaid Diagram...</span>
+            </div>
+          );
+        }
+        return <MermaidCard chartCode={contentStr} />;
+      }
+
+      if (isHtml) {
+        if (isMsgStreaming) {
+          return (
+            <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300 shadow-md">
+              <RefreshCw className="w-4 h-4 text-white animate-spin flex-shrink-0" />
+              <span className="font-sans font-medium">Generating Live HTML Application Sandbox...</span>
+            </div>
+          );
+        }
+        return <HtmlSandboxCard codeContent={contentStr} />;
+      }
+
+      const isBlockCode = hasNewline || (className && className.startsWith('language-'));
+
+      if (!isBlockCode) {
+        return (
+          <span className="font-mono text-slate-100 text-xs font-medium px-1.5 py-0.5 bg-[#242424] rounded">
+            {children}
+          </span>
+        );
+      }
+
+      return (
+        <pre className="p-3 my-2 rounded-xl bg-[#121212] border border-[#2a2a2a] overflow-x-auto text-xs font-mono text-slate-200">
+          <code className={className} {...props}>
+            {children}
+          </code>
+        </pre>
+      );
+    },
+    table: ({ children }) => (
+      <div className="my-3 overflow-x-auto rounded-xl border border-[#2a2a2a] bg-[#141414] shadow-lg">
+        <table className="w-full text-left text-xs border-collapse">{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => <thead className="bg-[#1c1c1c] text-slate-200 border-b border-[#2a2a2a] font-semibold">{children}</thead>,
+    th: ({ children }) => <th className="px-4 py-3 font-semibold text-slate-200 border-r border-[#262626] last:border-r-0">{children}</th>,
+    tbody: ({ children }) => <tbody className="divide-y divide-[#262626]">{children}</tbody>,
+    tr: ({ children }) => <tr className="hover:bg-[#1c1c1c] transition-colors">{children}</tr>,
+    td: ({ children }) => <td className="px-4 py-2.5 text-slate-300 border-r border-[#262626] last:border-r-0">{children}</td>,
+    a: ({ href, children }) => (
+      <a href={href} target="_blank" rel="noreferrer" className="text-white underline underline-offset-2 hover:text-slate-300 font-medium">
+        {children}
+      </a>
+    )
+  }), [isMsgStreaming]);
+
+  return (
+    <div className="flex flex-col space-y-2 group">
+      {/* User Message */}
+      {msg.role === 'user' ? (
+        <div className="flex justify-end">
+          <div className="max-w-[85%] sm:max-w-[80%] px-4 py-3 rounded-3xl bg-[#212121] text-slate-100 text-sm leading-relaxed shadow-sm border border-white/5">
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {msg.attachments.map((att, aIdx) => (
+                  <div key={aIdx} className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#171717] text-xs text-slate-300">
+                    {att.type?.startsWith('image/') ? <ImageIcon className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                    <span className="truncate max-w-[140px]">{att.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div>{msg.content}</div>
+          </div>
+        </div>
+      ) : (
+        /* Assistant Message */
+        <div className="flex space-x-3 sm:space-x-4 pt-2">
+          <div className="w-8 h-8 rounded-full border border-white/10 bg-[#212121] flex items-center justify-center text-white flex-shrink-0">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+
+          <div className="flex-1 space-y-3 text-sm text-slate-200 leading-relaxed pr-2 sm:pr-6 overflow-hidden">
+            {/* Executed Tools Accordion Dropdown */}
+            {msg.toolExecutions && msg.toolExecutions.length > 0 && (
+              <ToolCard toolExecutions={msg.toolExecutions} />
+            )}
+
+            {/* Speech Transcript Banner */}
+            {msg.speech && (
+              <div className="p-3.5 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-start space-x-3 shadow-inner">
+                <MessageSquareQuote className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-1">
+                  <div className="text-[10px] uppercase font-bold text-slate-500 font-mono tracking-wider">Assistant Spoken Speech</div>
+                  <p className="text-xs italic text-slate-100 leading-relaxed font-sans">{msg.speech}</p>
+                </div>
+                <button
+                  onClick={() => onSpeak(msg.speech)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#212121] cursor-pointer"
+                  title="Play Speech Audio"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* ReactMarkdown Parser with KaTeX Math, Mermaid & HTML Live Sandbox Support */}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+              components={markdownComponents}
+            >
+              {msg.content}
+            </ReactMarkdown>
+
+            {chartData && (
+              <ChartCard chartId={chartId} chartData={chartData} title={chartTitle} type={chartType} />
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center space-x-3 pt-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => onCopy(msg.content, idx)}
+                className="flex items-center space-x-1 hover:text-slate-200 cursor-pointer"
+              >
+                {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedIdx === idx ? 'Copied' : 'Copy'}</span>
+              </button>
+
+              <button
+                onClick={() => onSpeak(msg.speech || msg.content)}
+                className="flex items-center space-x-1 hover:text-slate-200 cursor-pointer"
+                title="Read Aloud"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Listen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export default function ChatPanel({ activeSessionId, onSessionCreated, initialPrompt, onClearInitialPrompt }) {
   const [messages, setMessages] = useState([]);
@@ -206,14 +396,21 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
     }
   };
 
-  // Text-to-Speech output fallback
-  const speakText = (text) => {
+  // Text-to-Speech output fallback (memoized)
+  const speakText = useCallback((text) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const cleanText = text.replace(/<[^>]*>/g, '').replace(/```[\s\S]*?```/g, '').substring(0, 300);
     const utterance = new SpeechSynthesisUtterance(cleanText);
     window.speechSynthesis.speak(utterance);
-  };
+  }, []);
+
+  // Copy handler (memoized)
+  const handleCopy = useCallback((text, idx) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  }, []);
 
   // Stop Generation Handler
   const handleStopGeneration = async () => {
@@ -251,12 +448,6 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
 
   const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleCopy = (text, idx) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 2000);
   };
 
   const handleSubmit = async (e, overridePrompt = null) => {
@@ -303,15 +494,17 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let assistantMsg = {
-        role: 'assistant',
-        content: '',
-        speech: '',
-        toolExecutions: [],
-        createdAt: new Date(),
-      };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '',
+          speech: '',
+          toolExecutions: [],
+          createdAt: new Date(),
+        }
+      ]);
 
       while (true) {
         const { value, done } = await reader.read();
@@ -469,188 +662,17 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
             </div>
           ) : (
             /* Message Thread */
-            messages.map((msg, idx) => {
-              const isMsgStreaming = isStreaming && idx === messages.length - 1;
-              const chartInfo = extractChartFromContent(msg.content, idx);
-              const chartData = msg.chartData || chartInfo?.chartData;
-              const chartType = msg.chartType || chartInfo?.chartType || 'bar';
-              const chartTitle = msg.chartTitle || chartInfo?.chartTitle || 'Analytics Chart';
-              const chartId = msg.chartId || chartInfo?.chartId || `chart-${idx}`;
-
-              return (
-                <div key={idx} className="flex flex-col space-y-2 group">
-                  {/* User Message */}
-                  {msg.role === 'user' ? (
-                    <div className="flex justify-end">
-                      <div className="max-w-[85%] sm:max-w-[80%] px-4 py-3 rounded-3xl bg-[#212121] text-slate-100 text-sm leading-relaxed shadow-sm border border-white/5">
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {msg.attachments.map((att, aIdx) => (
-                              <div key={aIdx} className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#171717] text-xs text-slate-300">
-                                {att.type?.startsWith('image/') ? <ImageIcon className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
-                                <span className="truncate max-w-[140px]">{att.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div>{msg.content}</div>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Assistant Message */
-                    <div className="flex space-x-3 sm:space-x-4 pt-2">
-                      <div className="w-8 h-8 rounded-full border border-white/10 bg-[#212121] flex items-center justify-center text-white flex-shrink-0">
-                        <Sparkles className="w-4 h-4 text-white" />
-                      </div>
-
-                      <div className="flex-1 space-y-3 text-sm text-slate-200 leading-relaxed pr-2 sm:pr-6 overflow-hidden">
-                        {/* Executed Tools Accordion Dropdown */}
-                        {msg.toolExecutions && msg.toolExecutions.length > 0 && (
-                          <ToolCard toolExecutions={msg.toolExecutions} />
-                        )}
-
-                        {/* Speech Transcript Banner */}
-                        {msg.speech && (
-                          <div className="p-3.5 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-start space-x-3 shadow-inner">
-                            <MessageSquareQuote className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
-                            <div className="flex-1 space-y-1">
-                              <div className="text-[10px] uppercase font-bold text-slate-500 font-mono tracking-wider">Assistant Spoken Speech</div>
-                              <p className="text-xs italic text-slate-100 leading-relaxed font-sans">{msg.speech}</p>
-                            </div>
-                            <button
-                              onClick={() => speakText(msg.speech)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#212121] cursor-pointer"
-                              title="Play Speech Audio"
-                            >
-                              <Volume2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* ReactMarkdown Parser with KaTeX Math, Mermaid & HTML Live Sandbox Support */}
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm, remarkMath]}
-                          rehypePlugins={[rehypeKatex]}
-                          components={{
-                            p: ({ children }) => <p className="mb-2 leading-relaxed text-slate-200">{children}</p>,
-                            h1: ({ children }) => <h1 className="text-xl font-bold text-slate-100 mt-4 mb-2">{children}</h1>,
-                            h2: ({ children }) => <h2 className="text-lg font-bold text-slate-100 mt-3 mb-2">{children}</h2>,
-                            h3: ({ children }) => <h3 className="text-base font-semibold text-slate-100 mt-2 mb-1">{children}</h3>,
-                            ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-2 text-slate-200">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2 text-slate-200">{children}</ol>,
-                            li: ({ children }) => <li className="text-slate-200">{children}</li>,
-                            strong: ({ children }) => <strong className="font-semibold text-slate-100">{children}</strong>,
-                            code: ({ node, className, children, ...props }) => {
-                              const contentStr = String(children || '').trim();
-                              const hasNewline = contentStr.includes('\n');
-                              const isMermaid = className?.includes('language-mermaid') || 
-                                (contentStr.startsWith('graph ') || 
-                                 contentStr.startsWith('flowchart ') || 
-                                 contentStr.startsWith('sequenceDiagram') || 
-                                 contentStr.startsWith('classDiagram') || 
-                                 contentStr.startsWith('stateDiagram') || 
-                                 contentStr.startsWith('erDiagram') || 
-                                 contentStr.startsWith('gantt') || 
-                                 contentStr.startsWith('mindmap') || 
-                                 contentStr.startsWith('pie'));
-                                
-                              const langLower = (className || '').toLowerCase();
-                              const isHtmlLang = langLower.includes('html') || langLower.includes('htm') || langLower.includes('markup') || langLower.includes('xml');
-                              const containsHtmlTags = /<(!DOCTYPE|html|head|body|div|style|script|svg|canvas|section|main|header|footer|table|form|p|h[1-6]|button)/i.test(contentStr);
-                              const startsWithHtml = contentStr.startsWith('<!DOCTYPE') || contentStr.startsWith('<html') || contentStr.startsWith('<div');
-                              const isHtml = (isHtmlLang || containsHtmlTags || startsWithHtml) && hasNewline && contentStr.includes('<');
-
-                              if (isMermaid) {
-                                if (isMsgStreaming) {
-                                  return (
-                                    <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300">
-                                      <RefreshCw className="w-4 h-4 text-white animate-spin" />
-                                      <span>Generating Mermaid Diagram...</span>
-                                    </div>
-                                  );
-                                }
-                                return <MermaidCard chartCode={contentStr} />;
-                              }
-
-                              if (isHtml) {
-                                if (isMsgStreaming) {
-                                  return (
-                                    <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300 shadow-md">
-                                      <RefreshCw className="w-4 h-4 text-white animate-spin flex-shrink-0" />
-                                      <span className="font-sans font-medium">Generating Live HTML Application Sandbox...</span>
-                                    </div>
-                                  );
-                                }
-                                return <HtmlSandboxCard codeContent={contentStr} />;
-                              }
-
-                              const isBlockCode = hasNewline || (className && className.startsWith('language-'));
-
-                              if (!isBlockCode) {
-                                return (
-                                  <span className="font-mono text-slate-100 text-xs font-medium px-1.5 py-0.5 bg-[#242424] rounded">
-                                    {children}
-                                  </span>
-                                );
-                              }
-
-                              return (
-                                <pre className="p-3 my-2 rounded-xl bg-[#121212] border border-[#2a2a2a] overflow-x-auto text-xs font-mono text-slate-200">
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                </pre>
-                              );
-                            },
-                            table: ({ children }) => (
-                              <div className="my-3 overflow-x-auto rounded-xl border border-[#2a2a2a] bg-[#141414] shadow-lg">
-                                <table className="w-full text-left text-xs border-collapse">{children}</table>
-                              </div>
-                            ),
-                            thead: ({ children }) => <thead className="bg-[#1c1c1c] text-slate-200 border-b border-[#2a2a2a] font-semibold">{children}</thead>,
-                            th: ({ children }) => <th className="px-4 py-3 font-semibold text-slate-200 border-r border-[#262626] last:border-r-0">{children}</th>,
-                            tbody: ({ children }) => <tbody className="divide-y divide-[#262626]">{children}</tbody>,
-                            tr: ({ children }) => <tr className="hover:bg-[#1c1c1c] transition-colors">{children}</tr>,
-                            td: ({ children }) => <td className="px-4 py-2.5 text-slate-300 border-r border-[#262626] last:border-r-0">{children}</td>,
-                            a: ({ href, children }) => (
-                              <a href={href} target="_blank" rel="noreferrer" className="text-white underline underline-offset-2 hover:text-slate-300 font-medium">
-                                {children}
-                              </a>
-                            )
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
-
-                        {chartData && (
-                          <ChartCard chartId={chartId} chartData={chartData} title={chartTitle} type={chartType} />
-                        )}
-
-                        {/* Action buttons */}
-                        <div className="flex items-center space-x-3 pt-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleCopy(msg.content, idx)}
-                            className="flex items-center space-x-1 hover:text-slate-200 cursor-pointer"
-                          >
-                            {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedIdx === idx ? 'Copied' : 'Copy'}</span>
-                          </button>
-
-                          <button
-                            onClick={() => speakText(msg.speech || msg.content)}
-                            className="flex items-center space-x-1 hover:text-slate-200 cursor-pointer"
-                            title="Read Aloud"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                            <span>Listen</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
+            messages.map((msg, idx) => (
+              <ChatMessageItem
+                key={msg.id || idx}
+                msg={msg}
+                idx={idx}
+                isMsgStreaming={isStreaming && idx === messages.length - 1}
+                copiedIdx={copiedIdx}
+                onCopy={handleCopy}
+                onSpeak={speakText}
+              />
+            ))
           )}
 
           {/* Minimalist Pulsing Dim-Dip Loader */}

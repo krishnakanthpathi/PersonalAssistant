@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Maximize2, Minimize2, Copy, Check, RefreshCw, ZoomIn, ZoomOut, RotateCcw, Pin } from 'lucide-react';
+import { Maximize2, Minimize2, Copy, Check, RefreshCw, ZoomIn, ZoomOut, RotateCcw, Move } from 'lucide-react';
 
 mermaid.initialize({
   startOnLoad: false,
@@ -21,9 +21,7 @@ mermaid.initialize({
 function sanitizeMermaidCode(code) {
   if (!code) return '';
   let trimmed = code.trim();
-  // Strip %%{init: ...}%% directive lines if present
   trimmed = trimmed.replace(/%%\{[\s\S]*?\}%%/gi, '').trim();
-  // Replace invalid barChart or lineChart keywords globally with xychart-beta
   trimmed = trimmed.replace(/\b(barChart|lineChart)\b/gi, 'xychart-beta');
   return trimmed;
 }
@@ -34,52 +32,15 @@ export default function MermaidCard({ chartCode }) {
   const [error, setError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [isPinned, setIsPinned] = useState(false);
+
+  // Pan & Zoom state (supports up to 1000% / 10.0x zoom and click-and-drag panning)
+  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+
   const diagramIdRef = useRef(`mermaid-${(chartCode || '').slice(0, 35).replace(/[^a-z0-9]+/gi, '-')}`);
-  const diagramId = diagramIdRef.current;
   const chartIdRef = useRef(`mermaid-svg-${Math.random().toString(36).substring(2, 9)}`);
-
-  useEffect(() => {
-    const checkPinnedStatus = async () => {
-      try {
-        const res = await fetch('/api/charts/favorites');
-        const data = await res.json();
-        if (data.success && Array.isArray(data.favorites)) {
-          const found = data.favorites.some(f => f.chartId === diagramId);
-          setIsPinned(found);
-        }
-      } catch (err) {
-        // Ignore
-      }
-    };
-    checkPinnedStatus();
-    window.addEventListener('pinnedchartschange', checkPinnedStatus);
-    return () => window.removeEventListener('pinnedchartschange', checkPinnedStatus);
-  }, [diagramId]);
-
-  const togglePin = async (e) => {
-    e.stopPropagation();
-    try {
-      const res = await fetch('/api/charts/favorites/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chartId: diagramId,
-          chartTitle: 'Mermaid Diagram',
-          chartType: 'mermaid',
-          chartData: [{ code: chartCode }]
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setIsPinned(data.isFavorite);
-        window.dispatchEvent(new Event('pinnedchartschange'));
-      }
-    } catch (err) {
-      console.error('Error toggling diagram pin:', err);
-    }
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -114,15 +75,61 @@ export default function MermaidCard({ chartCode }) {
   };
 
   const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(3.0, +(prev + 0.15).toFixed(2)));
+    setZoomLevel(prev => Math.min(10.0, +(prev + (prev >= 2 ? 1.0 : 0.25)).toFixed(2)));
   };
 
   const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(0.4, +(prev - 0.15).toFixed(2)));
+    setZoomLevel(prev => Math.max(0.2, +(prev - (prev >= 2 ? 1.0 : 0.25)).toFixed(2)));
   };
 
   const handleResetZoom = () => {
     setZoomLevel(1.0);
+    setPanPosition({ x: 0, y: 0 });
+  };
+
+  // Drag / Pan mouse handlers
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX - panPosition.x, y: e.clientY - panPosition.y };
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    setPanPosition({
+      x: e.clientX - dragStartRef.current.x,
+      y: e.clientY - dragStartRef.current.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Touch drag handlers
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      dragStartRef.current = { x: e.touches[0].clientX - panPosition.x, y: e.touches[0].clientY - panPosition.y };
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    setPanPosition({
+      x: e.touches[0].clientX - dragStartRef.current.x,
+      y: e.touches[0].clientY - dragStartRef.current.y
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Mouse wheel zoom up to 1000%
+  const handleWheel = (e) => {
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+    setZoomLevel(prev => Math.min(10.0, Math.max(0.2, +(prev * zoomFactor).toFixed(2))));
   };
 
   return (
@@ -134,10 +141,14 @@ export default function MermaidCard({ chartCode }) {
           <span className="text-xs font-mono font-semibold text-slate-200 uppercase tracking-wider">
             Mermaid Diagram
           </span>
+          <span className="text-[10px] text-slate-400 font-mono flex items-center space-x-1 pl-2 border-l border-[#333]">
+            <Move className="w-3 h-3 text-slate-400" />
+            <span>Drag to move • Up to 1000% zoom</span>
+          </span>
         </div>
 
         <div className="flex items-center space-x-1.5">
-          {/* Zoom Controls */}
+          {/* Zoom Controls (up to 1000%) */}
           <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-[#242424] border border-[#333333] text-slate-300">
             <button
               onClick={handleZoomOut}
@@ -146,7 +157,7 @@ export default function MermaidCard({ chartCode }) {
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[10px] font-mono text-slate-300 w-9 text-center select-none">
+            <span className="text-[10px] font-mono text-slate-200 w-12 text-center select-none font-bold">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
@@ -156,11 +167,11 @@ export default function MermaidCard({ chartCode }) {
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
-            {zoomLevel !== 1 && (
+            {(zoomLevel !== 1.0 || panPosition.x !== 0 || panPosition.y !== 0) && (
               <button
                 onClick={handleResetZoom}
                 className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer ml-0.5"
-                title="Reset Zoom (100%)"
+                title="Reset Zoom & Pan (100%)"
               >
                 <RotateCcw className="w-3 h-3" />
               </button>
@@ -184,10 +195,20 @@ export default function MermaidCard({ chartCode }) {
         </div>
       </div>
 
-      {/* Rendered SVG Content */}
-      <div className="p-4 overflow-auto flex justify-center bg-[#141414] min-h-[180px] items-center">
+      {/* Rendered Interactive Draggable & Zoomable SVG Canvas */}
+      <div 
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onWheel={handleWheel}
+        className="p-6 overflow-hidden flex justify-center bg-[#141414] min-h-[220px] items-center relative select-none cursor-grab active:cursor-grabbing"
+      >
         {error ? (
-          <div className="w-full space-y-2">
+          <div className="w-full space-y-2 select-text cursor-auto">
             <div className="text-xs font-mono text-slate-400 p-2.5 rounded-xl bg-[#1c1c1c] border border-white/10">
               {error}
             </div>
@@ -198,8 +219,11 @@ export default function MermaidCard({ chartCode }) {
         ) : svgContent ? (
           <div
             ref={containerRef}
-            className="mermaid-svg-wrapper transition-transform duration-200 ease-out origin-center"
-            style={{ transform: `scale(${zoomLevel})` }}
+            className="mermaid-svg-wrapper transition-transform duration-75 ease-out origin-center"
+            style={{
+              transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel})`,
+              cursor: isDragging ? 'grabbing' : 'grab'
+            }}
             dangerouslySetInnerHTML={{ __html: svgContent }}
           />
         ) : (
@@ -210,19 +234,19 @@ export default function MermaidCard({ chartCode }) {
         )}
       </div>
 
-      {/* Fullscreen Modal */}
+      {/* Fullscreen Interactive Canvas Modal */}
       {isExpanded && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4 sm:p-8 overflow-hidden">
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 rounded-full bg-white" />
               <span className="text-sm font-mono font-bold text-white uppercase tracking-wider">
-                Mermaid Diagram Viewer
+                Mermaid Diagram Viewer (Zoom: up to 1000%)
               </span>
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Fullscreen Zoom Controls */}
+              {/* Fullscreen Zoom & Reset Controls */}
               <div className="flex items-center space-x-1 px-3 py-1 rounded-xl bg-[#242424] border border-[#333333] text-slate-300">
                 <button
                   onClick={handleZoomOut}
@@ -231,7 +255,7 @@ export default function MermaidCard({ chartCode }) {
                 >
                   <ZoomOut className="w-4 h-4" />
                 </button>
-                <span className="text-xs font-mono text-slate-200 w-12 text-center select-none">
+                <span className="text-xs font-mono text-slate-200 w-14 text-center select-none font-bold">
                   {Math.round(zoomLevel * 100)}%
                 </span>
                 <button
@@ -259,11 +283,24 @@ export default function MermaidCard({ chartCode }) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto flex items-center justify-center p-6 bg-[#121212] my-4 rounded-2xl border border-white/10">
+          <div 
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onWheel={handleWheel}
+            className="flex-1 overflow-hidden flex items-center justify-center p-6 bg-[#121212] my-4 rounded-2xl border border-white/10 relative cursor-grab active:cursor-grabbing select-none"
+          >
             {svgContent ? (
               <div
-                className="mermaid-svg-wrapper transition-transform duration-200 ease-out origin-center"
-                style={{ transform: `scale(${zoomLevel})` }}
+                className="mermaid-svg-wrapper transition-transform duration-75 ease-out origin-center"
+                style={{
+                  transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel})`,
+                  cursor: isDragging ? 'grabbing' : 'grab'
+                }}
                 dangerouslySetInnerHTML={{ __html: svgContent }}
               />
             ) : (
