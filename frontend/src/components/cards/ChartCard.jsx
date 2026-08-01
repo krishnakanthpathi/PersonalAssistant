@@ -17,12 +17,22 @@ import { BarChart3, LineChart as LineIcon, PieChart as PieIcon, TrendingUp, Maxi
 
 const MONOCHROME_PALETTE = ['#ffffff', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b'];
 
-export default function ChartCard({ chartId: propChartId, chartData, title = 'Data Insights', type: defaultType = 'bar' }) {
-  const [activeChartType, setActiveChartType] = useState(defaultType || 'bar');
+export default function ChartCard({ 
+  chartId: propChartId, 
+  chartData, 
+  title: propTitle, 
+  chartTitle, 
+  type: defaultType = 'bar',
+  chartType
+}) {
+  const displayTitle = chartTitle || propTitle || 'Data Insights';
+  const displayType = chartType || defaultType || 'bar';
+
+  const [activeChartType, setActiveChartType] = useState(displayType);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const fallbackIdRef = useRef(
-    'chart-' + (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : Math.random().toString(36).substring(2, 9))
+    'chart-' + (displayTitle ? displayTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : Math.random().toString(36).substring(2, 9))
   );
   const chartId = propChartId || fallbackIdRef.current;
 
@@ -79,8 +89,8 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
         {activeChartType === 'area' || activeChartType === 'line' ? (
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
-              <linearGradient id="monoAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3}/>
+              <linearGradient id={`monoAreaGrad-${chartId}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ffffff" stopOpacity={0.35}/>
                 <stop offset="95%" stopColor="#ffffff" stopOpacity={0.0}/>
               </linearGradient>
             </defs>
@@ -96,7 +106,7 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
               stroke="#ffffff" 
               strokeWidth={2} 
               fillOpacity={1} 
-              fill="url(#monoAreaGrad)" 
+              fill={`url(#monoAreaGrad-${chartId})`} 
             />
           </AreaChart>
         ) : activeChartType === 'pie' ? (
@@ -130,10 +140,13 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
             />
             <Bar 
               dataKey={mainValueKey} 
-              fill="#ffffff" 
               radius={[6, 6, 0, 0]} 
               maxBarSize={45}
-            />
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`bar-cell-${index}`} fill={MONOCHROME_PALETTE[index % MONOCHROME_PALETTE.length]} />
+              ))}
+            </Bar>
           </BarChart>
         )}
       </ResponsiveContainer>
@@ -144,13 +157,13 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
     <>
       {/* Inline Standard View */}
       <div id={chartId} className="my-4 rounded-2xl bg-[#171717] border border-[#2a2a2a] overflow-hidden shadow-2xl font-sans">
-        <div className="p-4 border-b border-[#262626] flex items-center justify-between bg-[#1f1f1f]/50">
+        <div className="p-4 border-b border-[#262626] flex items-center justify-between flex-wrap gap-3 bg-[#1f1f1f]/50">
           <div>
             <div className="flex items-center space-x-2">
-              <span className="p-1 rounded-md bg-white/10 text-white">
+              <span className="p-1.5 rounded-lg bg-white/10 text-white border border-white/10">
                 <TrendingUp className="w-4 h-4" />
               </span>
-              <h4 className="text-sm font-semibold text-slate-100">{title}</h4>
+              <h4 className="text-sm font-semibold text-slate-100">{displayTitle}</h4>
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
               {chartData.length} Data Points • Metric: <span className="text-slate-200 font-semibold">{mainValueKey}</span>
@@ -158,7 +171,7 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* View Type Controls */}
+            {/* View Type Switcher */}
             <div className="flex items-center space-x-1 p-1 rounded-xl bg-[#121212] border border-[#2a2a2a]">
               <button
                 onClick={() => setActiveChartType('bar')}
@@ -189,11 +202,11 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
               </button>
             </div>
 
-            {/* Extension Fullscreen Button */}
+            {/* Fullscreen Viewer Button */}
             <button
               onClick={openFullscreen}
               className="p-2 rounded-xl bg-[#121212] hover:bg-[#262626] border border-[#2a2a2a] text-slate-300 hover:text-white transition-colors cursor-pointer"
-              title="Expand Chart View"
+              title="Expand Fullscreen Chart"
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
@@ -219,7 +232,7 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
         {renderChartCanvas('h-64')}
       </div>
 
-      {/* Expanded Extension Fullscreen Modal */}
+      {/* Fullscreen Chart Modal */}
       {isFullscreen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6" onClick={closeFullscreen}>
           <div className="bg-[#141414] border border-[#2a2a2a] rounded-3xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden shadow-2xl font-sans" onClick={e => e.stopPropagation()}>
@@ -227,7 +240,7 @@ export default function ChartCard({ chartId: propChartId, chartData, title = 'Da
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center space-x-2">
                   <TrendingUp className="w-5 h-5 text-white" />
-                  <span>{title} (Expanded Analytics)</span>
+                  <span>{displayTitle} (Expanded Analytics)</span>
                 </h3>
                 <p className="text-xs text-slate-400 font-mono mt-1">Full screen metric insights for {mainValueKey} • ID: {chartId}</p>
               </div>

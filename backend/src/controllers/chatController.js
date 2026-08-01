@@ -235,14 +235,15 @@ export const getChats = async (req, res) => {
 		const db = getDB();
 		const rows = await db.collection('chat_sessions')
 			.find()
-			.project({ _id: 1, title: 1, createdAt: 1, updatedAt: 1 })
-			.sort({ updatedAt: -1 })
+			.project({ _id: 1, title: 1, isPinned: 1, createdAt: 1, updatedAt: 1 })
+			.sort({ isPinned: -1, updatedAt: -1 })
 			.toArray();
 
 		// Map to format matching original response
 		const chats = rows.map(r => ({
 			id: r._id,
 			title: r.title,
+			isPinned: r.isPinned === true,
 			created_at: r.createdAt ? r.createdAt.toISOString() : null,
 			updated_at: r.updatedAt ? r.updatedAt.toISOString() : null
 		}));
@@ -250,6 +251,29 @@ export const getChats = async (req, res) => {
 		res.json({ success: true, chats });
 	} catch (error) {
 		logger.error(`Error fetching chat sessions: ${error.message}`);
+		res.status(500).json({ success: false, error: error.message });
+	}
+};
+
+// Toggle pin status of a chat session
+export const togglePinChat = async (req, res) => {
+	const { sessionId } = req.params;
+	try {
+		const db = getDB();
+		const session = await db.collection('chat_sessions').findOne({ _id: sessionId });
+		if (!session) {
+			return res.status(404).json({ success: false, error: 'Chat session not found' });
+		}
+
+		const newPinnedState = !session.isPinned;
+		await db.collection('chat_sessions').updateOne(
+			{ _id: sessionId },
+			{ $set: { isPinned: newPinnedState } }
+		);
+
+		res.json({ success: true, isPinned: newPinnedState });
+	} catch (error) {
+		logger.error(`Error toggling pin for chat session ${sessionId}: ${error.message}`);
 		res.status(500).json({ success: false, error: error.message });
 	}
 };

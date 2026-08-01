@@ -209,13 +209,13 @@ export default function AdminDashboard() {
         </button>
 
         <button
-          onClick={() => setActiveTab('rag')}
+          onClick={() => setActiveTab('okf')}
           className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
-            activeTab === 'rag' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+            activeTab === 'okf' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
           }`}
         >
           <Database className="w-4 h-4" />
-          <span>OKF RAG Search</span>
+          <span>OKF Knowledge DB</span>
         </button>
 
         <button
@@ -356,12 +356,12 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Tab 3: OKF RAG Tester */}
-      {activeTab === 'rag' && (
+      {/* Tab 3: OKF Knowledge Catalog Search */}
+      {activeTab === 'okf' && (
         <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-white">Open Knowledge Format (OKF) Memory Retrieval Test</h3>
-            <p className="text-xs text-slate-400">Test keyword and semantic matching against loaded catalog documents</p>
+            <h3 className="text-sm font-semibold text-white">Open Knowledge Format (OKF) Knowledge Search</h3>
+            <p className="text-xs text-slate-400">Search and verify personal knowledge documents loaded in the OKF catalog</p>
           </div>
 
           <div className="flex space-x-2">
@@ -499,7 +499,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] text-center">
-                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">RAG Retrieval</div>
+                <div className="text-[10px] uppercase text-slate-500 font-semibold font-mono">OKF Retrieval</div>
                 <div className="text-xl font-bold font-mono text-white mt-1">{metrics?.aggregates?.averageRetrievalTime || 0} ms</div>
               </div>
 
@@ -595,7 +595,7 @@ export default function AdminDashboard() {
 
                         <div className="flex items-center space-x-2 font-mono text-[11px]">
                           <span className="text-slate-300">Total: <strong className="text-white">{req.totalDuration}ms</strong></span>
-                          {req.retrievalTime > 0 && <span className="text-slate-400">• RAG: {req.retrievalTime}ms</span>}
+                          {req.retrievalTime > 0 && <span className="text-slate-400">• OKF: {req.retrievalTime}ms</span>}
                           {req.generationTime > 0 && <span className="text-slate-400">• LLM: {req.generationTime}ms</span>}
                         </div>
                       </div>

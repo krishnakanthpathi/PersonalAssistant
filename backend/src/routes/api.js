@@ -3,7 +3,7 @@ import { getStatus, getConfig, updateConfig, getAvailableModels } from '../contr
 import { getTools, searchTools, testTool, runRagTests, stopRagTests } from '../controllers/toolsController.js';
 import { getMetrics, clearMetrics } from '../controllers/metricsController.js';
 import { getSystemPrompt, saveSystemPrompt, activateSystemPrompt, deleteSystemPrompt } from '../controllers/systemPromptController.js';
-import { handleChat, stopChat, getChats, getChatMessages, deleteChatSession } from '../controllers/chatController.js';
+import { handleChat, stopChat, getChats, getChatMessages, deleteChatSession, togglePinChat } from '../controllers/chatController.js';
 import { updateMcpProgress, getMcpStatus } from '../controllers/mcpStatusController.js';
 import { getGoogleAuthUrl, handleGoogleCallback, getGoogleAuthStatus, disconnectGoogle } from '../controllers/authController.js';
 import { streamLogs } from '../controllers/logsController.js';
@@ -11,6 +11,7 @@ import { searchPersonalDb, testOkfRetrieval } from '../controllers/personalDbCon
 import { getPrebuiltForms, createPrebuiltForm, deletePrebuiltForm, updatePrebuiltForm, toggleFavoritePrebuiltForm } from '../controllers/prebuiltFormsController.js';
 import { getMcpConfig, saveMcpServer, deleteMcpServer, reconnectMcpServer, toggleMcpServer, syncMcpConfig } from '../controllers/mcpConfigController.js';
 import { getEnvConfig, saveEnvConfig } from '../controllers/envController.js';
+import { getFavoriteCharts, toggleFavoriteChart, deleteFavoriteChart } from '../controllers/chartFavoritesController.js';
 
 const router = Router();
 
@@ -69,11 +70,18 @@ router.post("/api/system-prompt", saveSystemPrompt);
 router.post("/api/system-prompt/activate", activateSystemPrompt);
 router.delete("/api/system-prompt/:id", deleteSystemPrompt);
 
+
 // Chat stream and sessions
 router.post("/api/chat", handleChat);
 router.post("/api/chat/stop", stopChat);
 router.get("/api/chats", getChats);
 router.get("/api/chats/:sessionId", getChatMessages);
+router.post("/api/chats/:sessionId/pin", togglePinChat);
 router.delete("/api/chats/:sessionId", deleteChatSession);
+
+// Chart Favorites
+router.get("/api/charts/favorites", getFavoriteCharts);
+router.post("/api/charts/favorites/toggle", toggleFavoriteChart);
+router.delete("/api/charts/favorites/:chartId", deleteFavoriteChart);
 
 export default router;

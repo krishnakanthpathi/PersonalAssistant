@@ -271,16 +271,6 @@ export default function SettingsPanel({ onConfigUpdated }) {
         </button>
 
         <button
-          onClick={() => setActiveTab('embeddings')}
-          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
-            activeTab === 'embeddings' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
-          }`}
-        >
-          <Database className="w-4 h-4" />
-          <span>Embeddings</span>
-        </button>
-
-        <button
           onClick={() => { setActiveTab('env'); fetchEnv(); }}
           className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
             activeTab === 'env' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
@@ -509,24 +499,7 @@ export default function SettingsPanel({ onConfigUpdated }) {
         </div>
       )}
 
-      {/* Tab 4: Embeddings */}
-      {activeTab === 'embeddings' && (
-        <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
-          <h3 className="text-sm font-semibold text-white">Embedding Provider for RAG</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <select
-              value={form.embeddingProvider}
-              onChange={(e) => setForm({ ...form, embeddingProvider: e.target.value })}
-              className="p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-200"
-            >
-              <option value="ollama">Local Ollama Embeddings (nomic-embed-text)</option>
-              <option value="openai">OpenAI Text Embeddings (text-embedding-3-small)</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: Environment (.env) */}
+      {/* Tab 4: Environment (.env) */}
       {activeTab === 'env' && (
         <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
           <div className="flex items-center justify-between">

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Maximize2, Minimize2, Copy, Check, RefreshCw, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Maximize2, Minimize2, Copy, Check, RefreshCw, ZoomIn, ZoomOut, RotateCcw, Pin } from 'lucide-react';
 
 mermaid.initialize({
   startOnLoad: false,
@@ -35,7 +35,51 @@ export default function MermaidCard({ chartCode }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const chartIdRef = useRef(`mermaid-${Math.random().toString(36).substring(2, 9)}`);
+  const [isPinned, setIsPinned] = useState(false);
+  const diagramIdRef = useRef(`mermaid-${(chartCode || '').slice(0, 35).replace(/[^a-z0-9]+/gi, '-')}`);
+  const diagramId = diagramIdRef.current;
+  const chartIdRef = useRef(`mermaid-svg-${Math.random().toString(36).substring(2, 9)}`);
+
+  useEffect(() => {
+    const checkPinnedStatus = async () => {
+      try {
+        const res = await fetch('/api/charts/favorites');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.favorites)) {
+          const found = data.favorites.some(f => f.chartId === diagramId);
+          setIsPinned(found);
+        }
+      } catch (err) {
+        // Ignore
+      }
+    };
+    checkPinnedStatus();
+    window.addEventListener('pinnedchartschange', checkPinnedStatus);
+    return () => window.removeEventListener('pinnedchartschange', checkPinnedStatus);
+  }, [diagramId]);
+
+  const togglePin = async (e) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch('/api/charts/favorites/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chartId: diagramId,
+          chartTitle: 'Mermaid Diagram',
+          chartType: 'mermaid',
+          chartData: [{ code: chartCode }]
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsPinned(data.isFavorite);
+        window.dispatchEvent(new Event('pinnedchartschange'));
+      }
+    } catch (err) {
+      console.error('Error toggling diagram pin:', err);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
