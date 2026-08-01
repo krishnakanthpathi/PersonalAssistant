@@ -47,7 +47,7 @@ function categorizeTool(toolName, description = '') {
 	if (name.includes('mouse') || name.includes('key_') || name.includes('keystroke') || name.includes('type_text') || name.includes('applescript')) {
 		return 'input_simulation';
 	}
-	if (name.includes('firecrawl') || name.includes('web_scrape') || name.includes('web_search')) {
+	if (name.includes('duckduckgo') || name.includes('duck') || name.includes('search') || name.includes('fetch_content') || name.includes('web_scrape') || name.includes('web_search')) {
 		return 'web_browsing';
 	}
 	if (name.includes('github') || name.includes('git')) {

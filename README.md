@@ -45,7 +45,7 @@ graph TD
         M_GC["Google Calendar MCP"]:::external
         M_GM["Gmail MCP"]:::external
         M_YT["YouTube MCP"]:::external
-        M_FC["Firecrawl MCP"]:::external
+        M_DDG["DuckDuckGo MCP"]:::external
         M_MEM["Memory MCP"]:::external
         M_VC["Video Converter MCP"]:::external
     end
@@ -76,7 +76,7 @@ graph TD
     MGR <--> |Calendar events| M_GC
     MGR <--> |Send/Read email| M_GM
     MGR <--> |Search YouTube videos| M_YT
-    MGR <--> |Scrap pages| M_FC
+    MGR <--> |Web Search & Fetch| M_DDG
     MGR <--> |Update context entities| M_MEM
     MGR <--> |Ffmpeg media conversions| M_VC
 ```
@@ -106,7 +106,7 @@ graph TD
   - `google-calendar` (Checks and creates calendar events)
   - `gmail` (Drafts and reads email messages)
   - `youtube` (Queries transcriptions and metadata)
-  - `firecrawl` (Web scraper markdown converter)
+  - `duckduckgo` (DuckDuckGo web search & content fetching)
   - `memory` (Semantic graph registry)
   - `video-converter` (Ffmpeg-based video and audio transcoder)
 
@@ -139,7 +139,7 @@ Copy the configuration template inside `backend/` to create a `.env` file:
 ```bash
 cp backend/.env.example backend/.env
 ```
-Open `backend/.env` and supply your API keys (e.g. `OPENAI_API_KEY`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `YOUTUBE_API_KEY`, `FIRECRAWL_API_KEY`).
+Open `backend/.env` and supply your API keys (e.g. `OPENAI_API_KEY`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `YOUTUBE_API_KEY`).
 
 ### 3. Configure Google OAuth Credentials (Optional)
 For Google Calendar and Gmail MCP servers, place your downloaded Google API credentials JSON at:

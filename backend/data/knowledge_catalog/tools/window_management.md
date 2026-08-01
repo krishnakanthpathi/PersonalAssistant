@@ -1,23 +1,23 @@
 ---
 type: tool_group
-title: macOS Window & Application Management
-description: A comprehensive suite of tools for inspecting, focusing, moving, resizing, and managing application windows and Mission Control spaces on macOS.
-tags: [window_management, macos, window, application, focus, move, resize, spaces, mission_control, accessibility, gui, get_active_window, list_apps, list_windows, focus_app, focus_window, move_window, resize_window, set_space]
+title: macOS Window Management & Application Control
+description: Tools for discovering, focusing, moving, resizing, and managing application windows and desktop spaces on macOS.
+tags: [window_management, windows, apps, applications, focus, move, resize, spaces, mission_control, accessibility, gui, desktop, window_layer, bundle_id, pid, get_active_window, list_apps, list_windows, focus_app, focus_window, move_window, resize_window, set_space, frontmost, activate]
 tools: [get_active_window, list_apps, list_windows, focus_app, focus_window, move_window, resize_window, set_space]
-timestamp: 2026-07-21T09:39:08.556Z
+timestamp: 2026-08-01T09:34:48.383Z
 ---
 
-# macOS Window & Application Management
+# macOS Window Management & Application Control
 
-This toolkit provides granular control over the macOS graphical user interface, enabling automation of desktop organization and workflow management. It leverages Accessibility APIs to manipulate windows and allows interaction with Mission Control spaces.
+This tool group provides comprehensive window and application management capabilities for macOS desktop automation. These tools leverage the Accessibility API to inspect, manipulate, and control on-screen windows and running applications.
 
 **Available Tools:**
 
-- **`get_active_window`**: Retrieves the application name of the frontmost focused window.
-- **`list_apps`**: Lists all running GUI applications with details like bundle ID, name, PID, and frontmost status.
-- **`list_windows`**: Enumerates on-screen windows, providing title, owner, PID, bounds, and layer info.
-- **`focus_app`**: Activates and brings a specific application to the foreground by bundle ID or name.
-- **`focus_window`**: Raises and focuses a specific window using its unique window number ID.
-- **`move_window`**: Repositions a window to specified screen coordinates.
-- **`resize_window`**: Resizes a window to specified width and height dimensions.
-- **`set_space`**: Switches the active Mission Control space by index (1-9).
+- **`get_active_window`**: Returns the application name of the currently focused frontmost window.
+- **`list_apps`**: Enumerates all running GUI applications with bundle ID, name, PID, and frontmost status.
+- **`list_windows`**: Lists all on-screen windows with titles, owner applications, PIDs, screen bounds, and layer information.
+- **`focus_app`**: Activates and brings an application to the foreground by bundle ID or name.
+- **`focus_window`**: Raises and focuses a specific window identified by its window number ID.
+- **`move_window`**: Repositions a window to specified screen coordinates (x, y).
+- **`resize_window`**: Resizes a window to specified dimensions (width, height).
+- **`set_space`**: Switches to a Mission Control desktop space by index (1-9).

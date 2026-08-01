@@ -1,20 +1,20 @@
 ---
 type: tool_group
-title: Terminal Session & Shell Command Execution
-description: Provides capabilities to execute shell commands, manage the working directory, and interact with terminal applications.
-tags: [terminal, shell, command, execute, cli, directory, pwd, cd, iterm, iterm2, terminal.app, session, shell_exec, allowed_commands, change_directory, get_current_directory]
+title: Shell Command Execution & Terminal Session Management
+description: Provides secure shell command execution within an allowlisted environment and full control over terminal application sessions.
+tags: [terminal, shell, command, execute, bash, cwd, directory, iterm, iterm2, terminal.app, session, cli]
 tools: [execute_command, change_directory, get_current_directory, get_allowed_commands, terminal]
-timestamp: 2026-07-21T09:39:03.560Z
+timestamp: 2026-08-01T09:34:43.589Z
 ---
 
-# Terminal Session & Shell Command Execution
+# Shell Command Execution & Terminal Session Management
 
-This tool group enables direct interaction with the system shell and terminal environment. It provides full control over command execution, directory navigation, and terminal application management.
+These tools provide a secure interface for executing shell commands and managing terminal sessions on the host system. They bridge the gap between sandboxed execution and full terminal control.
 
-### Available Tools
+**Available Tools:**
 
-- **`terminal`**: Interact with terminal applications (Terminal.app or iTerm2): open windows, run commands, list active sessions.
-- **`execute_command`**: Execute an allowlisted shell command in the current working directory.
-- **`change_directory`**: Change the current working directory of the terminal session.
+- **`execute_command`**: Execute an allowlisted shell command in the current working directory. Only pre-approved commands can be run for security.
+- **`change_directory`**: Change the current working directory of the terminal session, affecting subsequent command executions.
 - **`get_current_directory`**: Retrieve the current working directory of this terminal session.
-- **`get_allowed_commands`**: Retrieve the list of allowed commands configured for this server.
+- **`get_allowed_commands`**: Retrieve the list of allowed commands configured for this server, useful for discovering what operations are permitted.
+- **`terminal`**: Interact with terminal applications (Terminal.app or iTerm2) to open windows, run commands, and list active sessions.

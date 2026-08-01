@@ -31,7 +31,7 @@ timestamp: 2026-07-19T14:46:00Z
 ## Active MCP Servers
 - **Filesystem**: File read/write capabilities on allowed directories under `/Users/krishnakanth`.
 - **YouTube**: Searching video transcript extraction and metadata.
-- **Firecrawl**: Web crawling and scraping.
+- **DuckDuckGo**: Web search capabilities and webpage content fetching.
 - **Memory**: Entity and relation mapping (deprecating vector RAG in favor of this OKF directory catalog).
 - **Video Converter**: Local video processing and converter server.
 - **Terminal**: Shell/terminal command execution and workspace configurations. Restricts commands to allowed list (`ALLOWED_COMMANDS`).

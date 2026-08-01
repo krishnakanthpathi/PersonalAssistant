@@ -1,23 +1,20 @@
 ---
 type: tool_group
-title: macOS Input Simulation & Automation
-description: A comprehensive suite of tools for programmatically simulating mouse movements, keyboard input, and executing system-level automation scripts on macOS.
-tags: [input, simulation, mouse, keyboard, typing, click, drag, scroll, key_press, type_text, keystroke_action, mouse_move, mouse_click, mouse_drag, mouse_scroll, applescript, osascript, automation, gui, macos, shortcut]
-tools: [mouse_move, mouse_click, mouse_drag, mouse_scroll, key_press, type_text, keystroke_action, run_applescript]
-timestamp: 2026-07-21T09:39:17.482Z
+title: Input Simulation: Mouse & Keyboard Control
+description: A suite of tools for simulating low-level user inputs including mouse movements, clicks, scrolling, and keyboard typing or shortcuts.
+tags: [input_simulation, mouse, keyboard, automation, mouse_move, mouse_click, mouse_drag, mouse_scroll, key_press, type_text, keystroke_action, GUI automation, screen coordinates, shortcut, macOS]
+tools: [mouse_move, mouse_click, mouse_drag, mouse_scroll, key_press, type_text, keystroke_action]
+timestamp: 2026-08-01T09:34:54.491Z
 ---
 
-# macOS Input Simulation & Automation
+# Input Simulation: Mouse & Keyboard Control
 
-This tool group provides low-level input simulation capabilities, enabling agents and scripts to interact with the macOS graphical user interface programmatically. These tools are essential for UI testing, workflow automation, and interacting with applications that lack scripting APIs.
+The `input_simulation` category provides tools to programmatically control user interface peripherals. These tools are essential for GUI automation, testing, and accessibility workflows.
 
-**Available Tools:**
-
-- **`mouse_move`**: Move the mouse cursor to specified global screen coordinates (x, y).
-- **`mouse_click`**: Perform a mouse click at specific coordinates with configurable button, click count, and modifier keys.
-- **`mouse_drag`**: Execute a press-drag-release mouse operation from one coordinate to another.
-- **`mouse_scroll`**: Send scroll-wheel events in either line or pixel units.
-- **`key_press`**: Press a single key or keyboard shortcut combination (named key + modifiers) on macOS.
-- **`type_text`**: Type a Unicode string directly into the currently active input field.
-- **`keystroke_action`**: Simulates typing text or pressing specific keyboard shortcut keys on macOS.
-- **`run_applescript`**: Executes raw AppleScript code via `osascript` for advanced, custom automation workflows.
+- **`mouse_move`**: Moves the cursor to specific global screen coordinates.
+- **`mouse_click`**: Performs a mouse click with customizable buttons and modifiers.
+- **`mouse_drag`**: Executes a press-drag-release mouse operation.
+- **`mouse_scroll`**: Simulates mouse wheel scrolling events.
+- **`key_press`**: Presses single keys or keyboard shortcuts.
+- **`type_text`**: Types a Unicode string into the active field.
+- **`keystroke_action`**: Simulates typing or specific shortcut key presses on macOS.

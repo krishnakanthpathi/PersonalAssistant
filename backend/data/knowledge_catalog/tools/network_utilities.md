@@ -1,15 +1,16 @@
 ---
 type: tool_group
-title: Network Database Connectivity & Query Utilities
-description: Tools for establishing connections to remote databases and executing SQL queries across networked data sources.
-tags: [network_utilities, database, sql, query, postgresql, mysql, rds, connection, remote, select, data_retrieval]
+title: Network & Database Connectivity Utilities
+description: Tools for establishing connections to remote data sources and executing queries against networked databases.
+tags: [network, database, sql, postgresql, mysql, rds, query, connection, data_access, db_utilities]
 tools: [query_rds_database]
-timestamp: 2026-07-21T09:38:15.058Z
+timestamp: 2026-08-01T09:34:01.446Z
 ---
 
-# Network Database Connectivity & Query Utilities
+# Network & Database Connectivity Utilities
 
-This category provides tools for interfacing with remote database systems over a network connection. These utilities enable direct interaction with SQL-based databases for data retrieval and execution of structured queries.
+This category provides tools for interfacing with network-accessible data sources. These utilities enable direct connections to databases and the execution of structured queries for data retrieval and analysis.
 
 **Available Tools:**
-- **`query_rds_database`**: Connects to a PostgreSQL or MySQL database using a connection string URL and executes database queries such as SELECT statements with filters and conditions.
+
+- **`query_rds_database`**: Connects to a PostgreSQL or MySQL database using a connection string URL and executes database queries (e.g., SELECT statements with filters and conditions). Supports standard SQL operations for retrieving and filtering data from remote database instances.

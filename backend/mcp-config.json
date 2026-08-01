@@ -36,15 +36,11 @@
         "YOUTUBE_API_KEY": "YOUR_YOUTUBE_API_KEY_HERE"
       }
     },
-    "firecrawl": {
-      "command": "npx",
+    "duckduckgo": {
+      "command": "uvx",
       "args": [
-        "-y",
-        "firecrawl-mcp"
+        "duckduckgo-mcp-server"
       ],
-      "env": {
-        "FIRECRAWL_API_KEY": ""
-      },
       "enabled": true
     },
     "gmail": {
