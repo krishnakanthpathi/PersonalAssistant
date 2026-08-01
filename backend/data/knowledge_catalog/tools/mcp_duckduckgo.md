@@ -4,7 +4,7 @@ title: MCP Server - duckduckgo
 description: Integrated MCP server providing tools for duckduckgo.
 tags: [duckduckgo, search, fetch, content]
 tools: [search, fetch_content]
-timestamp: 2026-08-01T09:35:46.075Z
+timestamp: 2026-08-01T15:54:54.934Z
 ---
 
 # MCP Server - duckduckgo

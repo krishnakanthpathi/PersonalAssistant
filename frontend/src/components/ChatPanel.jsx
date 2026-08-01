@@ -554,7 +554,11 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                                  contentStr.startsWith('mindmap') || 
                                  contentStr.startsWith('pie'));
                                 
-                              const isHtml = className?.includes('language-html') && (contentStr.includes('<html') || contentStr.includes('<div') || contentStr.includes('<style'));
+                              const langLower = (className || '').toLowerCase();
+                              const isHtmlLang = langLower.includes('html') || langLower.includes('htm') || langLower.includes('markup') || langLower.includes('xml');
+                              const containsHtmlTags = /<(!DOCTYPE|html|head|body|div|style|script|svg|canvas|section|main|header|footer|table|form|p|h[1-6]|button)/i.test(contentStr);
+                              const startsWithHtml = contentStr.startsWith('<!DOCTYPE') || contentStr.startsWith('<html') || contentStr.startsWith('<div');
+                              const isHtml = (isHtmlLang || containsHtmlTags || startsWithHtml) && hasNewline && contentStr.includes('<');
 
                               if (isMermaid) {
                                 if (isMsgStreaming) {
@@ -568,12 +572,12 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                                 return <MermaidCard chartCode={contentStr} />;
                               }
 
-                              if (isHtml && hasNewline) {
+                              if (isHtml) {
                                 if (isMsgStreaming) {
                                   return (
-                                    <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300">
-                                      <RefreshCw className="w-4 h-4 text-white animate-spin" />
-                                      <span>Generating Live HTML Application Sandbox...</span>
+                                    <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300 shadow-md">
+                                      <RefreshCw className="w-4 h-4 text-white animate-spin flex-shrink-0" />
+                                      <span className="font-sans font-medium">Generating Live HTML Application Sandbox...</span>
                                     </div>
                                   );
                                 }

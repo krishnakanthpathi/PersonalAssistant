@@ -4,7 +4,7 @@ title: MCP Server - terminal
 description: Integrated MCP server providing tools for terminal.
 tags: [terminal, execute, command, change, directory, get, current, allowed, commands]
 tools: [execute_command, change_directory, get_current_directory, get_allowed_commands]
-timestamp: 2026-08-01T09:35:46.096Z
+timestamp: 2026-08-01T15:54:54.976Z
 ---
 
 # MCP Server - terminal

@@ -263,7 +263,8 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		const payload = {
 			model: model,
 			messages: finalMsgs,
-			stream: Boolean(onToken)
+			stream: Boolean(onToken),
+			max_tokens: 8192
 		};
 
 		if (useNativeTools) {
@@ -350,7 +351,8 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		const payload = {
 			model: model,
 			messages: finalMsgs,
-			stream: Boolean(onToken)
+			stream: Boolean(onToken),
+			max_tokens: 8192
 		};
 
 		if (useNativeTools) {
@@ -1008,36 +1010,48 @@ export function appendToolErrorMessage(messages, call, errorMsg, toolName) {
 // ==========================================
 
 export function parseAgentResponse(rawContent) {
-	// Strip thinking/reasoning tags first so they don't pollute final output or text-to-speech
+	if (!rawContent || typeof rawContent !== 'string') {
+		return { speech: '', content: '' };
+	}
+
 	const cleaned = stripThinkingTags(rawContent);
 
-	const speechMatch = cleaned.match(/<speech>([\s\S]*?)<\/speech>/i);
-	const actionMatch = cleaned.match(/<action>([\s\S]*?)<\/action>/i);
-
 	let speech = '';
-	let action = '';
+	let action = cleaned;
 
-	if (speechMatch) {
-		speech = speechMatch[1].trim();
-	}
-	if (actionMatch) {
-		action = actionMatch[1].trim();
-	}
-
-	if (!speechMatch && !actionMatch) {
-		action = cleaned.trim();
-		speech = cleanTextForSpeech(action);
-	} else if (speechMatch && !actionMatch) {
+	// Support both closed <speech>...</speech> and unclosed <speech>...
+	const speechClosedMatch = cleaned.match(/<speech>([\s\S]*?)<\/speech>/i);
+	if (speechClosedMatch) {
+		speech = speechClosedMatch[1].trim();
 		action = cleaned.replace(/<speech>[\s\S]*?<\/speech>/gi, '').trim();
-	} else if (!speechMatch && actionMatch) {
-		action = actionMatch[1].trim();
-		speech = cleanTextForSpeech(action);
+	} else {
+		const speechOpenMatch = cleaned.match(/<speech>([\s\S]*?)(?:<action>|```|$)/i);
+		if (speechOpenMatch) {
+			speech = speechOpenMatch[1].trim();
+			action = cleaned.replace(/<speech>[\s\S]*?(?=<action>|```|$)/gi, '').trim();
+		}
 	}
 
-	// Clean remaining assistant-specific tags
+	// Extract <action>...</action> or unclosed <action>... if present
+	const actionClosedMatch = action.match(/<action>([\s\S]*?)<\/action>/i);
+	if (actionClosedMatch) {
+		action = actionClosedMatch[1].trim();
+	} else {
+		const actionOpenMatch = action.match(/<action>([\s\S]*)$/i);
+		if (actionOpenMatch) {
+			action = actionOpenMatch[1].trim();
+		}
+	}
+
+	// Strip remaining tag artifacts from speech and action
 	const tagRegex = /<\/?(speech|action|thought)>/gi;
 	speech = speech.replace(tagRegex, '').trim();
 	action = action.replace(tagRegex, '').trim();
+
+	// If no explicit speech tag was provided, generate clean text for speech from the action content
+	if (!speech && action) {
+		speech = cleanTextForSpeech(action);
+	}
 
 	return { speech, content: action };
 }
