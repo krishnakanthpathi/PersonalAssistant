@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { 
   Paperclip, 
   Sparkles, 
@@ -10,6 +13,7 @@ import {
   Copy, 
   Check, 
   ArrowUp,
+  ArrowDown,
   Brain,
   Code2,
   BarChart2,
@@ -20,7 +24,8 @@ import {
   VolumeX,
   Square,
   MessageSquareQuote,
-  Layers
+  Layers,
+  RefreshCw
 } from 'lucide-react';
 import ToolCard from './cards/ToolCard';
 import ChartCard from './cards/ChartCard';
@@ -30,6 +35,15 @@ import PrebuiltFormsModal from './cards/PrebuiltFormsModal';
 
 function slugify(text) {
   return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function formatMathDelimiters(text) {
+  if (!text || typeof text !== 'string') return '';
+  // Convert LaTeX display math \[ ... \] to $$ ... $$
+  let formatted = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => `\n$$\n${math.trim()}\n$$\n`);
+  // Convert LaTeX inline math \( ... \) to $ ... $
+  formatted = formatted.replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => `$${math.trim()}$`);
+  return formatted;
 }
 
 function extractChartFromContent(content, index = 0) {
@@ -66,11 +80,21 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const userScrolledUpRef = useRef(false);
+  const [showScrollBottomButton, setShowScrollBottomButton] = useState(false);
 
   // Voice Mode State
   const [isListening, setIsListening] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const recognitionRef = useRef(null);
+
+  const handleChatContainerScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 150;
+    userScrolledUpRef.current = !isAtBottom;
+    setShowScrollBottomButton(!isAtBottom);
+  };
 
   // Dynamic auto-expansion for chat input textarea
   useEffect(() => {
@@ -108,8 +132,11 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
     }
   };
 
+  // Smart Auto-Scroll: only scroll to bottom if user is not inspecting previous content higher up
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!userScrolledUpRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, statusMessage, isStreaming]);
 
   // Voice Dictation setup
@@ -153,7 +180,33 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
     setIsListening(true);
   };
 
-  // Text-to-Speech output
+  const sentenceBufferRef = useRef('');
+
+  // Sentence-Buffered Streaming Text-to-Speech Output
+  const processStreamingSpeech = (token) => {
+    if (!window.speechSynthesis) return;
+    sentenceBufferRef.current += token;
+
+    const sentenceRegex = /^([\s\S]*?[.!?\n])\s*([\s\S]*)$/;
+    const match = sentenceBufferRef.current.match(sentenceRegex);
+
+    if (match) {
+      const sentenceToSpeak = match[1].trim();
+      sentenceBufferRef.current = match[2];
+
+      if (sentenceToSpeak) {
+        const cleanText = sentenceToSpeak.replace(/<[^>]*>/g, '').replace(/```[\s\S]*?```/g, '').trim();
+        if (cleanText.length > 0) {
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+    }
+  };
+
+  // Text-to-Speech output fallback
   const speakText = (text) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -216,6 +269,9 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
       setIsListening(false);
     }
 
+    userScrolledUpRef.current = false;
+    setShowScrollBottomButton(false);
+
     const userMsg = {
       role: 'user',
       content: promptToSend,
@@ -228,6 +284,10 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
     setAttachments([]);
     setIsStreaming(true);
     setStatusMessage('Thinking...');
+    sentenceBufferRef.current = '';
+    if (ttsEnabled && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -287,6 +347,32 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                     return updated;
                   });
                 }
+              } else if (data.type === 'token') {
+                const tokenChunk = data.content;
+                if (tokenChunk && typeof tokenChunk === 'string') {
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    const lastIdx = updated.length - 1;
+                    if (lastIdx >= 0) {
+                      const existing = updated[lastIdx];
+                      const newContent = existing.content + tokenChunk;
+                      const chartInfo = extractChartFromContent(newContent, lastIdx);
+                      updated[lastIdx] = {
+                        ...existing,
+                        content: newContent,
+                        chartId: chartInfo?.chartId || existing.chartId || null,
+                        chartData: chartInfo?.chartData || existing.chartData || null,
+                        chartType: chartInfo?.chartType || existing.chartType || 'bar',
+                        chartTitle: chartInfo?.chartTitle || existing.chartTitle || '',
+                      };
+                    }
+                    return updated;
+                  });
+
+                  if (ttsEnabled) {
+                    processStreamingSpeech(tokenChunk);
+                  }
+                }
               } else if (data.type === 'result') {
                 const resObj = data.content;
                 const rawContent = resObj.content || (typeof resObj === 'string' ? resObj : '');
@@ -294,7 +380,14 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                 const lastIdx = messages.length;
                 const chartInfo = extractChartFromContent(rawContent, lastIdx);
 
-                if (ttsEnabled && (speechContent || rawContent)) {
+                if (ttsEnabled && sentenceBufferRef.current.trim()) {
+                  const cleanRemaining = sentenceBufferRef.current.replace(/<[^>]*>/g, '').replace(/```[\s\S]*?```/g, '').trim();
+                  if (cleanRemaining.length > 0 && window.speechSynthesis) {
+                    const utterance = new SpeechSynthesisUtterance(cleanRemaining);
+                    window.speechSynthesis.speak(utterance);
+                  }
+                  sentenceBufferRef.current = '';
+                } else if (ttsEnabled && !sentenceBufferRef.current.trim() && (speechContent || rawContent)) {
                   speakText(speechContent || rawContent);
                 }
 
@@ -303,14 +396,14 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                   const idx = updated.length - 1;
                   updated[idx] = {
                     role: 'assistant',
-                    content: rawContent,
+                    content: rawContent || updated[idx].content,
                     speech: speechContent,
                     toolExecutions: resObj.toolExecutions || updated[idx].toolExecutions || [],
                     ragFacts: resObj.ragFacts || [],
-                    chartId: chartInfo?.chartId || null,
-                    chartData: chartInfo?.chartData || null,
-                    chartType: chartInfo?.chartType || 'bar',
-                    chartTitle: chartInfo?.chartTitle || '',
+                    chartId: chartInfo?.chartId || updated[idx].chartId || null,
+                    chartData: chartInfo?.chartData || updated[idx].chartData || null,
+                    chartType: chartInfo?.chartType || updated[idx].chartType || 'bar',
+                    chartTitle: chartInfo?.chartTitle || updated[idx].chartTitle || '',
                     createdAt: new Date(),
                   };
                   return updated;
@@ -343,7 +436,11 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
   return (
     <div className="flex-1 flex flex-col h-full chatgpt-main overflow-hidden relative font-sans">
       {/* Scrollable Chat Feed */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div 
+        ref={chatContainerRef} 
+        onScroll={handleChatContainerScroll} 
+        className="flex-1 overflow-y-auto px-4 py-6 relative"
+      >
         <div className="max-w-3xl mx-auto space-y-6">
           {messages.length === 0 ? (
             /* ChatGPT Welcome Screen */
@@ -373,6 +470,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
           ) : (
             /* Message Thread */
             messages.map((msg, idx) => {
+              const isMsgStreaming = isStreaming && idx === messages.length - 1;
               const chartInfo = extractChartFromContent(msg.content, idx);
               const chartData = msg.chartData || chartInfo?.chartData;
               const chartType = msg.chartType || chartInfo?.chartType || 'bar';
@@ -429,9 +527,10 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                           </div>
                         )}
 
-                        {/* ReactMarkdown Parser with Mermaid & HTML Live Sandbox Support */}
+                        {/* ReactMarkdown Parser with KaTeX Math, Mermaid & HTML Live Sandbox Support */}
                         <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
                           components={{
                             p: ({ children }) => <p className="mb-2 leading-relaxed text-slate-200">{children}</p>,
                             h1: ({ children }) => <h1 className="text-xl font-bold text-slate-100 mt-4 mb-2">{children}</h1>,
@@ -444,7 +543,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                             code: ({ node, className, children, ...props }) => {
                               const contentStr = String(children || '').trim();
                               const hasNewline = contentStr.includes('\n');
-                              const isMermaid = className?.includes('language-mermaid') && 
+                              const isMermaid = className?.includes('language-mermaid') || 
                                 (contentStr.startsWith('graph ') || 
                                  contentStr.startsWith('flowchart ') || 
                                  contentStr.startsWith('sequenceDiagram') || 
@@ -458,10 +557,26 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                               const isHtml = className?.includes('language-html') && (contentStr.includes('<html') || contentStr.includes('<div') || contentStr.includes('<style'));
 
                               if (isMermaid) {
+                                if (isMsgStreaming) {
+                                  return (
+                                    <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300">
+                                      <RefreshCw className="w-4 h-4 text-white animate-spin" />
+                                      <span>Generating Mermaid Diagram...</span>
+                                    </div>
+                                  );
+                                }
                                 return <MermaidCard chartCode={contentStr} />;
                               }
 
                               if (isHtml && hasNewline) {
+                                if (isMsgStreaming) {
+                                  return (
+                                    <div className="my-3 p-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-center space-x-3 text-xs font-mono text-slate-300">
+                                      <RefreshCw className="w-4 h-4 text-white animate-spin" />
+                                      <span>Generating Live HTML Application Sandbox...</span>
+                                    </div>
+                                  );
+                                }
                                 return <HtmlSandboxCard codeContent={contentStr} />;
                               }
 
@@ -469,7 +584,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
 
                               if (!isBlockCode) {
                                 return (
-                                  <span className="font-mono text-slate-100 text-xs font-medium px-1 bg-[#242424] rounded">
+                                  <span className="font-mono text-slate-100 text-xs font-medium px-1.5 py-0.5 bg-[#242424] rounded">
                                     {children}
                                   </span>
                                 );
@@ -492,7 +607,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                             th: ({ children }) => <th className="px-4 py-3 font-semibold text-slate-200 border-r border-[#262626] last:border-r-0">{children}</th>,
                             tbody: ({ children }) => <tbody className="divide-y divide-[#262626]">{children}</tbody>,
                             tr: ({ children }) => <tr className="hover:bg-[#1c1c1c] transition-colors">{children}</tr>,
-                            td: ({ children }) => <td className="px-4 py-3 text-slate-300 border-r border-[#262626] last:border-r-0 leading-normal">{children}</td>,
+                            td: ({ children }) => <td className="px-4 py-2.5 text-slate-300 border-r border-[#262626] last:border-r-0">{children}</td>,
                             a: ({ href, children }) => (
                               <a href={href} target="_blank" rel="noreferrer" className="text-white underline underline-offset-2 hover:text-slate-300 font-medium">
                                 {children}
@@ -545,6 +660,21 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Floating Scroll to Bottom Button */}
+      {showScrollBottomButton && (
+        <button
+          onClick={() => {
+            userScrolledUpRef.current = false;
+            setShowScrollBottomButton(false);
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          className="absolute bottom-28 right-8 z-30 px-3.5 py-2 rounded-full bg-[#242424] hover:bg-[#333333] border border-white/10 text-slate-200 text-xs font-semibold shadow-2xl flex items-center space-x-1.5 cursor-pointer transition-all"
+        >
+          <ArrowDown className="w-3.5 h-3.5" />
+          <span>Scroll to bottom</span>
+        </button>
+      )}
 
       {/* Floating ChatGPT Input Box */}
       <div className="p-4 bg-gradient-to-t from-[#171717] via-[#171717] to-transparent">

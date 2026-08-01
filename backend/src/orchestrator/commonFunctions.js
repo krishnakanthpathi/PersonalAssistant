@@ -150,7 +150,7 @@ export async function prepareMessages(prompt, history, images = []) {
 // 2. LLM Provider Integration Client
 // ==========================================
 
-export async function callLLM(msgs, includeTools = false, tools = [], requestId = null) {
+export async function callLLM(msgs, includeTools = false, tools = [], requestId = null, onToken = null) {
 	// Determine if we should override using the multimedia model config
 	const hasImages = msgs.some(m => m.images && m.images.length > 0);
 	const useMultimedia = env.USE_MULTIMEDIA_MODEL && hasImages;
@@ -263,7 +263,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		const payload = {
 			model: model,
 			messages: finalMsgs,
-			stream: false
+			stream: Boolean(onToken)
 		};
 
 		if (useNativeTools) {
@@ -271,10 +271,40 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`OpenAI request: model=${model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`OpenAI request: model=${model}, messages=${finalMsgs.length}, streaming=${Boolean(onToken)}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
+			if (onToken) {
+				const stream = await openaiInstance.chat.completions.create(payload);
+				let fullContent = '';
+				let toolCallsMap = new Map();
+
+				for await (const chunk of stream) {
+					const delta = chunk.choices[0]?.delta;
+					if (delta?.content) {
+						fullContent += delta.content;
+						onToken(delta.content);
+					}
+					if (delta?.tool_calls) {
+						for (const tc of delta.tool_calls) {
+							const idx = tc.index ?? 0;
+							if (!toolCallsMap.has(idx)) {
+								toolCallsMap.set(idx, { id: tc.id || `call_${idx}`, type: tc.type || 'function', function: { name: tc.function?.name || '', arguments: tc.function?.arguments || '' } });
+							} else {
+								const existing = toolCallsMap.get(idx);
+								if (tc.function?.name) existing.function.name += tc.function.name;
+								if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+							}
+						}
+					}
+				}
+				duration = Date.now() - start;
+				if (requestId) metricsService.recordLLMCall(requestId, duration, 0, fullContent);
+				const tool_calls = toolCallsMap.size > 0 ? Array.from(toolCallsMap.values()) : undefined;
+				return { message: { role: 'assistant', content: fullContent, tool_calls } };
+			}
+
 			const res = await openaiInstance.chat.completions.create(payload);
 			duration = Date.now() - start;
 
@@ -320,7 +350,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		const payload = {
 			model: model,
 			messages: finalMsgs,
-			stream: false
+			stream: Boolean(onToken)
 		};
 
 		if (useNativeTools) {
@@ -328,10 +358,40 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`Grok request: model=${model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`Grok request: model=${model}, messages=${finalMsgs.length}, streaming=${Boolean(onToken)}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
+			if (onToken) {
+				const stream = await grokInstance.chat.completions.create(payload);
+				let fullContent = '';
+				let toolCallsMap = new Map();
+
+				for await (const chunk of stream) {
+					const delta = chunk.choices[0]?.delta;
+					if (delta?.content) {
+						fullContent += delta.content;
+						onToken(delta.content);
+					}
+					if (delta?.tool_calls) {
+						for (const tc of delta.tool_calls) {
+							const idx = tc.index ?? 0;
+							if (!toolCallsMap.has(idx)) {
+								toolCallsMap.set(idx, { id: tc.id || `call_${idx}`, type: tc.type || 'function', function: { name: tc.function?.name || '', arguments: tc.function?.arguments || '' } });
+							} else {
+								const existing = toolCallsMap.get(idx);
+								if (tc.function?.name) existing.function.name += tc.function.name;
+								if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+							}
+						}
+					}
+				}
+				duration = Date.now() - start;
+				if (requestId) metricsService.recordLLMCall(requestId, duration, 0, fullContent);
+				const tool_calls = toolCallsMap.size > 0 ? Array.from(toolCallsMap.values()) : undefined;
+				return { message: { role: 'assistant', content: fullContent, tool_calls } };
+			}
+
 			const res = await grokInstance.chat.completions.create(payload);
 			duration = Date.now() - start;
 
@@ -368,7 +428,7 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		const payload = {
 			model: model,
 			messages: finalMsgs,
-			stream: false,
+			stream: Boolean(onToken),
 			options: {
 				num_ctx: 32768
 			}
@@ -378,10 +438,58 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 		}
 
 		const payloadSize = JSON.stringify(payload).length;
-		logger.info(`Ollama request: model=${model}, messages=${finalMsgs.length}, payloadSize=${payloadSize} chars`);
+		logger.info(`Ollama request: model=${model}, messages=${finalMsgs.length}, streaming=${Boolean(onToken)}, payloadSize=${payloadSize} chars`);
 
 		try {
 			const start = Date.now();
+			if (onToken) {
+				const res = await axios.post(`${baseUrl}/api/chat`, payload, { responseType: 'stream' });
+				let fullContent = '';
+				let toolCalls = [];
+
+				await new Promise((resolve, reject) => {
+					let buffer = '';
+					res.data.on('data', chunk => {
+						buffer += chunk.toString('utf8');
+						const lines = buffer.split('\n');
+						buffer = lines.pop();
+						for (const line of lines) {
+							if (!line.trim()) continue;
+							try {
+								const parsed = JSON.parse(line);
+								if (parsed.message?.content) {
+									fullContent += parsed.message.content;
+									onToken(parsed.message.content);
+								}
+								if (parsed.message?.tool_calls) {
+									toolCalls = parsed.message.tool_calls;
+								}
+							} catch (e) {}
+						}
+					});
+					res.data.on('end', () => {
+						if (buffer.trim()) {
+							try {
+								const parsed = JSON.parse(buffer);
+								if (parsed.message?.content) {
+									fullContent += parsed.message.content;
+									onToken(parsed.message.content);
+								}
+								if (parsed.message?.tool_calls) {
+									toolCalls = parsed.message.tool_calls;
+								}
+							} catch (e) {}
+						}
+						resolve();
+					});
+					res.data.on('error', err => reject(err));
+				});
+
+				duration = Date.now() - start;
+				if (requestId) metricsService.recordLLMCall(requestId, duration, 0, fullContent);
+				return { message: { role: 'assistant', content: fullContent, tool_calls: toolCalls.length > 0 ? toolCalls : undefined } };
+			}
+
 			const res = await axios.post(`${baseUrl}/api/chat`, payload);
 			const elapsed = Date.now() - start;
 			const data = res.data;

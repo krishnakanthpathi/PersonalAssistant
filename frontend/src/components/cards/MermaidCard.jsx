@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Maximize2, Minimize2, Copy, Check, RefreshCw } from 'lucide-react';
+import { Maximize2, Minimize2, Copy, Check, RefreshCw, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 mermaid.initialize({
   startOnLoad: false,
@@ -34,6 +34,7 @@ export default function MermaidCard({ chartCode }) {
   const [error, setError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const chartIdRef = useRef(`mermaid-${Math.random().toString(36).substring(2, 9)}`);
 
   useEffect(() => {
@@ -48,9 +49,10 @@ export default function MermaidCard({ chartCode }) {
           setSvgContent(svg);
         }
       } catch (err) {
-        console.error('Mermaid render error:', err);
+        const orphanErrEl = document.getElementById(`d${chartIdRef.current}`);
+        if (orphanErrEl) orphanErrEl.remove();
         if (isMounted) {
-          setError('Could not render diagram format. Displaying raw code fallback below.');
+          setError('Diagram compilation pending or syntax invalid.');
         }
       }
     };
@@ -67,10 +69,22 @@ export default function MermaidCard({ chartCode }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(3.0, +(prev + 0.15).toFixed(2)));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(0.4, +(prev - 0.15).toFixed(2)));
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+  };
+
   return (
     <div className="my-3 rounded-2xl bg-[#141414] border border-[#2a2a2a] overflow-hidden shadow-xl font-sans">
       {/* Top Header */}
-      <div className="px-4 py-3 bg-[#1c1c1c] border-b border-[#262626] flex items-center justify-between">
+      <div className="px-4 py-3 bg-[#1c1c1c] border-b border-[#262626] flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center space-x-2">
           <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
           <span className="text-xs font-mono font-semibold text-slate-200 uppercase tracking-wider">
@@ -78,7 +92,37 @@ export default function MermaidCard({ chartCode }) {
           </span>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5">
+          {/* Zoom Controls */}
+          <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-[#242424] border border-[#333333] text-slate-300">
+            <button
+              onClick={handleZoomOut}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
+              title="Zoom Out (-)"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[10px] font-mono text-slate-300 w-9 text-center select-none">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <button
+              onClick={handleZoomIn}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
+              title="Zoom In (+)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            {zoomLevel !== 1 && (
+              <button
+                onClick={handleResetZoom}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer ml-0.5"
+                title="Reset Zoom (100%)"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
           <button
             onClick={handleCopyCode}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626] transition-colors cursor-pointer"
@@ -97,7 +141,7 @@ export default function MermaidCard({ chartCode }) {
       </div>
 
       {/* Rendered SVG Content */}
-      <div className="p-4 overflow-x-auto flex justify-center bg-[#141414] min-h-[160px] items-center">
+      <div className="p-4 overflow-auto flex justify-center bg-[#141414] min-h-[180px] items-center">
         {error ? (
           <div className="w-full space-y-2">
             <div className="text-xs font-mono text-slate-400 p-2.5 rounded-xl bg-[#1c1c1c] border border-white/10">
@@ -110,7 +154,8 @@ export default function MermaidCard({ chartCode }) {
         ) : svgContent ? (
           <div
             ref={containerRef}
-            className="mermaid-svg-wrapper max-w-full"
+            className="mermaid-svg-wrapper transition-transform duration-200 ease-out origin-center"
+            style={{ transform: `scale(${zoomLevel})` }}
             dangerouslySetInnerHTML={{ __html: svgContent }}
           />
         ) : (
@@ -131,18 +176,50 @@ export default function MermaidCard({ chartCode }) {
                 Mermaid Diagram Viewer
               </span>
             </div>
-            <button
-              onClick={() => setIsExpanded(false)}
-              className="p-2 rounded-xl bg-[#212121] text-slate-300 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
-            >
-              <Minimize2 className="w-5 h-5" />
-            </button>
+
+            <div className="flex items-center space-x-2">
+              {/* Fullscreen Zoom Controls */}
+              <div className="flex items-center space-x-1 px-3 py-1 rounded-xl bg-[#242424] border border-[#333333] text-slate-300">
+                <button
+                  onClick={handleZoomOut}
+                  className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
+                  title="Zoom Out (-)"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-mono text-slate-200 w-12 text-center select-none">
+                  {Math.round(zoomLevel * 100)}%
+                </span>
+                <button
+                  onClick={handleZoomIn}
+                  className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
+                  title="Zoom In (+)"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleResetZoom}
+                  className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer ml-1"
+                  title="Reset Zoom (100%)"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="p-2 rounded-xl bg-[#212121] text-slate-300 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
+              >
+                <Minimize2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto flex items-center justify-center p-6 bg-[#121212] my-4 rounded-2xl border border-white/10">
             {svgContent ? (
               <div
-                className="mermaid-svg-wrapper scale-110 max-w-full max-h-full"
+                className="mermaid-svg-wrapper transition-transform duration-200 ease-out origin-center"
+                style={{ transform: `scale(${zoomLevel})` }}
                 dangerouslySetInnerHTML={{ __html: svgContent }}
               />
             ) : (

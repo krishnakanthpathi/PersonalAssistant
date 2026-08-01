@@ -22,7 +22,7 @@ export class Agent {
 	 * @param {Array} history 
 	 * @param {Function} onStatusUpdate 
 	 */
-	run = catchErrors(async (prompt, history = [], onStatusUpdate = null, shouldStop = null, images = [], onMetadataRetrieved = null) => {
+	run = catchErrors(async (prompt, history = [], onStatusUpdate = null, shouldStop = null, images = [], onMetadataRetrieved = null, onToken = null) => {
 		const requestId = metricsService.startRequest(prompt);
 		const logs = [];
 		const triggerStatusUpdate = (status) => {
@@ -74,7 +74,7 @@ export class Agent {
 			// 3. First call to LLM including the tools list
 			checkAborted();
 			triggerStatusUpdate('Thinking...');
-			const response = await callLLM(messages, true, tools, requestId);
+			const response = await callLLM(messages, true, tools, requestId, onToken);
 			let message = response.message;
 
 			// Parse XML tool calls in the initial response
@@ -117,7 +117,7 @@ export class Agent {
 
 				checkAborted();
 				triggerStatusUpdate(`Thinking... (step ${iteration})`);
-				const nextResponse = await callLLM(messages, true, tools, requestId);
+				const nextResponse = await callLLM(messages, true, tools, requestId, onToken);
 				message = nextResponse.message;
 
 				parseXmlToolCalls(message, tools);

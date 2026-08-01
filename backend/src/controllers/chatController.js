@@ -151,12 +151,16 @@ export const handleChat = async (req, res) => {
 			{ $push: { messages: userMessage } }
 		);
 
-		// 3. Run agent with history, abort checks, and images
-		const response = await agent.run(enhancedPrompt, history, (status) => {
-			sendSSE('status', status);
-		}, () => isAborted, images, (metadata) => {
-			sendSSE('metadata', metadata);
-		});
+		// 3. Run agent with history, abort checks, images, and live token stream
+		const response = await agent.run(
+			enhancedPrompt,
+			history,
+			(status) => sendSSE('status', status),
+			() => isAborted,
+			images,
+			(metadata) => sendSSE('metadata', metadata),
+			(token) => sendSSE('token', token)
+		);
 
 		// 4. Save assistant response
 		const assistantMessage = {
