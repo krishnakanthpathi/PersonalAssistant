@@ -55,7 +55,7 @@ function extractChartFromContent(content, index = 0) {
   return null;
 }
 
-export default function ChatPanel({ activeSessionId, onSessionCreated }) {
+export default function ChatPanel({ activeSessionId, onSessionCreated, initialPrompt, onClearInitialPrompt }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -65,11 +65,28 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
   const [isCardsModalOpen, setIsCardsModalOpen] = useState(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   // Voice Mode State
   const [isListening, setIsListening] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const recognitionRef = useRef(null);
+
+  // Dynamic auto-expansion for chat input textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 450)}px`;
+    }
+  }, [input]);
+
+  useEffect(() => {
+    if (initialPrompt && typeof initialPrompt === 'string') {
+      setInput(initialPrompt);
+      if (onClearInitialPrompt) onClearInitialPrompt();
+    }
+  }, [initialPrompt]);
 
   useEffect(() => {
     if (activeSessionId) {
@@ -546,7 +563,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="chatgpt-input-box rounded-3xl px-4 py-3 flex items-center space-x-3">
+          <form onSubmit={handleSubmit} className="chatgpt-input-box rounded-3xl px-4 py-2.5 flex items-end space-x-2 sm:space-x-3">
             <input
               type="file"
               ref={fileInputRef}
@@ -555,76 +572,87 @@ export default function ChatPanel({ activeSessionId, onSessionCreated }) {
               className="hidden"
             />
 
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-[#2f2f2f] transition-colors cursor-pointer"
-              title="Attach files"
-            >
-              <Paperclip className="w-5 h-5" />
-            </button>
+            <div className="flex items-center space-x-1 sm:space-x-1.5 pb-1 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-[#2f2f2f] transition-colors cursor-pointer"
+                title="Attach files"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
 
-            {/* Quick Cards & Actions Extension Launcher */}
-            <button
-              type="button"
-              onClick={() => setIsCardsModalOpen(true)}
-              className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-[#2f2f2f] transition-colors cursor-pointer"
-              title="Action Cards & Quick Library"
-            >
-              <Layers className="w-5 h-5 text-slate-300 hover:text-white" />
-            </button>
+              {/* Quick Cards & Actions Extension Launcher */}
+              <button
+                type="button"
+                onClick={() => setIsCardsModalOpen(true)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-[#2f2f2f] transition-colors cursor-pointer"
+                title="Action Cards & Quick Library"
+              >
+                <Layers className="w-5 h-5 text-slate-300 hover:text-white" />
+              </button>
 
-            {/* Mic Dictation Toggle Button */}
-            <button
-              type="button"
-              onClick={toggleSpeechRecognition}
-              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                isListening ? 'bg-white text-black animate-pulse' : 'text-slate-400 hover:text-white hover:bg-[#2f2f2f]'
-              }`}
-              title={isListening ? 'Stop Listening' : 'Voice Dictation'}
-            >
-              {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </button>
+              {/* Mic Dictation Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleSpeechRecognition}
+                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                  isListening ? 'bg-white text-black animate-pulse' : 'text-slate-400 hover:text-white hover:bg-[#2f2f2f]'
+                }`}
+                title={isListening ? 'Stop Listening' : 'Voice Dictation'}
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
 
-            {/* Read Aloud Toggle */}
-            <button
-              type="button"
-              onClick={() => setTtsEnabled(!ttsEnabled)}
-              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                ttsEnabled ? 'text-white bg-[#2f2f2f]' : 'text-slate-400 hover:text-white hover:bg-[#2f2f2f]'
-              }`}
-              title={ttsEnabled ? 'Voice Response Enabled' : 'Enable Voice Response'}
-            >
-              {ttsEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-            </button>
+              {/* Read Aloud Toggle */}
+              <button
+                type="button"
+                onClick={() => setTtsEnabled(!ttsEnabled)}
+                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                  ttsEnabled ? 'text-white bg-[#2f2f2f]' : 'text-slate-400 hover:text-white hover:bg-[#2f2f2f]'
+                }`}
+                title={ttsEnabled ? 'Voice Response Enabled' : 'Enable Voice Response'}
+              >
+                {ttsEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              </button>
+            </div>
 
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
+              rows={1}
               placeholder={isListening ? 'Listening to your voice...' : 'Message Personal Assistant...'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
               disabled={isStreaming}
-              className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none placeholder-slate-500 disabled:opacity-50"
+              className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none placeholder-slate-500 disabled:opacity-50 resize-none max-h-[50vh] overflow-y-auto py-1.5 leading-relaxed font-sans"
             />
 
-            {isStreaming ? (
-              <button
-                type="button"
-                onClick={handleStopGeneration}
-                className="w-8 h-8 rounded-full bg-[#2f2f2f] text-white hover:bg-white hover:text-black flex items-center justify-center transition-all shadow-md flex-shrink-0 cursor-pointer"
-                title="Stop Generating"
-              >
-                <Square className="w-4 h-4 fill-current" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!input.trim() && attachments.length === 0}
-                className="w-8 h-8 rounded-full bg-white text-black hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-white flex items-center justify-center transition-all shadow-md flex-shrink-0 cursor-pointer"
-              >
-                <ArrowUp className="w-5 h-5 stroke-[2.5]" />
-              </button>
-            )}
+            <div className="pb-1 flex-shrink-0">
+              {isStreaming ? (
+                <button
+                  type="button"
+                  onClick={handleStopGeneration}
+                  className="w-8 h-8 rounded-full bg-[#2f2f2f] text-white hover:bg-white hover:text-black flex items-center justify-center transition-all shadow-md flex-shrink-0 cursor-pointer"
+                  title="Stop Generating"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim() && attachments.length === 0}
+                  className="w-8 h-8 rounded-full bg-white text-black hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-white flex items-center justify-center transition-all shadow-md flex-shrink-0 cursor-pointer"
+                >
+                  <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+                </button>
+              )}
+            </div>
           </form>
 
           <p className="text-[11px] text-center text-slate-500 font-sans">

@@ -58,8 +58,14 @@ export default function App() {
     updateUrlSession(newId);
   };
 
+  const [initialPrompt, setInitialPrompt] = useState(null);
+
   const handleSelectPrebuiltForm = (form) => {
-    console.log('Selected action card:', form);
+    const promptToRun = form.populatedPrompt || form.prompt || form.promptTemplate;
+    if (promptToRun) {
+      setInitialPrompt(promptToRun);
+      setActiveTab('chat');
+    }
   };
 
   return (
@@ -98,6 +104,8 @@ export default function App() {
           <ChatPanel
             activeSessionId={activeSessionId}
             onSessionCreated={handleSessionCreated}
+            initialPrompt={initialPrompt}
+            onClearInitialPrompt={() => setInitialPrompt(null)}
           />
         )}
       </div>

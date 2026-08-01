@@ -78,8 +78,10 @@ class ToolRegistry {
 			}
 		});
 
-		// Always keep get_current_time active
-		activeToolNames.add('get_current_time');
+		// Always keep all core local built-in tools active (non-MCP tools like create_prebuilt_form, etc.)
+		for (const localToolName of this.tools.keys()) {
+			activeToolNames.add(localToolName);
+		}
 
 		// Directly match search terms in tool names & descriptions (enables dynamic skill search)
 		const STOP_WORDS = new Set([
