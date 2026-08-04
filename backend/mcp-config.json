@@ -75,7 +75,8 @@
       "env": {
         "MEM0_API_KEY": "YOUR_MEM0_API_KEY_HERE",
         "DEFAULT_USER_ID": "krishnakanth"
-      }
+      },
+      "enabled": false
     },
     "video-converter": {
       "command": "./mcps/mcp-video-converter/mcp-video-converter/.venv/bin/python",
@@ -117,6 +118,13 @@
       "env": {
         "NODE_PATH": "/Users/krishnakanth/Projects/PersonalAssisstent/backend/node_modules"
       }
+    },
+    "memorize": {
+      "enabled": true,
+      "command": "python3",
+      "args": [
+        "/Users/krishnakanth/Projects/memorize/main.py"
+      ]
     }
   }
 }

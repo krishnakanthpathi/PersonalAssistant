@@ -87,15 +87,15 @@ export default function MermaidCard({ chartCode }) {
     setPanPosition({ x: 0, y: 0 });
   };
 
-  // Drag / Pan mouse handlers
+  // Drag / Pan mouse handlers (only active when expanded in fullscreen)
   const handleMouseDown = (e) => {
-    if (e.button !== 0) return;
+    if (!isExpanded || e.button !== 0) return;
     setIsDragging(true);
     dragStartRef.current = { x: e.clientX - panPosition.x, y: e.clientY - panPosition.y };
   };
 
   const handleMouseMove = (e) => {
-    if (!isDragging) return;
+    if (!isExpanded || !isDragging) return;
     setPanPosition({
       x: e.clientX - dragStartRef.current.x,
       y: e.clientY - dragStartRef.current.y
@@ -108,6 +108,7 @@ export default function MermaidCard({ chartCode }) {
 
   // Touch drag handlers
   const handleTouchStart = (e) => {
+    if (!isExpanded) return;
     if (e.touches.length === 1) {
       setIsDragging(true);
       dragStartRef.current = { x: e.touches[0].clientX - panPosition.x, y: e.touches[0].clientY - panPosition.y };
@@ -115,7 +116,7 @@ export default function MermaidCard({ chartCode }) {
   };
 
   const handleTouchMove = (e) => {
-    if (!isDragging || e.touches.length !== 1) return;
+    if (!isExpanded || !isDragging || e.touches.length !== 1) return;
     setPanPosition({
       x: e.touches[0].clientX - dragStartRef.current.x,
       y: e.touches[0].clientY - dragStartRef.current.y
@@ -126,8 +127,9 @@ export default function MermaidCard({ chartCode }) {
     setIsDragging(false);
   };
 
-  // Mouse wheel zoom up to 1000%
+  // Mouse wheel zoom up to 1000% (only when expanded in fullscreen)
   const handleWheel = (e) => {
+    if (!isExpanded) return;
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
     setZoomLevel(prev => Math.min(10.0, Math.max(0.2, +(prev * zoomFactor).toFixed(2))));
   };
@@ -141,42 +143,21 @@ export default function MermaidCard({ chartCode }) {
           <span className="text-xs font-mono font-semibold text-slate-200 uppercase tracking-wider">
             Mermaid Diagram
           </span>
-          <span className="text-[10px] text-slate-400 font-mono flex items-center space-x-1 pl-2 border-l border-[#333]">
-            <Move className="w-3 h-3 text-slate-400" />
-            <span>Drag to move • Up to 1000% zoom</span>
-          </span>
         </div>
 
         <div className="flex items-center space-x-1.5">
-          {/* Zoom Controls (up to 1000%) */}
-          <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-[#242424] border border-[#333333] text-slate-300">
-            <button
-              onClick={handleZoomOut}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
-              title="Zoom Out (-)"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-[10px] font-mono text-slate-200 w-12 text-center select-none font-bold">
-              {Math.round(zoomLevel * 100)}%
-            </span>
-            <button
-              onClick={handleZoomIn}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer"
-              title="Zoom In (+)"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-            {(zoomLevel !== 1.0 || panPosition.x !== 0 || panPosition.y !== 0) && (
-              <button
-                onClick={handleResetZoom}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#333333] transition-colors cursor-pointer ml-0.5"
-                title="Reset Zoom & Pan (100%)"
-              >
-                <RotateCcw className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+          {/* Zoom Locked Indicator in Inline View */}
+          <button
+            onClick={() => {
+              setIsExpanded(true);
+              handleResetZoom();
+            }}
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-[#242424] border border-[#333333] text-slate-400 hover:text-white text-[10px] font-mono transition-colors cursor-pointer"
+            title="Zoom is locked inline. Click to expand for full interactive zoom and pan."
+          >
+            <ZoomIn className="w-3 h-3 text-slate-400" />
+            <span>Zoom Locked (Click to Expand)</span>
+          </button>
 
           <button
             onClick={handleCopyCode}
@@ -186,7 +167,10 @@ export default function MermaidCard({ chartCode }) {
             {copied ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => {
+              setIsExpanded(!isExpanded);
+              if (!isExpanded) handleResetZoom();
+            }}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626] transition-colors cursor-pointer"
             title={isExpanded ? 'Exit Fullscreen' : 'Expand Fullscreen'}
           >
@@ -195,20 +179,17 @@ export default function MermaidCard({ chartCode }) {
         </div>
       </div>
 
-      {/* Rendered Interactive Draggable & Zoomable SVG Canvas */}
+      {/* Rendered Inline SVG Canvas (Zoom & Pan Locked) */}
       <div 
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onWheel={handleWheel}
-        className="p-6 overflow-hidden flex justify-center bg-[#141414] min-h-[220px] items-center relative select-none cursor-grab active:cursor-grabbing"
+        onClick={() => {
+          setIsExpanded(true);
+          handleResetZoom();
+        }}
+        className="p-6 overflow-hidden flex justify-center bg-[#141414] min-h-[220px] items-center relative select-none cursor-pointer group"
+        title="Click to view full screen with interactive zoom and pan"
       >
         {error ? (
-          <div className="w-full space-y-2 select-text cursor-auto">
+          <div className="w-full space-y-2 select-text cursor-auto" onClick={(e) => e.stopPropagation()}>
             <div className="text-xs font-mono text-slate-400 p-2.5 rounded-xl bg-[#1c1c1c] border border-white/10">
               {error}
             </div>
@@ -219,10 +200,10 @@ export default function MermaidCard({ chartCode }) {
         ) : svgContent ? (
           <div
             ref={containerRef}
-            className="mermaid-svg-wrapper transition-transform duration-75 ease-out origin-center"
+            className="mermaid-svg-wrapper transition-transform duration-150 ease-out origin-center group-hover:scale-[1.01]"
             style={{
-              transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel})`,
-              cursor: isDragging ? 'grabbing' : 'grab'
+              transform: 'none',
+              cursor: 'pointer'
             }}
             dangerouslySetInnerHTML={{ __html: svgContent }}
           />

@@ -1,0 +1,221 @@
+/* Reset highlight.js default padding and background to avoid box-in-box artifact */
+code.hljs, pre code.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  white-space: pre !important;
+  word-break: normal !important;
+  word-wrap: normal !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  tab-size: 4 !important;
+  -moz-tab-size: 4 !important;
+}
+
+/* Theme 1: Monokai */
+.code-theme-monokai {
+  background-color: #272822 !important;
+  border-color: #3e3d32 !important;
+}
+.code-theme-monokai .code-header {
+  background-color: #1e1f1c !important;
+  border-bottom-color: #34352e !important;
+}
+.code-theme-monokai code { color: #f8f8f2; }
+.code-theme-monokai .hljs-keyword,
+.code-theme-monokai .hljs-operator,
+.code-theme-monokai .hljs-name { color: #f92672; font-weight: 500; }
+.code-theme-monokai .hljs-string,
+.code-theme-monokai .hljs-quote { color: #e6db74; }
+.code-theme-monokai .hljs-number,
+.code-theme-monokai .hljs-literal,
+.code-theme-monokai .hljs-variable { color: #ae81ff; }
+.code-theme-monokai .hljs-function,
+.code-theme-monokai .hljs-title { color: #a6e22e; }
+.code-theme-monokai .hljs-comment { color: #75715e; font-style: italic; }
+.code-theme-monokai .hljs-built_in,
+.code-theme-monokai .hljs-attr { color: #66d9ef; }
+.code-theme-monokai .hljs-type,
+.code-theme-monokai .hljs-title.class_ { color: #66d9ef; font-style: italic; }
+
+/* Theme 2: Monokai Fire */
+.code-theme-monokai-fire {
+  background-color: #221010 !important;
+  border-color: #4a1d1d !important;
+}
+.code-theme-monokai-fire .code-header {
+  background-color: #180b0b !important;
+  border-bottom-color: #381515 !important;
+}
+.code-theme-monokai-fire code { color: #fff3e0; }
+.code-theme-monokai-fire .hljs-keyword,
+.code-theme-monokai-fire .hljs-operator,
+.code-theme-monokai-fire .hljs-name { color: #ff3d00; font-weight: 600; }
+.code-theme-monokai-fire .hljs-string,
+.code-theme-monokai-fire .hljs-quote { color: #ffab00; }
+.code-theme-monokai-fire .hljs-number,
+.code-theme-monokai-fire .hljs-literal,
+.code-theme-monokai-fire .hljs-variable { color: #ff6d00; }
+.code-theme-monokai-fire .hljs-function,
+.code-theme-monokai-fire .hljs-title { color: #ff8f00; font-weight: 500; }
+.code-theme-monokai-fire .hljs-comment { color: #9e5b5b; font-style: italic; }
+.code-theme-monokai-fire .hljs-built_in,
+.code-theme-monokai-fire .hljs-attr { color: #ff5252; }
+.code-theme-monokai-fire .hljs-type,
+.code-theme-monokai-fire .hljs-title.class_ { color: #ffd740; }
+
+/* Theme 3: Tokyo Night */
+.code-theme-tokyo-night {
+  background-color: #1a1b26 !important;
+  border-color: #2f3549 !important;
+}
+.code-theme-tokyo-night .code-header {
+  background-color: #16161e !important;
+  border-bottom-color: #232433 !important;
+}
+.code-theme-tokyo-night code { color: #a9b1d6; }
+.code-theme-tokyo-night .hljs-keyword,
+.code-theme-tokyo-night .hljs-operator,
+.code-theme-tokyo-night .hljs-name { color: #bb9af7; }
+.code-theme-tokyo-night .hljs-string,
+.code-theme-tokyo-night .hljs-quote { color: #9ece6a; }
+.code-theme-tokyo-night .hljs-number,
+.code-theme-tokyo-night .hljs-literal,
+.code-theme-tokyo-night .hljs-variable { color: #ff9e64; }
+.code-theme-tokyo-night .hljs-function,
+.code-theme-tokyo-night .hljs-title { color: #7aa2f7; }
+.code-theme-tokyo-night .hljs-comment { color: #565f89; font-style: italic; }
+.code-theme-tokyo-night .hljs-built_in,
+.code-theme-tokyo-night .hljs-attr { color: #e0af68; }
+.code-theme-tokyo-night .hljs-type,
+.code-theme-tokyo-night .hljs-title.class_ { color: #2ac3de; }
+
+/* Theme 4: Atom One Dark */
+.code-theme-atom-one-dark {
+  background-color: #282c34 !important;
+  border-color: #3b4048 !important;
+}
+.code-theme-atom-one-dark .code-header {
+  background-color: #21252b !important;
+  border-bottom-color: #31353d !important;
+}
+.code-theme-atom-one-dark code { color: #abb2bf; }
+.code-theme-atom-one-dark .hljs-keyword,
+.code-theme-atom-one-dark .hljs-operator,
+.code-theme-atom-one-dark .hljs-name { color: #c678dd; }
+.code-theme-atom-one-dark .hljs-string,
+.code-theme-atom-one-dark .hljs-quote { color: #98c379; }
+.code-theme-atom-one-dark .hljs-number,
+.code-theme-atom-one-dark .hljs-literal,
+.code-theme-atom-one-dark .hljs-variable { color: #d19a66; }
+.code-theme-atom-one-dark .hljs-function,
+.code-theme-atom-one-dark .hljs-title { color: #61aeee; }
+.code-theme-atom-one-dark .hljs-comment { color: #5c6370; font-style: italic; }
+.code-theme-atom-one-dark .hljs-built_in,
+.code-theme-atom-one-dark .hljs-attr { color: #e6c07b; }
+.code-theme-atom-one-dark .hljs-type,
+.code-theme-atom-one-dark .hljs-title.class_ { color: #e06c75; }
+
+/* Theme 5: GitHub Dark */
+.code-theme-github-dark {
+  background-color: #0d1117 !important;
+  border-color: #21262d !important;
+}
+.code-theme-github-dark .code-header {
+  background-color: #010409 !important;
+  border-bottom-color: #161b22 !important;
+}
+.code-theme-github-dark code { color: #c9d1d9; }
+.code-theme-github-dark .hljs-keyword,
+.code-theme-github-dark .hljs-operator,
+.code-theme-github-dark .hljs-name { color: #ff7b72; }
+.code-theme-github-dark .hljs-string,
+.code-theme-github-dark .hljs-quote { color: #a5d6ff; }
+.code-theme-github-dark .hljs-number,
+.code-theme-github-dark .hljs-literal,
+.code-theme-github-dark .hljs-variable { color: #79c0ff; }
+.code-theme-github-dark .hljs-function,
+.code-theme-github-dark .hljs-title { color: #d2a8ff; }
+.code-theme-github-dark .hljs-comment { color: #8b949e; font-style: italic; }
+.code-theme-github-dark .hljs-built_in,
+.code-theme-github-dark .hljs-attr { color: #ffa657; }
+.code-theme-github-dark .hljs-type,
+.code-theme-github-dark .hljs-title.class_ { color: #ffa657; }
+
+/* Theme 6: Dracula */
+.code-theme-dracula {
+  background-color: #282a36 !important;
+  border-color: #44475a !important;
+}
+.code-theme-dracula .code-header {
+  background-color: #21222c !important;
+  border-bottom-color: #383a4c !important;
+}
+.code-theme-dracula code { color: #f8f8f2; }
+.code-theme-dracula .hljs-keyword,
+.code-theme-dracula .hljs-operator,
+.code-theme-dracula .hljs-name { color: #ff79c6; }
+.code-theme-dracula .hljs-string,
+.code-theme-dracula .hljs-quote { color: #f1fa8c; }
+.code-theme-dracula .hljs-number,
+.code-theme-dracula .hljs-literal,
+.code-theme-dracula .hljs-variable { color: #bd93f9; }
+.code-theme-dracula .hljs-function,
+.code-theme-dracula .hljs-title { color: #50fa7b; }
+.code-theme-dracula .hljs-comment { color: #6272a4; font-style: italic; }
+.code-theme-dracula .hljs-built_in,
+.code-theme-dracula .hljs-attr { color: #8be9fd; }
+.code-theme-dracula .hljs-type,
+.code-theme-dracula .hljs-title.class_ { color: #8be9fd; font-style: italic; }
+
+/* Theme 7: Night Owl */
+.code-theme-night-owl {
+  background-color: #011627 !important;
+  border-color: #0d3251 !important;
+}
+.code-theme-night-owl .code-header {
+  background-color: #010e1a !important;
+  border-bottom-color: #0b253a !important;
+}
+.code-theme-night-owl code { color: #d6deeb; }
+.code-theme-night-owl .hljs-keyword,
+.code-theme-night-owl .hljs-operator,
+.code-theme-night-owl .hljs-name { color: #c792ea; }
+.code-theme-night-owl .hljs-string,
+.code-theme-night-owl .hljs-quote { color: #ecc48d; }
+.code-theme-night-owl .hljs-number,
+.code-theme-night-owl .hljs-literal,
+.code-theme-night-owl .hljs-variable { color: #f78c6c; }
+.code-theme-night-owl .hljs-function,
+.code-theme-night-owl .hljs-title { color: #82aaff; }
+.code-theme-night-owl .hljs-comment { color: #637777; font-style: italic; }
+.code-theme-night-owl .hljs-built_in,
+.code-theme-night-owl .hljs-attr { color: #7fdbca; }
+.code-theme-night-owl .hljs-type,
+.code-theme-night-owl .hljs-title.class_ { color: #ffcb8b; }
+
+/* Theme 8: Cyberpunk */
+.code-theme-cyberpunk {
+  background-color: #12091f !important;
+  border-color: #3b1763 !important;
+}
+.code-theme-cyberpunk .code-header {
+  background-color: #0a0414 !important;
+  border-bottom-color: #270f44 !important;
+}
+.code-theme-cyberpunk code { color: #e0f7fa; }
+.code-theme-cyberpunk .hljs-keyword,
+.code-theme-cyberpunk .hljs-operator,
+.code-theme-cyberpunk .hljs-name { color: #ff007f; font-weight: 600; }
+.code-theme-cyberpunk .hljs-string,
+.code-theme-cyberpunk .hljs-quote { color: #00f5d4; }
+.code-theme-cyberpunk .hljs-number,
+.code-theme-cyberpunk .hljs-literal,
+.code-theme-cyberpunk .hljs-variable { color: #fee440; }
+.code-theme-cyberpunk .hljs-function,
+.code-theme-cyberpunk .hljs-title { color: #00bbf9; }
+.code-theme-cyberpunk .hljs-comment { color: #7b61ff; font-style: italic; }
+.code-theme-cyberpunk .hljs-built_in,
+.code-theme-cyberpunk .hljs-attr { color: #f15bb5; }
+.code-theme-cyberpunk .hljs-type,
+.code-theme-cyberpunk .hljs-title.class_ { color: #9d4edd; }

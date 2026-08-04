@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, Code, Maximize2, Minimize2, Copy, Check, RefreshCw } from 'lucide-react';
+import CodeBlock from './CodeBlock';
 
 function prepareSandboxHtml(code) {
   if (!code || typeof code !== 'string') return '';
@@ -116,9 +117,9 @@ export default function HtmlSandboxCard({ codeContent, title = 'Interactive HTML
             sandbox="allow-scripts allow-modals allow-same-origin"
           />
         ) : (
-          <pre className="p-4 m-0 overflow-x-auto text-xs font-mono text-slate-200 bg-[#121212] max-h-96">
-            <code>{codeContent}</code>
-          </pre>
+          <div className="p-3 bg-[#121212] max-h-96 overflow-y-auto">
+            <CodeBlock className="language-html" rawCode={codeContent} />
+          </div>
         )}
       </div>
 

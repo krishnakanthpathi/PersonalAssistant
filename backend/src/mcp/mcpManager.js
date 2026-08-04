@@ -107,6 +107,15 @@ export class MCPManager {
 				fs.mkdirSync(okfDir, { recursive: true });
 			}
 
+			const SERVER_TAG_SYNONYMS = {
+				memorize: ['remember', 'recall', 'save', 'note', 'notes', 'forget', 'retrieve', 'know', 'preference', 'preferences', 'knowledge', 'find', 'lookup', 'keep', 'mind', 'store', 'memory', 'memories'],
+				'google-calendar': ['event', 'events', 'schedule', 'meeting', 'meetings', 'calendar', 'appointment', 'appointments', 'remind', 'reminder'],
+				duckduckgo: ['search', 'web', 'google', 'find', 'lookup', 'browse', 'internet', 'query', 'info', 'news'],
+				gmail: ['email', 'emails', 'mail', 'send', 'inbox', 'message', 'messages', 'draft'],
+				notion: ['page', 'pages', 'database', 'notes', 'workspace', 'document', 'documents'],
+				github: ['repo', 'repository', 'issue', 'issues', 'pull', 'pr', 'commit', 'code']
+			};
+
 			// Write or update catalog documents for currently active servers
 			for (const [serverName, client] of this.servers.entries()) {
 				try {
@@ -114,18 +123,23 @@ export class MCPManager {
 					if (tools && tools.length > 0) {
 						const okfFilePath = path.join(okfDir, `mcp_${serverName}.md`);
 						const toolNames = tools.map(t => t.name);
+						const extraSynonyms = SERVER_TAG_SYNONYMS[serverName] || [];
 						const tags = Array.from(new Set([
 							serverName,
 							...serverName.split(/[-_]/),
-							...toolNames.flatMap(n => n.split(/[-_]/))
+							...toolNames.flatMap(n => n.split(/[-_]/)),
+							...extraSynonyms
 						])).filter(t => t.length > 2);
 
 						const toolsSummaryMarkdown = tools.map(t => `- **\`${t.name}\`**: ${t.description || 'No description provided.'}`).join('\n');
+						const descText = serverName === 'memorize'
+							? 'Integrated MCP server providing tools for memory storage, remembering notes and preferences, recalling info, saving, and searching memories.'
+							: `Integrated MCP server providing tools for ${serverName}.`;
 
 						const okfContent = `---
 type: tool_group
 title: MCP Server - ${serverName}
-description: Integrated MCP server providing tools for ${serverName}.
+description: ${descText}
 tags: [${tags.join(', ')}]
 tools: [${toolNames.join(', ')}]
 timestamp: ${new Date().toISOString()}

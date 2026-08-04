@@ -2,9 +2,9 @@
 type: tool_group
 title: MCP Server - duckduckgo
 description: Integrated MCP server providing tools for duckduckgo.
-tags: [duckduckgo, search, fetch, content]
+tags: [duckduckgo, search, fetch, content, web, google, find, lookup, browse, internet, query, info, news]
 tools: [search, fetch_content]
-timestamp: 2026-08-01T15:54:54.934Z
+timestamp: 2026-08-04T16:58:19.362Z
 ---
 
 # MCP Server - duckduckgo

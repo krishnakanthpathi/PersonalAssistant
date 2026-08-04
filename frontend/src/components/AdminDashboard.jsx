@@ -17,9 +17,11 @@ import {
   Zap,
   AlertCircle
 } from 'lucide-react';
+import McpServerManagementPanel from './McpServerManagementPanel';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('prompts'); // 'prompts', 'mcp', 'rag', 'metrics'
+  const [activeTab, setActiveTab] = useState('prompts'); // 'prompts', 'mcp', 'okf', 'metrics'
+  const [mcpSubTab, setMcpSubTab] = useState('servers'); // 'servers' | 'sandbox'
 
   // System Prompts State
   const [promptInput, setPromptInput] = useState('');
@@ -263,96 +265,133 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Tab 2: MCP Tools Sandbox */}
+      {/* Tab 2: MCP Servers & Tools */}
       {activeTab === 'mcp' && (
         <div className="space-y-6">
-          {/* Direct Tool Execution Tester */}
-          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
-            <div className="flex items-center space-x-2">
-              <Wrench className="w-4 h-4 text-white" />
-              <h3 className="text-sm font-semibold text-white">Direct MCP Tool Execution Sandbox</h3>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Select Registered Tool</label>
-                <select
-                  value={testToolName}
-                  onChange={(e) => setTestToolName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
-                >
-                  <option value="">Select tool...</option>
-                  {mcpTools.map((t, idx) => {
-                    const name = t.name || t.function?.name;
-                    return <option key={idx} value={name}>{name}</option>;
-                  })}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">JSON Arguments</label>
-                <input
-                  type="text"
-                  value={testToolArgs}
-                  onChange={(e) => setTestToolArgs(e.target.value)}
-                  placeholder='{"query": "test"}'
-                  className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
-                />
-              </div>
-            </div>
-
+          {/* Sub-tab Switcher */}
+          <div className="flex items-center space-x-2 border-b border-[#262626] pb-2">
             <button
-              onClick={handleRunToolTest}
-              disabled={testingTool || !testToolName}
-              className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 shadow flex items-center space-x-1.5 cursor-pointer"
+              onClick={() => setMcpSubTab('servers')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+                mcpSubTab === 'servers'
+                  ? 'bg-white text-black shadow'
+                  : 'bg-[#1c1c1c] text-slate-400 hover:text-white hover:bg-[#262626] border border-[#2a2a2a]'
+              }`}
             >
-              <Play className="w-3.5 h-3.5 fill-black" />
-              <span>Execute Tool</span>
+              <Cpu className="w-3.5 h-3.5" />
+              <span>MCP Server Configuration (CRUD)</span>
             </button>
 
-            {testToolResult && (
-              <pre className="p-3 rounded-xl bg-[#0c0c0c] border border-[#262626] overflow-x-auto text-xs font-mono text-slate-300 max-h-60">
-                {JSON.stringify(testToolResult, null, 2)}
-              </pre>
-            )}
+            <button
+              onClick={() => setMcpSubTab('sandbox')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+                mcpSubTab === 'sandbox'
+                  ? 'bg-white text-black shadow'
+                  : 'bg-[#1c1c1c] text-slate-400 hover:text-white hover:bg-[#262626] border border-[#2a2a2a]'
+              }`}
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span>Direct Tool Execution Sandbox & Catalog</span>
+            </button>
           </div>
 
-          {/* Registered Tools Catalog List */}
-          <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">Registered Tools Catalog ({filteredTools.length})</h3>
-              <div className="relative w-64">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder="Filter tool by name..."
-                  value={mcpSearch}
-                  onChange={(e) => setMcpSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-200"
-                />
+          {/* Sub-tab 1: MCP Server Manager */}
+          {mcpSubTab === 'servers' && (
+            <McpServerManagementPanel />
+          )}
+
+          {/* Sub-tab 2: Direct Tool Execution Tester & Catalog */}
+          {mcpSubTab === 'sandbox' && (
+            <div className="space-y-6">
+              {/* Direct Tool Execution Tester */}
+              <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Wrench className="w-4 h-4 text-white" />
+                  <h3 className="text-sm font-semibold text-white">Direct MCP Tool Execution Sandbox</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-300 block mb-1">Select Registered Tool</label>
+                    <select
+                      value={testToolName}
+                      onChange={(e) => setTestToolName(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
+                    >
+                      <option value="">Select tool...</option>
+                      {mcpTools.map((t, idx) => {
+                        const name = t.name || t.function?.name;
+                        return <option key={idx} value={name}>{name}</option>;
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-slate-300 block mb-1">JSON Arguments</label>
+                    <input
+                      type="text"
+                      value={testToolArgs}
+                      onChange={(e) => setTestToolArgs(e.target.value)}
+                      placeholder='{"query": "test"}'
+                      className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleRunToolTest}
+                  disabled={testingTool || !testToolName}
+                  className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-slate-200 shadow flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5 fill-black" />
+                  <span>Execute Tool</span>
+                </button>
+
+                {testToolResult && (
+                  <pre className="p-3 rounded-xl bg-[#0c0c0c] border border-[#262626] overflow-x-auto text-xs font-mono text-slate-300 max-h-60">
+                    {JSON.stringify(testToolResult, null, 2)}
+                  </pre>
+                )}
+              </div>
+
+              {/* Registered Tools Catalog List */}
+              <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-white">Registered Tools Catalog ({filteredTools.length})</h3>
+                  <div className="relative w-64">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      placeholder="Filter tool by name..."
+                      value={mcpSearch}
+                      onChange={(e) => setMcpSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs text-slate-200"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                  {filteredTools.map((tool, idx) => {
+                    const name = tool.name || tool.function?.name;
+                    const desc = tool.description || tool.function?.description;
+                    return (
+                      <div key={idx} className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold font-mono text-white">{name}</span>
+                          {tool.serverName && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#262626] text-slate-300 border border-white/5">
+                              {tool.serverName}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 line-clamp-2">{desc || 'No description available.'}</p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-              {filteredTools.map((tool, idx) => {
-                const name = tool.name || tool.function?.name;
-                const desc = tool.description || tool.function?.description;
-                return (
-                  <div key={idx} className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2a2a2a] space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold font-mono text-white">{name}</span>
-                      {tool.serverName && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#262626] text-slate-300 border border-white/5">
-                          {tool.serverName}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-400 line-clamp-2">{desc || 'No description available.'}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </div>
       )}
 

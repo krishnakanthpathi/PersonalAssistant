@@ -31,6 +31,7 @@ import ToolCard from './cards/ToolCard';
 import ChartCard from './cards/ChartCard';
 import MermaidCard from './cards/MermaidCard';
 import HtmlSandboxCard from './cards/HtmlSandboxCard';
+import CodeBlock from './cards/CodeBlock';
 import PrebuiltFormsModal from './cards/PrebuiltFormsModal';
 
 function slugify(text) {
@@ -83,6 +84,7 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
   const chartId = msg.chartId || chartInfo?.chartId || `chart-${idx}`;
 
   const markdownComponents = useMemo(() => ({
+    pre: ({ children }) => <>{children}</>,
     p: ({ children }) => <p className="mb-2 leading-relaxed text-slate-200">{children}</p>,
     h1: ({ children }) => <h1 className="text-xl font-bold text-slate-100 mt-4 mb-2">{children}</h1>,
     h2: ({ children }) => <h2 className="text-lg font-bold text-slate-100 mt-3 mb-2">{children}</h2>,
@@ -146,11 +148,9 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
       }
 
       return (
-        <pre className="p-3 my-2 rounded-xl bg-[#121212] border border-[#2a2a2a] overflow-x-auto text-xs font-mono text-slate-200">
-          <code className={className} {...props}>
-            {children}
-          </code>
-        </pre>
+        <CodeBlock className={className} rawCode={contentStr}>
+          {children}
+        </CodeBlock>
       );
     },
     table: ({ children }) => (

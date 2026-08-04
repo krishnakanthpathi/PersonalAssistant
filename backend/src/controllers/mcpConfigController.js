@@ -53,7 +53,7 @@ export const getMcpConfig = catchErrors(async (req, res) => {
 		});
 	}
 
-	res.json({ servers });
+	res.json({ success: true, servers, config });
 }, 'Failed to get MCP config');
 
 /**

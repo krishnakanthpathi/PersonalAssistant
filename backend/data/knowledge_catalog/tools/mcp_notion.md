@@ -2,9 +2,9 @@
 type: tool_group
 title: MCP Server - notion
 description: Integrated MCP server providing tools for notion.
-tags: [notion, API, get, user, users, self, post, search, block, children, patch, retrieve, update, delete, page, property, comment, create, query, data, source, list, templates, database, move, markdown]
+tags: [notion, API, get, user, users, self, post, search, block, children, patch, retrieve, update, delete, page, property, comment, create, query, data, source, list, templates, database, move, markdown, pages, notes, workspace, document, documents]
 tools: [API-get-user, API-get-users, API-get-self, API-post-search, API-get-block-children, API-patch-block-children, API-retrieve-a-block, API-update-a-block, API-delete-a-block, API-retrieve-a-page, API-patch-page, API-post-page, API-retrieve-a-page-property, API-retrieve-a-comment, API-create-a-comment, API-query-data-source, API-retrieve-a-data-source, API-update-a-data-source, API-create-a-data-source, API-list-data-source-templates, API-retrieve-a-database, API-move-page, API-retrieve-page-markdown, API-update-page-markdown]
-timestamp: 2026-08-01T15:54:54.856Z
+timestamp: 2026-08-04T16:58:19.321Z
 ---
 
 # MCP Server - notion
