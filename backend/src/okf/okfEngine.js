@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from '../utils/logger.js';
+import { getEmbedding, cosineSimilarity } from '../utils/embeddingService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_DIR = path.resolve(__dirname, '../../data/tools_catalog');
@@ -107,15 +108,22 @@ Provides system capabilities to register, connect, manage, and query dynamic MCP
 
 				// Only load tool_group documents
 				if (parsed.frontmatter.type === 'tool_group') {
+					const tags = Array.isArray(parsed.frontmatter.tags) ? parsed.frontmatter.tags : [];
+					const title = parsed.frontmatter.title || file;
+					const content = parsed.content.trim();
+					const embeddingText = `${title} ${tags.join(' ')} ${content}`;
+					const embedding = await getEmbedding(embeddingText);
+
 					this.documents.push({
 						filename: file,
 						filepath,
 						type: parsed.frontmatter.type,
-						title: parsed.frontmatter.title || file,
-						tags: Array.isArray(parsed.frontmatter.tags) ? parsed.frontmatter.tags : [],
+						title,
+						tags,
 						timestamp: parsed.frontmatter.timestamp || '',
 						frontmatter: parsed.frontmatter,
-						content: parsed.content.trim()
+						content,
+						embedding
 					});
 				}
 			}
@@ -131,21 +139,16 @@ Provides system capabilities to register, connect, manage, and query dynamic MCP
 		return this.documents;
 	}
 
-	match(query) {
+	match(query, queryEmbedding = null) {
 		if (!this.initialized || this.documents.length === 0) {
 			return [];
 		}
 
-		if (!query) {
+		if (!query && !queryEmbedding) {
 			return this.documents;
 		}
 
-		const terms = query.toLowerCase().split(/\W+/).filter(t => t.length > 2);
-		if (terms.length === 0) {
-			// Return all documents if the query lacks specific keywords
-			return this.documents;
-		}
-
+		const terms = query ? query.toLowerCase().split(/\W+/).filter(t => t.length > 2) : [];
 		const searchTerms = [...terms];
 		terms.forEach(term => {
 			if (term.endsWith('s') && term.length > 3) {
@@ -154,27 +157,35 @@ Provides system capabilities to register, connect, manage, and query dynamic MCP
 		});
 
 		const scoredDocs = this.documents.map(doc => {
-			let score = 0;
+			let lexicalScore = 0;
 			const searchArea = `${doc.title} ${doc.type} ${doc.tags.join(' ')} ${doc.content}`.toLowerCase();
 
 			searchTerms.forEach(term => {
 				if (searchArea.includes(term)) {
-					score += 1;
-					// Extra weight for metadata hits
-					if (doc.title.toLowerCase().includes(term)) score += 3;
-					if (doc.type.toLowerCase().includes(term)) score += 3;
-					if (doc.tags.some(t => t.toLowerCase().includes(term))) score += 2;
+					lexicalScore += 1;
+					if (doc.title.toLowerCase().includes(term)) lexicalScore += 3;
+					if (doc.type.toLowerCase().includes(term)) lexicalScore += 3;
+					if (doc.tags.some(t => t.toLowerCase().includes(term))) lexicalScore += 2;
 				}
 			});
-			return { doc, score };
+
+			let vectorSimilarity = 0;
+			if (queryEmbedding && doc.embedding) {
+				vectorSimilarity = cosineSimilarity(queryEmbedding, doc.embedding);
+			}
+
+			// Combined hybrid score (vector similarity normalized into score weight)
+			const hybridScore = lexicalScore + (vectorSimilarity * 5.0);
+
+			return { doc, score: hybridScore, vectorSimilarity, lexicalScore };
 		});
 
 		const matches = [];
 		const maxScore = Math.max(...scoredDocs.map(item => item.score), 0);
-		if (maxScore > 0) {
-			const threshold = Math.max(1, maxScore - 2);
+		if (maxScore > 0.5) {
+			const threshold = Math.max(0.5, maxScore - 3);
 			scoredDocs.forEach(item => {
-				if (item.score >= threshold) {
+				if (item.score >= threshold || item.vectorSimilarity >= 0.35) {
 					matches.push(item.doc);
 				}
 			});

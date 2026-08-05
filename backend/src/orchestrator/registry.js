@@ -11,6 +11,7 @@ import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { OKFEngine } from '../okf/okfEngine.js';
+import { getEmbedding, cosineSimilarity } from '../utils/embeddingService.js';
 
 class ToolRegistry {
 	constructor() {
@@ -52,7 +53,7 @@ class ToolRegistry {
 		return [...localTools, ...mappedMcpTools];
 	}
 
-	// Dynamic filtering of tools based on matched OKF catalog documents
+	// Dynamic filtering of tools based on matched OKF catalog documents & vector similarity
 	async getRelevantTools(query) {
 		const allTools = await this.getOllamaTools();
 
@@ -65,8 +66,11 @@ class ToolRegistry {
 			await OKFEngine.initialize();
 		}
 
-		// Match prompt query against OKF documents
-		const matchedDocs = OKFEngine.match(query);
+		// Generate query embedding for similarity search
+		const queryEmbedding = await getEmbedding(query);
+
+		// Match prompt query against OKF documents using hybrid matching (query string + embedding)
+		const matchedDocs = OKFEngine.match(query, queryEmbedding);
 
 		const activeToolNames = new Set();
 		matchedDocs.forEach(doc => {
@@ -80,7 +84,7 @@ class ToolRegistry {
 			activeToolNames.add(localToolName);
 		}
 
-		// Directly match search terms in tool names & descriptions (enables dynamic skill search)
+		// Directly match search terms in tool names & descriptions
 		const STOP_WORDS = new Set([
 			'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'arent', 'as', 'at',
 			'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by',
@@ -103,27 +107,47 @@ class ToolRegistry {
 
 		const queryTerms = query.toLowerCase().split(/\W+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
 
-		const filteredTools = allTools.filter(t => {
-			const name = (t.function?.name || t.name || '').toLowerCase();
-			const desc = (t.function?.description || t.description || '').toLowerCase();
+		// Vector similarity check across all tools using embedding
+		const toolScores = await Promise.all(allTools.map(async (t) => {
+			const toolName = (t.function?.name || t.name || '');
+			const desc = (t.function?.description || t.description || '');
 
-			// 1. Keep if listed in catalog frontmatter
-			if (activeToolNames.has(t.function?.name || t.name)) {
-				return true;
+			// Check exact catalog match
+			if (activeToolNames.has(toolName)) {
+				return { tool: t, score: 10.0 };
 			}
 
-			// 2. Keep if query terms match tool name or description
+			let lexicalScore = 0;
+			const nameLower = toolName.toLowerCase();
+			const descLower = desc.toLowerCase();
+
 			for (const term of queryTerms) {
-				if (name.includes(term) || desc.includes(term)) {
-					return true;
+				if (nameLower.includes(term) || descLower.includes(term)) {
+					lexicalScore += 2;
 				}
 			}
 
-			return false;
-		});
+			let vectorSimilarity = 0;
+			if (queryEmbedding) {
+				const toolEmbeddingText = `${toolName} ${desc}`;
+				const toolEmbedding = await getEmbedding(toolEmbeddingText);
+				if (toolEmbedding) {
+					vectorSimilarity = cosineSimilarity(queryEmbedding, toolEmbedding);
+				}
+			}
+
+			const totalScore = lexicalScore + (vectorSimilarity * 5.0);
+			return { tool: t, score: totalScore, vectorSimilarity, lexicalScore };
+		}));
+
+		const threshold = env.TOOL_SIMILARITY_THRESHOLD || 0.25;
+		const filtered = toolScores
+			.filter(item => item.score > 1.0 || item.vectorSimilarity >= threshold)
+			.sort((a, b) => b.score - a.score)
+			.map(item => item.tool);
 
 		// Fallback: If filtering prunes everything, return all tools
-		return filteredTools.length > 0 ? filteredTools : allTools;
+		return filtered.length > 0 ? filtered : allTools;
 	}
 
 	async executeTool(name, args, context) {

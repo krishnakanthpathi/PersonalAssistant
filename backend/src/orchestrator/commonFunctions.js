@@ -103,7 +103,7 @@ export async function prepareMessages(prompt, history, images = []) {
 		{ role: 'user', content: prompt, images: images || [] }
 	];
 
-	const userMessages = cleanedHistory.filter(m => m.role === 'user').slice(-2);
+	const userMessages = cleanedHistory.filter(m => m.role === 'user');
 	const combinedRAGQuery = [...userMessages.map(m => m.content), prompt].join(' ');
 
 	return {

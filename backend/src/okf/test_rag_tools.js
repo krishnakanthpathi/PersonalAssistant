@@ -114,7 +114,8 @@ async function testRAGSelection() {
 	try {
 		const result = await registry.callTool('list_applications', {});
 		console.log('Result (first 500 chars):');
-		console.log(result.substring(0, 500) + '...');
+		const resStr = typeof result === 'string' ? result : JSON.stringify(result);
+		console.log(resStr.substring(0, 500) + '...');
 		console.log('✅ EXECUTION PASSED: Tool ran successfully.');
 	} catch (error) {
 		console.log('❌ EXECUTION FAILED:', error.message);
