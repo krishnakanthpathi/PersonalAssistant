@@ -102,9 +102,15 @@ export class MCPManager {
 	async syncOkfCatalog() {
 		try {
 			const { OKFEngine } = await import('../okf/okfEngine.js');
-			const okfDir = path.resolve(__dirname, '../../data/knowledge_catalog/tools');
-			if (!fs.existsSync(okfDir)) {
-				fs.mkdirSync(okfDir, { recursive: true });
+			const catalogDirs = [
+				path.resolve(__dirname, '../../data/tools_catalog/tools'),
+				path.resolve(__dirname, '../../data/knowledge_catalog/tools')
+			];
+
+			for (const okfDir of catalogDirs) {
+				if (!fs.existsSync(okfDir)) {
+					fs.mkdirSync(okfDir, { recursive: true });
+				}
 			}
 
 			const SERVER_TAG_SYNONYMS = {
@@ -121,7 +127,6 @@ export class MCPManager {
 				try {
 					const tools = await client.listTools();
 					if (tools && tools.length > 0) {
-						const okfFilePath = path.join(okfDir, `mcp_${serverName}.md`);
 						const toolNames = tools.map(t => t.name);
 						const extraSynonyms = SERVER_TAG_SYNONYMS[serverName] || [];
 						const tags = Array.from(new Set([
@@ -153,29 +158,36 @@ Integrated MCP server providing tools and capabilities for ${serverName}.
 
 ${toolsSummaryMarkdown}
 `;
-						fs.writeFileSync(okfFilePath, okfContent, 'utf8');
-						logger.info(`Synced OKF catalog document for MCP server "${serverName}" at ${okfFilePath}`);
+						for (const okfDir of catalogDirs) {
+							const okfFilePath = path.join(okfDir, `mcp_${serverName}.md`);
+							fs.writeFileSync(okfFilePath, okfContent, 'utf8');
+							logger.info(`Synced OKF catalog document for MCP server "${serverName}" at ${okfFilePath}`);
+						}
 					}
 				} catch (err) {
 					logger.warn(`Failed to sync OKF catalog for server "${serverName}": ${err.message}`);
 				}
 			}
 
-			// Prune any stale/orphaned mcp_*.md catalog files for disconnected or deleted servers
+			// Prune any stale/orphaned mcp_*.md catalog files for disconnected or deleted servers in both dirs
 			const activeMcpFileNames = new Set(
 				Array.from(this.servers.keys()).map(name => `mcp_${name}.md`)
 			);
 			activeMcpFileNames.add('mcp_management.md');
 
-			const existingCatalogFiles = fs.readdirSync(okfDir);
-			for (const file of existingCatalogFiles) {
-				if (file.startsWith('mcp_') && file.endsWith('.md') && !activeMcpFileNames.has(file)) {
-					const stalePath = path.join(okfDir, file);
-					try {
-						fs.unlinkSync(stalePath);
-						logger.info(`Pruned stale OKF RAG catalog document: ${file}`);
-					} catch (e) {
-						logger.warn(`Failed to prune stale OKF file ${file}: ${e.message}`);
+			for (const okfDir of catalogDirs) {
+				if (fs.existsSync(okfDir)) {
+					const existingCatalogFiles = fs.readdirSync(okfDir);
+					for (const file of existingCatalogFiles) {
+						if (file.startsWith('mcp_') && file.endsWith('.md') && !activeMcpFileNames.has(file)) {
+							const stalePath = path.join(okfDir, file);
+							try {
+								fs.unlinkSync(stalePath);
+								logger.info(`Pruned stale OKF RAG catalog document: ${stalePath}`);
+							} catch (e) {
+								logger.warn(`Failed to prune stale OKF file ${file}: ${e.message}`);
+							}
+						}
 					}
 				}
 			}
@@ -279,7 +291,7 @@ ${toolsSummaryMarkdown}
 	/**
 	 * Full sync of MCP servers and OKF catalog against current mcp-config.json file
 	 */
-	syncConfigState = catchErrors(async () => {
+	syncConfigState = catchErrors(async (forceReconnect = true) => {
 		if (!fs.existsSync(configPath)) {
 			logger.warn('mcp-config.json not found during config sync.');
 			return;
@@ -293,24 +305,18 @@ ${toolsSummaryMarkdown}
 			const serverConfig = configuredServers[serverName];
 			if (!serverConfig || serverConfig.enabled === false) {
 				logger.info(`Disconnecting server "${serverName}" as it is disabled or removed from config.`);
-				const client = this.servers.get(serverName);
-				if (client && client.client) {
-					try { await client.client.close(); } catch (e) {}
-				}
-				this.servers.delete(serverName);
+				await this.disconnectServer(serverName);
 			}
 		}
 
-		// Connect configured enabled servers not currently in memory
+		// Connect or reconnect configured enabled servers
 		for (const [serverName, serverConfig] of Object.entries(configuredServers)) {
 			if (serverConfig.enabled !== false) {
-				if (!this.servers.has(serverName)) {
-					try {
-						logger.info(`Syncing config: Connecting MCP server "${serverName}"...`);
-						await this.connectServer(serverName, serverConfig);
-					} catch (err) {
-						logger.warn(`Failed to connect MCP server "${serverName}" during sync: ${err.message}`);
-					}
+				try {
+					logger.info(`Syncing config: Reconnecting MCP server "${serverName}"...`);
+					await this.reconnectServer(serverName);
+				} catch (err) {
+					logger.warn(`Failed to connect/reconnect MCP server "${serverName}" during sync: ${err.message}`);
 				}
 			}
 		}

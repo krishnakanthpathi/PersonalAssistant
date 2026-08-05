@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { logger } from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CATALOG_DIR = path.resolve(__dirname, '../../data/knowledge_catalog');
+const CATALOG_DIR = path.resolve(__dirname, '../../data/tools_catalog');
 
 export function parseMarkdownOKF(fileContent) {
 	const match = fileContent.match(/^---\r?\n([\s\S]+?)\r?\n---\r?\n([\s\S]*)$/);
@@ -69,7 +69,7 @@ type: tool_group
 title: MCP Server Management & Dynamic Tool Integration
 description: Utilities to connect, configure, manage, and execute dynamic Model Context Protocol (MCP) servers.
 tags: [mcp, server, integration, tools, dynamic, connect]
-tools: [integrate_mcp_server, get_knowledge_document, update_knowledge_document, create_prebuilt_form, rds_query]
+tools: [integrate_mcp_server, create_prebuilt_form, rds_query]
 timestamp: ${new Date().toISOString()}
 ---
 
@@ -79,60 +79,25 @@ Provides system capabilities to register, connect, manage, and query dynamic MCP
 
 ### Available Tools
 - **\`integrate_mcp_server\`**: Add, edit, test, enable, disable, or delete MCP servers dynamically.
-- **\`get_knowledge_document\`**: Fetch knowledge documents from the OKF catalog.
-- **\`update_knowledge_document\`**: Update or append content to an OKF catalog document.
 - **\`create_prebuilt_form\`**: Create structured UI form inputs for users.
 - **\`rds_query\`**: Query relational database systems.
 `;
 			fs.writeFileSync(mcpMgmtPath, content, 'utf8');
 		}
-
-		const mcpIntegPath = path.join(CATALOG_DIR, 'mcp_integrations.md');
-		if (!fs.existsSync(mcpIntegPath)) {
-			const content = `---
-type: integration
-title: MCP & Workspace Integrations
-description: Active Model Context Protocol integrations, Notion configs, YouTube requirements, and Gmail details.
-tags: [integration, configs, mcp]
-timestamp: ${new Date().toISOString()}
----
-
-# MCP & Workspace Integrations
-
-Default integration configs for MCP servers and workspace integrations.
-`;
-			fs.writeFileSync(mcpIntegPath, content, 'utf8');
-		}
-
-		const sysEnvPath = path.join(CATALOG_DIR, 'system_environment.md');
-		if (!fs.existsSync(sysEnvPath)) {
-			const content = `---
-type: system_environment
-title: System Environment
-description: Home lab setup, devices, network configuration, and local server setups.
-tags: [systems, hardware, network]
-timestamp: ${new Date().toISOString()}
----
-
-# System Environment
-
-System environment configuration and host details.
-`;
-			fs.writeFileSync(sysEnvPath, content, 'utf8');
-		}
 	}
 
 	async initialize() {
 		try {
-			if (!fs.existsSync(CATALOG_DIR)) {
-				logger.info(`Creating OKF catalog directory at: ${CATALOG_DIR}`);
-				fs.mkdirSync(CATALOG_DIR, { recursive: true });
+			const toolsDir = path.join(CATALOG_DIR, 'tools');
+			if (!fs.existsSync(toolsDir)) {
+				logger.info(`Creating OKF tools catalog directory at: ${toolsDir}`);
+				fs.mkdirSync(toolsDir, { recursive: true });
 			}
 
 			await this.ensureDefaultCatalogs();
 
-			logger.info(`Initializing OKF Knowledge Engine from ${CATALOG_DIR}...`);
-			const mdFilepaths = await getMarkdownFilesRecursively(CATALOG_DIR);
+			logger.info(`Initializing OKF Tool Catalog Engine from ${toolsDir}...`);
+			const mdFilepaths = await getMarkdownFilesRecursively(toolsDir);
 
 			this.documents = [];
 			for (const filepath of mdFilepaths) {
@@ -140,19 +105,22 @@ System environment configuration and host details.
 				const contentStr = await fs.promises.readFile(filepath, 'utf8');
 				const parsed = parseMarkdownOKF(contentStr);
 
-				this.documents.push({
-					filename: file,
-					filepath,
-					type: parsed.frontmatter.type || 'unknown',
-					title: parsed.frontmatter.title || file,
-					tags: Array.isArray(parsed.frontmatter.tags) ? parsed.frontmatter.tags : [],
-					timestamp: parsed.frontmatter.timestamp || '',
-					frontmatter: parsed.frontmatter,
-					content: parsed.content.trim()
-				});
+				// Only load tool_group documents
+				if (parsed.frontmatter.type === 'tool_group') {
+					this.documents.push({
+						filename: file,
+						filepath,
+						type: parsed.frontmatter.type,
+						title: parsed.frontmatter.title || file,
+						tags: Array.isArray(parsed.frontmatter.tags) ? parsed.frontmatter.tags : [],
+						timestamp: parsed.frontmatter.timestamp || '',
+						frontmatter: parsed.frontmatter,
+						content: parsed.content.trim()
+					});
+				}
 			}
 			this.initialized = true;
-			logger.info(`OKF Engine loaded ${this.documents.length} knowledge documents successfully.`);
+			logger.info(`OKF Engine loaded ${this.documents.length} tool group catalog documents successfully.`);
 		} catch (error) {
 			logger.error(`Failed to initialize OKF engine: ${error.message}`);
 			this.initialized = false;
@@ -201,37 +169,19 @@ System environment configuration and host details.
 			return { doc, score };
 		});
 
-		// Group scored documents by parent folder to avoid search shadowing.
-		// A high matching score in user profile docs should not filter out matched tool documentation docs.
-		const groups = {
-			user: scoredDocs.filter(item => item.doc.filename.startsWith('user/')),
-			tools: scoredDocs.filter(item => item.doc.filename.startsWith('tools/')),
-			others: scoredDocs.filter(item => !item.doc.filename.startsWith('user/') && !item.doc.filename.startsWith('tools/'))
-		};
-
 		const matches = [];
-		let totalMaxScore = 0;
-
-		Object.entries(groups).forEach(([groupName, groupDocs]) => {
-			if (groupDocs.length === 0) return;
-			const maxScore = Math.max(...groupDocs.map(item => item.score));
-			if (maxScore > 0) {
-				totalMaxScore = Math.max(totalMaxScore, maxScore);
-				const threshold = Math.max(1, maxScore - 2);
-				groupDocs.forEach(item => {
-					if (item.score >= threshold) {
-						matches.push(item.doc);
-					}
-				});
-			}
-		});
-
-		if (totalMaxScore === 0) {
-			// If absolutely nothing matched, return everything as fallback
-			return this.documents;
+		const maxScore = Math.max(...scoredDocs.map(item => item.score), 0);
+		if (maxScore > 0) {
+			const threshold = Math.max(1, maxScore - 2);
+			scoredDocs.forEach(item => {
+				if (item.score >= threshold) {
+					matches.push(item.doc);
+				}
+			});
+			return matches;
 		}
 
-		return matches;
+		return this.documents;
 	}
 
 	async updateDocument(filename, contentBody, newFrontmatter = {}) {

@@ -74,6 +74,9 @@ export async function loadDbConfig() {
 				grokApiKey: env.GROK_API_KEY,
 				grokBaseUrl: env.GROK_BASE_URL,
 				grokModel: env.GROK_MODEL,
+				geminiApiKey: env.GEMINI_API_KEY,
+				geminiBaseUrl: env.GEMINI_BASE_URL,
+				geminiModel: env.GEMINI_MODEL,
 				embeddingProvider: env.EMBEDDING_PROVIDER,
 				embeddingApiKey: env.EMBEDDING_API_KEY,
 				embeddingBaseUrl: env.EMBEDDING_BASE_URL,
@@ -97,12 +100,20 @@ export async function loadDbConfig() {
 				configDoc.grokApiKey = env.GROK_API_KEY;
 				needsUpdate = true;
 			}
+			if (env.GEMINI_API_KEY && env.GEMINI_API_KEY !== configDoc.geminiApiKey) {
+				configDoc.geminiApiKey = env.GEMINI_API_KEY;
+				needsUpdate = true;
+			}
 			if (env.OPENAI_BASE_URL && env.OPENAI_BASE_URL !== configDoc.openaiBaseUrl) {
 				configDoc.openaiBaseUrl = env.OPENAI_BASE_URL;
 				needsUpdate = true;
 			}
 			if (env.GROK_BASE_URL && env.GROK_BASE_URL !== configDoc.grokBaseUrl) {
 				configDoc.grokBaseUrl = env.GROK_BASE_URL;
+				needsUpdate = true;
+			}
+			if (env.GEMINI_BASE_URL && env.GEMINI_BASE_URL !== configDoc.geminiBaseUrl) {
+				configDoc.geminiBaseUrl = env.GEMINI_BASE_URL;
 				needsUpdate = true;
 			}
 			if (env.EMBEDDING_API_KEY && env.EMBEDDING_API_KEY !== configDoc.embeddingApiKey) {
@@ -128,6 +139,9 @@ export async function loadDbConfig() {
 			if (configDoc.grokApiKey) env.GROK_API_KEY = configDoc.grokApiKey;
 			if (configDoc.grokBaseUrl) env.GROK_BASE_URL = configDoc.grokBaseUrl;
 			if (configDoc.grokModel) env.GROK_MODEL = configDoc.grokModel;
+			if (configDoc.geminiApiKey) env.GEMINI_API_KEY = configDoc.geminiApiKey;
+			if (configDoc.geminiBaseUrl) env.GEMINI_BASE_URL = configDoc.geminiBaseUrl;
+			if (configDoc.geminiModel) env.GEMINI_MODEL = configDoc.geminiModel;
 			if (configDoc.embeddingProvider) env.EMBEDDING_PROVIDER = configDoc.embeddingProvider;
 			if (configDoc.embeddingApiKey) env.EMBEDDING_API_KEY = configDoc.embeddingApiKey;
 			if (configDoc.embeddingBaseUrl) env.EMBEDDING_BASE_URL = configDoc.embeddingBaseUrl;

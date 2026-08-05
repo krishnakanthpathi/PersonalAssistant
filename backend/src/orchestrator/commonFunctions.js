@@ -51,41 +51,9 @@ export async function loadOKFContext(query) {
 			return { contextBlock: '', okfDocs: [] };
 		}
 
-		// Get all currently active tool names to prune inactive ones from context docs
-		const activeTools = await registry.getOllamaTools();
-		const activeNames = new Set(activeTools.map(t => t.function?.name || t.name));
-
-		let contextBlock = '\n\n## User Long-Term Memory (Open Knowledge Format)\n';
-		contextBlock += 'The following structured knowledge files about the user (Krishnakanth), preferences, routines, and environment are loaded:\n\n';
-
-		matchedDocs.forEach(doc => {
-			let content = doc.content;
-
-			if (doc.type === 'tool_group') {
-				const lines = content.split('\n');
-				const filteredLines = lines.filter(line => {
-					// Regex to capture tool name from bullets, e.g. "- **`tool_name`**:" or "- `tool_name`:"
-					const match = line.match(/(?:-\s+\*\*`?|^\*\s+\*\*`?|-\s+`)([a-zA-Z0-9_\-]+)(?:`?\*\*|`):/);
-					if (match) {
-						const toolName = match[1];
-						return activeNames.has(toolName);
-					}
-					return true;
-				});
-				content = filteredLines.join('\n');
-			}
-
-			contextBlock += `### Document: ${doc.filename} (Type: ${doc.type})\n`;
-			contextBlock += `**Title**: ${doc.title}\n`;
-			contextBlock += `**Tags**: ${doc.tags.join(', ')}\n\n`;
-			contextBlock += `${content}\n\n`;
-			contextBlock += `---\n\n`;
-		});
-
-		logger.info(`Injected ${matchedDocs.length} matched OKF documents into system prompt.`);
-		return { contextBlock, okfDocs: matchedDocs.map(d => d.filename) };
+		return { contextBlock: '', okfDocs: matchedDocs.map(d => d.filename) };
 	} catch (error) {
-		logger.error(`Failed to load memory context from OKF catalog: ${error.message}`);
+		logger.error(`Failed to query OKF tool catalog: ${error.message}`);
 		return { contextBlock: '', okfDocs: [] };
 	}
 }
@@ -170,6 +138,10 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 			model = env.MULTIMEDIA_MODEL || env.GROK_MODEL || 'grok-2-1218';
 			baseUrl = env.MULTIMEDIA_BASE_URL || env.GROK_BASE_URL || 'https://api.x.ai/v1';
 			apiKey = env.MULTIMEDIA_API_KEY || env.GROK_API_KEY || '';
+		} else if (provider === 'gemini') {
+			model = (env.MULTIMEDIA_MODEL || env.GEMINI_MODEL || 'gemini-3.6-flash').replace(/^models\//, '');
+			baseUrl = env.MULTIMEDIA_BASE_URL || env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
+			apiKey = env.MULTIMEDIA_API_KEY || env.GEMINI_API_KEY || '';
 		} else if (provider === 'ollama') {
 			model = env.MULTIMEDIA_MODEL || env.OLLAMA_MODEL;
 			baseUrl = env.MULTIMEDIA_BASE_URL || env.OLLAMA_URL;
@@ -184,6 +156,10 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 			model = env.GROK_MODEL || 'grok-2-1218';
 			baseUrl = env.GROK_BASE_URL || 'https://api.x.ai/v1';
 			apiKey = env.GROK_API_KEY || '';
+		} else if (provider === 'gemini') {
+			model = (env.GEMINI_MODEL || 'gemini-3.6-flash').replace(/^models\//, '');
+			baseUrl = env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
+			apiKey = env.GEMINI_API_KEY || '';
 		} else if (provider === 'ollama') {
 			model = env.OLLAMA_MODEL;
 			baseUrl = env.OLLAMA_URL;
@@ -221,8 +197,8 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 	// Prepare and clean messages history for the API payload
 	finalMsgs = prepareMessagesPayload(finalMsgs, strategy);
 
-	// Format images for OpenAI-like APIs (OpenAI & Grok) or Ollama
-	if (provider === 'openai' || provider === 'grok') {
+	// Format images for OpenAI-like APIs (OpenAI, Grok, & Gemini) or Ollama
+	if (provider === 'openai' || provider === 'grok' || provider === 'gemini') {
 		for (const msg of finalMsgs) {
 			if (msg.images && msg.images.length > 0) {
 				const contentParts = [
@@ -424,6 +400,98 @@ export async function callLLM(msgs, includeTools = false, tools = [], requestId 
 			};
 		} catch (error) {
 			logger.error(`Grok request failed: ${error.message}`);
+			throw error;
+		}
+	} else if (provider === 'gemini') {
+		const targetKey = apiKey || env.GEMINI_API_KEY;
+		if (!targetKey) {
+			throw new Error('GEMINI_API_KEY is not defined.');
+		}
+		const geminiInstance = new OpenAI({
+			apiKey: targetKey,
+			baseURL: baseUrl || 'https://generativelanguage.googleapis.com/v1beta/openai'
+		});
+
+		const payload = {
+			model: model,
+			messages: finalMsgs,
+			stream: Boolean(onToken),
+			max_tokens: 8192
+		};
+
+		if (useNativeTools) {
+			payload.tools = processedTools;
+		}
+
+		const payloadSize = JSON.stringify(payload).length;
+		logger.info(`Gemini request: model=${model}, messages=${finalMsgs.length}, streaming=${Boolean(onToken)}, payloadSize=${payloadSize} chars`);
+
+		try {
+			const start = Date.now();
+			if (onToken) {
+				const stream = await geminiInstance.chat.completions.create(payload);
+				let fullContent = '';
+				let toolCallsMap = new Map();
+
+				for await (const chunk of stream) {
+					const delta = chunk.choices[0]?.delta;
+					if (delta?.content) {
+						fullContent += delta.content;
+						onToken(delta.content);
+					}
+					if (delta?.tool_calls) {
+						for (const tc of delta.tool_calls) {
+							const idx = tc.index ?? 0;
+							if (!toolCallsMap.has(idx)) {
+								toolCallsMap.set(idx, { id: tc.id || `call_${idx}`, type: tc.type || 'function', function: { name: tc.function?.name || '', arguments: tc.function?.arguments || '' } });
+							} else {
+								const existing = toolCallsMap.get(idx);
+								if (tc.function?.name) existing.function.name += tc.function.name;
+								if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+							}
+						}
+					}
+				}
+				duration = Date.now() - start;
+				if (requestId) metricsService.recordLLMCall(requestId, duration, 0, fullContent);
+				const tool_calls = toolCallsMap.size > 0 ? Array.from(toolCallsMap.values()) : undefined;
+				return { message: { role: 'assistant', content: fullContent, tool_calls } };
+			}
+
+			const res = await geminiInstance.chat.completions.create(payload);
+			duration = Date.now() - start;
+
+			const responseMessage = res.choices[0].message;
+			logger.info(`Gemini response: role=${responseMessage.role}, tool_calls=${responseMessage.tool_calls?.length || 0}`);
+
+			generatedContent = responseMessage.content || '';
+			if (responseMessage.tool_calls) {
+				generatedContent += '\nTool Calls: ' + JSON.stringify(responseMessage.tool_calls.map(tc => tc.function.name));
+			}
+			if (requestId) {
+				metricsService.recordLLMCall(requestId, duration, promptEvalDuration, generatedContent);
+			}
+
+			return {
+				message: {
+					role: 'assistant',
+					content: responseMessage.content || '',
+					tool_calls: responseMessage.tool_calls ? responseMessage.tool_calls.map(tc => ({
+						id: tc.id,
+						type: tc.type,
+						function: {
+							name: tc.function.name,
+							arguments: tc.function.arguments
+						}
+					})) : undefined
+				}
+			};
+		} catch (error) {
+			if (error.status === 429 || (error.message && error.message.includes('429'))) {
+				logger.error(`Gemini Rate Limit (HTTP 429): Free tier quota exceeded. ${error.message}`);
+				throw new Error('Google Gemini API rate limit / free tier quota exceeded (HTTP 429). Please wait a few seconds before trying again.');
+			}
+			logger.error(`Gemini request failed: ${error.message}`);
 			throw error;
 		}
 	} else {

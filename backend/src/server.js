@@ -1,5 +1,5 @@
 /**
- * Express application & HTTP/WS bootstrapper
+ * Express application & HTTP/WS bootstrapper - Gemini Enabled
  */
 import express from 'express';
 import cors from 'cors';

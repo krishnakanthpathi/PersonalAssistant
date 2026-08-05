@@ -3,7 +3,6 @@
  */
 
 import { rdsQueryTool } from '../tools/rdsQuery.js';
-import { getKnowledgeDocumentTool, updateKnowledgeDocumentTool } from '../tools/okfTools.js';
 import { createPrebuiltFormTool } from '../tools/prebuiltFormTools.js';
 import { integrateMcpServerTool } from '../tools/mcpIntegrationTool.js';
 import { getCurrentTimeTool } from '../tools/dateTimeTool.js';
@@ -21,8 +20,6 @@ class ToolRegistry {
 	initialize() {
 		// Register core local tools
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
-		this.tools.set(getKnowledgeDocumentTool.definition.name, getKnowledgeDocumentTool);
-		this.tools.set(updateKnowledgeDocumentTool.definition.name, updateKnowledgeDocumentTool);
 		this.tools.set(createPrebuiltFormTool.definition.name, createPrebuiltFormTool);
 		this.tools.set(integrateMcpServerTool.definition.name, integrateMcpServerTool);
 		this.tools.set(getCurrentTimeTool.definition.name, getCurrentTimeTool);

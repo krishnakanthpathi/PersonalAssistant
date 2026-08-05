@@ -37,6 +37,8 @@ export function getToolCallingCapability(provider, model, baseUrl = '') {
 		} else {
 			strategy = 'native';
 		}
+	} else if (provider === 'gemini') {
+		strategy = 'native';
 	} else if (provider === 'ollama') {
 		const lowerModel = (model || '').toLowerCase();
 		// Ollama native function calling is supported in llama3.1, llama3.2, qwen2.5.
@@ -115,7 +117,10 @@ export function standardizeToolSchema(tool) {
 	// Clean additionalProperties: some models/gateways reject it
 	delete fn.parameters.additionalProperties;
 
-	return cloned;
+	return {
+		type: cloned.type || 'function',
+		function: fn
+	};
 }
 
 /**

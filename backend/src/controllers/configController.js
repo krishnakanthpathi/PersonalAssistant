@@ -22,10 +22,17 @@ export const getConfig = async (req, res) => {
 			// MongoDB might not be connected or collection empty
 		}
 
+		const getCurrentModel = () => {
+			if (env.LLM_PROVIDER === 'openai') return env.OPENAI_MODEL;
+			if (env.LLM_PROVIDER === 'grok') return env.GROK_MODEL;
+			if (env.LLM_PROVIDER === 'gemini') return env.GEMINI_MODEL;
+			return env.OLLAMA_MODEL;
+		};
+
 		res.json({
 			success: true,
 			provider: env.LLM_PROVIDER,
-			model: env.LLM_PROVIDER === 'openai' ? env.OPENAI_MODEL : (env.LLM_PROVIDER === 'grok' ? env.GROK_MODEL : env.OLLAMA_MODEL),
+			model: getCurrentModel(),
 			openaiBaseUrl: env.OPENAI_BASE_URL || 'default',
 			port: env.PORT,
 			settings: {
@@ -38,6 +45,9 @@ export const getConfig = async (req, res) => {
 				grokApiKey: dbSettings.grokApiKey || env.GROK_API_KEY || '',
 				grokBaseUrl: dbSettings.grokBaseUrl || env.GROK_BASE_URL || '',
 				grokModel: dbSettings.grokModel || env.GROK_MODEL || '',
+				geminiApiKey: dbSettings.geminiApiKey || env.GEMINI_API_KEY || '',
+				geminiBaseUrl: dbSettings.geminiBaseUrl || env.GEMINI_BASE_URL || '',
+				geminiModel: dbSettings.geminiModel || env.GEMINI_MODEL || '',
 				embeddingProvider: dbSettings.embeddingProvider || env.EMBEDDING_PROVIDER || '',
 				embeddingApiKey: dbSettings.embeddingApiKey || env.EMBEDDING_API_KEY || '',
 				embeddingBaseUrl: dbSettings.embeddingBaseUrl || env.EMBEDDING_BASE_URL || '',
@@ -67,6 +77,9 @@ export const updateConfig = async (req, res) => {
 			grokApiKey,
 			grokBaseUrl,
 			grokModel,
+			geminiApiKey,
+			geminiBaseUrl,
+			geminiModel,
 			embeddingProvider,
 			embeddingApiKey,
 			embeddingBaseUrl,
@@ -80,8 +93,8 @@ export const updateConfig = async (req, res) => {
 		} = req.body;
 
 		// Validate provider
-		if (provider && !['openai', 'ollama', 'grok'].includes(provider)) {
-			return res.status(400).json({ success: false, error: 'Invalid provider value. Must be openai, ollama, or grok.' });
+		if (provider && !['openai', 'ollama', 'grok', 'gemini'].includes(provider)) {
+			return res.status(400).json({ success: false, error: 'Invalid provider value. Must be openai, ollama, grok, or gemini.' });
 		}
 
 		// Validate embedding provider
@@ -90,8 +103,8 @@ export const updateConfig = async (req, res) => {
 		}
 
 		// Validate multimedia provider
-		if (multimediaProvider && !['openai', 'ollama', 'grok'].includes(multimediaProvider)) {
-			return res.status(400).json({ success: false, error: 'Invalid multimedia provider value. Must be openai, ollama, or grok.' });
+		if (multimediaProvider && !['openai', 'ollama', 'grok', 'gemini'].includes(multimediaProvider)) {
+			return res.status(400).json({ success: false, error: 'Invalid multimedia provider value. Must be openai, ollama, grok, or gemini.' });
 		}
 
 		const db = getDB();
@@ -105,6 +118,9 @@ export const updateConfig = async (req, res) => {
 		if (grokApiKey !== undefined) updateData.grokApiKey = grokApiKey;
 		if (grokBaseUrl !== undefined) updateData.grokBaseUrl = grokBaseUrl;
 		if (grokModel !== undefined) updateData.grokModel = grokModel;
+		if (geminiApiKey !== undefined) updateData.geminiApiKey = geminiApiKey;
+		if (geminiBaseUrl !== undefined) updateData.geminiBaseUrl = geminiBaseUrl;
+		if (geminiModel !== undefined) updateData.geminiModel = geminiModel;
 		if (embeddingProvider !== undefined) updateData.embeddingProvider = embeddingProvider;
 		if (embeddingApiKey !== undefined) updateData.embeddingApiKey = embeddingApiKey;
 		if (embeddingBaseUrl !== undefined) updateData.embeddingBaseUrl = embeddingBaseUrl;
@@ -132,6 +148,9 @@ export const updateConfig = async (req, res) => {
 		if (grokApiKey !== undefined) env.GROK_API_KEY = grokApiKey;
 		if (grokBaseUrl !== undefined) env.GROK_BASE_URL = grokBaseUrl;
 		if (grokModel !== undefined) env.GROK_MODEL = grokModel;
+		if (geminiApiKey !== undefined) env.GEMINI_API_KEY = geminiApiKey;
+		if (geminiBaseUrl !== undefined) env.GEMINI_BASE_URL = geminiBaseUrl;
+		if (geminiModel !== undefined) env.GEMINI_MODEL = geminiModel;
 		if (embeddingProvider !== undefined) env.EMBEDDING_PROVIDER = embeddingProvider;
 		if (embeddingApiKey !== undefined) env.EMBEDDING_API_KEY = embeddingApiKey;
 		if (embeddingBaseUrl !== undefined) env.EMBEDDING_BASE_URL = embeddingBaseUrl;
@@ -143,12 +162,19 @@ export const updateConfig = async (req, res) => {
 		if (multimediaApiKey !== undefined) env.MULTIMEDIA_API_KEY = multimediaApiKey;
 		if (multimediaBaseUrl !== undefined) env.MULTIMEDIA_BASE_URL = multimediaBaseUrl;
 
+		const getCurrentModel = () => {
+			if (env.LLM_PROVIDER === 'openai') return env.OPENAI_MODEL;
+			if (env.LLM_PROVIDER === 'grok') return env.GROK_MODEL;
+			if (env.LLM_PROVIDER === 'gemini') return env.GEMINI_MODEL;
+			return env.OLLAMA_MODEL;
+		};
+
 		res.json({
 			success: true,
 			message: 'Configuration updated successfully',
 			config: {
 				provider: env.LLM_PROVIDER,
-				model: env.LLM_PROVIDER === 'openai' ? env.OPENAI_MODEL : (env.LLM_PROVIDER === 'grok' ? env.GROK_MODEL : env.OLLAMA_MODEL),
+				model: getCurrentModel(),
 				openaiBaseUrl: env.OPENAI_BASE_URL || 'default',
 				port: env.PORT
 			}
@@ -237,6 +263,47 @@ export const getAvailableModels = async (req, res) => {
 					];
 					if (dbSettings.grokModel && !models.includes(dbSettings.grokModel)) {
 						models.unshift(dbSettings.grokModel);
+					}
+				}
+			}
+		} else if (targetProvider === 'gemini') {
+			const targetKey = apiKey || dbSettings.geminiApiKey || env.GEMINI_API_KEY;
+			const targetUrl = baseUrl !== undefined ? baseUrl : (dbSettings.geminiBaseUrl || env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai');
+
+			if (!targetKey) {
+				models = [
+					'gemini-3.6-flash',
+					'gemini-2.5-flash',
+					'gemini-2.5-pro',
+					'gemini-2.0-flash',
+					'gemini-1.5-flash',
+					'gemini-1.5-pro'
+				];
+				if (dbSettings.geminiModel && !models.includes(dbSettings.geminiModel)) {
+					models.unshift(dbSettings.geminiModel);
+				}
+			} else {
+				try {
+					const cleanUrl = (targetUrl && targetUrl !== 'default' && targetUrl.trim() !== '') ? targetUrl : 'https://generativelanguage.googleapis.com/v1beta/openai';
+					const geminiInstance = new OpenAI({
+						apiKey: targetKey,
+						baseURL: cleanUrl
+					});
+
+					const response = await geminiInstance.models.list();
+					models = response.data.map(m => m.id.replace(/^models\//, ''));
+				} catch (err) {
+					fetchError = err.message;
+					models = [
+						'gemini-3.6-flash',
+						'gemini-2.5-flash',
+						'gemini-2.5-pro',
+						'gemini-2.0-flash',
+						'gemini-1.5-flash',
+						'gemini-1.5-pro'
+					];
+					if (dbSettings.geminiModel && !models.includes(dbSettings.geminiModel)) {
+						models.unshift(dbSettings.geminiModel);
 					}
 				}
 			}

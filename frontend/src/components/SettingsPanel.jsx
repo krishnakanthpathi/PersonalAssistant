@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Cpu, 
-  Database, 
-  Key, 
-  Check, 
-  RefreshCw, 
-  Save, 
+import {
+  Settings,
+  Cpu,
+  Database,
+  Key,
+  Check,
+  RefreshCw,
+  Save,
   AlertCircle,
   Eye,
   ToggleLeft,
@@ -15,8 +15,10 @@ import {
   Star,
   Trash2,
   Plus,
-  Edit3
+  Edit3,
+  Zap
 } from 'lucide-react';
+import McpServerManagementPanel from './McpServerManagementPanel';
 
 export default function SettingsPanel({ onConfigUpdated }) {
   const [activeTab, setActiveTab] = useState('models'); // 'models', 'cards', 'multimedia', 'embeddings', 'env'
@@ -35,6 +37,9 @@ export default function SettingsPanel({ onConfigUpdated }) {
     grokApiKey: '',
     grokBaseUrl: '',
     grokModel: '',
+    geminiApiKey: '',
+    geminiBaseUrl: '',
+    geminiModel: '',
     useMultimediaModel: false,
     multimediaProvider: 'ollama',
     multimediaModel: '',
@@ -99,7 +104,7 @@ export default function SettingsPanel({ onConfigUpdated }) {
       const res = await fetch('/api/prebuilt-forms');
       const data = await res.json();
       if (data.success && Array.isArray(data.forms)) setActionCards(data.forms);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const [editingCardId, setEditingCardId] = useState(null);
@@ -124,7 +129,7 @@ export default function SettingsPanel({ onConfigUpdated }) {
         setEditingCardId(null);
         fetchActionCards();
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleStartEditCard = (card) => {
@@ -139,7 +144,7 @@ export default function SettingsPanel({ onConfigUpdated }) {
       const res = await fetch(`/api/prebuilt-forms/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) fetchActionCards();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const fetchModelsForProvider = async (targetProvider, isMultimedia = false) => {
@@ -190,7 +195,7 @@ export default function SettingsPanel({ onConfigUpdated }) {
       const res = await fetch('/api/env');
       const data = await res.json();
       if (data.content) setEnvContent(data.content);
-    } catch (e) {} finally { setEnvLoading(false); }
+    } catch (e) { } finally { setEnvLoading(false); }
   };
 
   const handleSaveEnv = async () => {
@@ -213,6 +218,28 @@ export default function SettingsPanel({ onConfigUpdated }) {
     }
   };
 
+  const [mcpSyncing, setMcpSyncing] = useState(false);
+
+  const handleRefreshMcpServers = async () => {
+    try {
+      setMcpSyncing(true);
+      setMsg('');
+      setErr('');
+      const res = await fetch('/api/mcp/config/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.success || res.ok) {
+        setMsg('MCP servers re-connected & Knowledge Catalog re-indexed!');
+        setTimeout(() => setMsg(''), 4000);
+      } else {
+        setErr(data.error || 'Failed to refresh MCP servers');
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setMcpSyncing(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 font-sans text-slate-100 pb-12">
       {/* Top Bar */}
@@ -222,17 +249,29 @@ export default function SettingsPanel({ onConfigUpdated }) {
             <Settings className="w-5 h-5 text-white" />
             <span>Settings & Control Panel</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Configure LLM models, action cards, vision models, and system environment</p>
+          <p className="text-xs text-slate-400 mt-1">Configure LLM models, MCP servers, action cards, vision models, and environment</p>
         </div>
 
-        <button
-          onClick={handleSaveConfig}
-          disabled={loading}
-          className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs flex items-center space-x-2 shadow hover:bg-slate-200 transition-all cursor-pointer"
-        >
-          <Save className="w-4 h-4" />
-          <span>Save Settings</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleRefreshMcpServers}
+            disabled={mcpSyncing}
+            className="px-3.5 py-2 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] text-xs font-semibold text-slate-200 flex items-center space-x-1.5 transition-colors border border-white/10 cursor-pointer"
+            title="Restart stdio servers, re-fetch tools, & regenerate RAG catalog"
+          >
+            <Zap className={`w-3.5 h-3.5 text-amber-400 ${mcpSyncing ? 'animate-spin' : ''}`} />
+            <span>Refresh & Re-create MCPs</span>
+          </button>
+
+          <button
+            onClick={handleSaveConfig}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs flex items-center space-x-2 shadow hover:bg-slate-200 transition-all cursor-pointer"
+          >
+            <Save className="w-4 h-4" />
+            <span>Save Settings</span>
+          </button>
+        </div>
       </div>
 
       {msg && <div className="p-3 rounded-xl bg-[#212121] border border-[#2a2a2a] text-white text-xs flex items-center"><Check className="w-4 h-4 mr-2" /> {msg}</div>}
@@ -242,19 +281,26 @@ export default function SettingsPanel({ onConfigUpdated }) {
       <div className="flex space-x-2 border-b border-[#262626] pb-1 overflow-x-auto">
         <button
           onClick={() => setActiveTab('models')}
-          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
-            activeTab === 'models' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${activeTab === 'models' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+            }`}
         >
           <Cpu className="w-4 h-4" />
           <span>LLM Models</span>
         </button>
 
         <button
+          onClick={() => setActiveTab('mcp')}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${activeTab === 'mcp' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+            }`}
+        >
+          <Zap className="w-4 h-4 text-amber-400" />
+          <span>MCP Servers</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('cards')}
-          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
-            activeTab === 'cards' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${activeTab === 'cards' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+            }`}
         >
           <Layers className="w-4 h-4" />
           <span>Action Cards</span>
@@ -262,9 +308,8 @@ export default function SettingsPanel({ onConfigUpdated }) {
 
         <button
           onClick={() => setActiveTab('multimedia')}
-          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
-            activeTab === 'multimedia' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${activeTab === 'multimedia' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+            }`}
         >
           <Eye className="w-4 h-4" />
           <span>Vision & Multimedia</span>
@@ -272,9 +317,8 @@ export default function SettingsPanel({ onConfigUpdated }) {
 
         <button
           onClick={() => { setActiveTab('env'); fetchEnv(); }}
-          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${
-            activeTab === 'env' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer ${activeTab === 'env' ? 'bg-white text-black font-semibold shadow' : 'text-slate-400 hover:text-white hover:bg-[#212121]'
+            }`}
         >
           <Key className="w-4 h-4" />
           <span>Environment (.env)</span>
@@ -287,18 +331,17 @@ export default function SettingsPanel({ onConfigUpdated }) {
           <div className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-4">
             <h3 className="text-sm font-semibold text-white">Primary LLM Provider</h3>
 
-            <div className="grid grid-cols-3 gap-3">
-              {['grok', 'openai', 'ollama'].map((p) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {['grok', 'openai', 'gemini', 'ollama'].map((p) => (
                 <div
                   key={p}
                   onClick={() => setForm({ ...form, provider: p })}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all text-center ${
-                    form.provider === p ? 'bg-[#212121] border-white text-white font-semibold' : 'bg-[#1c1c1c] border-[#2a2a2a] text-slate-400 hover:bg-[#212121]'
-                  }`}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all text-center ${form.provider === p ? 'bg-[#212121] border-white text-white font-semibold' : 'bg-[#1c1c1c] border-[#2a2a2a] text-slate-400 hover:bg-[#212121]'
+                    }`}
                 >
                   <div className="text-xs font-bold uppercase font-mono">{p}</div>
                   <div className="text-[10px] mt-1 text-slate-400">
-                    {p === 'grok' ? 'Groq / Grok API' : p === 'openai' ? 'OpenAI / Compatible' : 'Local Ollama'}
+                    {p === 'grok' ? 'Groq / Grok API' : p === 'openai' ? 'OpenAI / Compatible' : p === 'gemini' ? 'Google Gemini' : 'Local Ollama'}
                   </div>
                 </div>
               ))}
@@ -318,11 +361,12 @@ export default function SettingsPanel({ onConfigUpdated }) {
 
               {availableModels.length > 0 ? (
                 <select
-                  value={form.provider === 'openai' ? form.openaiModel : form.provider === 'grok' ? form.grokModel : form.ollamaModel}
+                  value={form.provider === 'openai' ? form.openaiModel : form.provider === 'grok' ? form.grokModel : form.provider === 'gemini' ? form.geminiModel : form.ollamaModel}
                   onChange={(e) => {
                     const val = e.target.value;
                     if (form.provider === 'openai') setForm({ ...form, openaiModel: val });
                     if (form.provider === 'grok') setForm({ ...form, grokModel: val });
+                    if (form.provider === 'gemini') setForm({ ...form, geminiModel: val });
                     if (form.provider === 'ollama') setForm({ ...form, ollamaModel: val });
                   }}
                   className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100 focus:outline-none"
@@ -335,11 +379,12 @@ export default function SettingsPanel({ onConfigUpdated }) {
                 <input
                   type="text"
                   placeholder="Enter model name..."
-                  value={form.provider === 'openai' ? form.openaiModel : form.provider === 'grok' ? form.grokModel : form.ollamaModel}
+                  value={form.provider === 'openai' ? form.openaiModel : form.provider === 'grok' ? form.grokModel : form.provider === 'gemini' ? form.geminiModel : form.ollamaModel}
                   onChange={(e) => {
                     const val = e.target.value;
                     if (form.provider === 'openai') setForm({ ...form, openaiModel: val });
                     if (form.provider === 'grok') setForm({ ...form, grokModel: val });
+                    if (form.provider === 'gemini') setForm({ ...form, geminiModel: val });
                     if (form.provider === 'ollama') setForm({ ...form, ollamaModel: val });
                   }}
                   className="w-full p-2.5 rounded-xl bg-[#0c0c0c] border border-[#262626] text-xs font-mono text-slate-100 focus:outline-none"
@@ -350,7 +395,12 @@ export default function SettingsPanel({ onConfigUpdated }) {
         </div>
       )}
 
-      {/* Tab 2: Action Cards Manager */}
+      {/* Tab 2: MCP Servers Management */}
+      {activeTab === 'mcp' && (
+        <McpServerManagementPanel />
+      )}
+
+      {/* Tab 3: Action Cards Manager */}
       {activeTab === 'cards' && (
         <div className="space-y-4">
           <form onSubmit={handleCreateOrUpdateActionCard} className="p-5 rounded-2xl bg-[#141414] border border-[#2a2a2a] space-y-3">
@@ -469,6 +519,7 @@ export default function SettingsPanel({ onConfigUpdated }) {
                   <option value="ollama">Local Ollama Vision (llava / qwen-vl)</option>
                   <option value="openai">OpenAI Vision (gpt-4o / gpt-4-turbo)</option>
                   <option value="grok">Grok Vision (grok-2-vision)</option>
+                  <option value="gemini">Google Gemini Vision (gemini-3.6-flash / gemini-2.5-flash)</option>
                 </select>
               </div>
 

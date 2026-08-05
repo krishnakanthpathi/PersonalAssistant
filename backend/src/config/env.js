@@ -36,6 +36,11 @@ export const env = {
 	GROK_BASE_URL: process.env.GROK_BASE_URL || 'https://api.x.ai/v1',
 	GROK_MODEL: process.env.GROK_MODEL || 'grok-2-1218',
 
+	// gemini
+	GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+	GEMINI_BASE_URL: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
+	GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+
 	// mcps
 	NOTION_TOKEN: process.env.NOTION_TOKEN,
 	NOTION_PARENT_PAGE_ID: process.env.NOTION_PARENT_PAGE_ID,

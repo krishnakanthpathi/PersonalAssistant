@@ -2,9 +2,9 @@
 type: tool_group
 title: MCP Server - memorize
 description: Integrated MCP server providing tools for memory storage, remembering notes and preferences, recalling info, saving, and searching memories.
-tags: [memorize, store, memory, read, delete, clear, all, memories, list, get, file, status, sync, markdown, files, hybrid, search, auto, classify, categories, add, category, peek, vector, chunks, available, models, remember, recall, save, note, notes, forget, retrieve, know, preference, preferences, knowledge, find, lookup, keep, mind]
-tools: [store_memory, read_memory, delete_memory, clear_all_memories, list_memories, get_memory_file_status, sync_markdown_files, hybrid_search_memories, auto_classify_memory, get_categories, add_category, delete_category, peek_vector_db_chunks, list_available_models]
-timestamp: 2026-08-04T16:58:19.430Z
+tags: [memorize, upsert, memory, store, read, delete, clear, all, memories, list, get, file, status, sync, markdown, files, hybrid, search, auto, classify, categories, add, category, peek, vector, chunks, available, models, remember, recall, save, note, notes, forget, retrieve, know, preference, preferences, knowledge, find, lookup, keep, mind]
+tools: [upsert_memory, store_memory, read_memory, delete_memory, clear_all_memories, list_memories, get_memory_file_status, sync_markdown_files, hybrid_search_memories, auto_classify_memory, get_categories, add_category, delete_category, peek_vector_db_chunks, list_available_models]
+timestamp: 2026-08-05T13:41:20.646Z
 ---
 
 # MCP Server - memorize
@@ -13,24 +13,25 @@ Integrated MCP server providing tools and capabilities for memorize.
 
 ### Available Tools
 
+- **`upsert_memory`**: 
+Unified memory lifecycle tool to Insert, Update, Append, or Delete memories.
+Normalizes title strings, prevents filename duplication, and appends to existing files seamlessly.
+
 - **`store_memory`**: 
-Full end-to-end memory pipeline:
-Generates a unique Memory ID, creates Markdown storage file on disk,
-chunks text, generates vector embeddings, upserts chunks to ChromaDB,
-and records metadata in data/index.json.
+Stores memory into system. Automatically updates/appends if topic already exists.
 
 - **`read_memory`**: 
 Fetches frontmatter metadata, tags, and full content for a given Memory ID.
 
 - **`delete_memory`**: 
-Deletes a memory across Markdown disk storage, index.json, and ChromaDB vector store.
+Deletes a memory across Markdown disk storage, SQLite database, and ChromaDB vector store.
 
 - **`clear_all_memories`**: 
-Completely purges all memories from disk, resets data/index.json,
+Completely purges all memories from disk, resets SQLite database,
 and clears ChromaDB vector database store.
 
 - **`list_memories`**: 
-Lists stored memories with optional filtering by category or tag.
+Lists stored memories from SQLite with optional filtering by category or tag.
 
 - **`get_memory_file_status`**: 
 Checks and returns the exact status of a Markdown file (existence, full text,
@@ -38,24 +39,23 @@ frontmatter metadata, estimated tokens, content hash, and sync state).
 
 - **`sync_markdown_files`**: 
 Scans data/memories/ for Markdown files added, updated, or deleted on disk,
-automatically chunking, embedding, and updating index.json + ChromaDB.
+automatically chunking, embedding, and updating SQLite + ChromaDB.
 
 - **`hybrid_search_memories`**: 
 Performs hybrid weighted relevance search combining Vector Similarity (50%),
 Tag Match (30%), and Category Match (20%) to return ranked top memories.
 
 - **`auto_classify_memory`**: 
-Analyzes raw text, automatically assigns a category (creating new ones dynamically if needed),
-and extracts relevant tags.
+Analyzes raw text, automatically assigns a category, and extracts relevant tags.
 
 - **`get_categories`**: 
-Returns all currently available memory categories on disk and in index.json.
+Returns all currently available memory categories on disk.
 
 - **`add_category`**: 
-Dynamically registers a new category in index.json and creates its storage directory.
+Dynamically creates category storage directory.
 
 - **`delete_category`**: 
-Deletes a category from index.json and removes its directory on disk.
+Deletes a category directory on disk and purges category records from SQLite.
 
 - **`peek_vector_db_chunks`**: 
 Inspects stored vector chunks in ChromaDB.

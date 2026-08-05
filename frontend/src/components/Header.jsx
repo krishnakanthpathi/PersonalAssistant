@@ -52,6 +52,7 @@ export default function Header({
       const updatePayload = {};
       if (runningConfig.provider === 'openai') updatePayload.openaiModel = newModel;
       if (runningConfig.provider === 'grok') updatePayload.grokModel = newModel;
+      if (runningConfig.provider === 'gemini') updatePayload.geminiModel = newModel;
       if (runningConfig.provider === 'ollama') updatePayload.ollamaModel = newModel;
 
       const res = await fetch('/api/config', {
