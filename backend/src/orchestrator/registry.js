@@ -6,6 +6,10 @@ import { rdsQueryTool } from '../tools/rdsQuery.js';
 import { createPrebuiltFormTool } from '../tools/prebuiltFormTools.js';
 import { integrateMcpServerTool } from '../tools/mcpIntegrationTool.js';
 import { getCurrentTimeTool } from '../tools/dateTimeTool.js';
+import { imageProcessorTool } from '../tools/imageProcessorTool.js';
+import { attachmentProcessorTool } from '../tools/attachmentProcessorTool.js';
+import { mediaProcessorTool } from '../tools/mediaProcessorTool.js';
+import { ocrTool } from '../tools/ocrTool.js';
 
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
@@ -24,6 +28,10 @@ class ToolRegistry {
 		this.tools.set(createPrebuiltFormTool.definition.name, createPrebuiltFormTool);
 		this.tools.set(integrateMcpServerTool.definition.name, integrateMcpServerTool);
 		this.tools.set(getCurrentTimeTool.definition.name, getCurrentTimeTool);
+		this.tools.set(imageProcessorTool.definition.name, imageProcessorTool);
+		this.tools.set(attachmentProcessorTool.definition.name, attachmentProcessorTool);
+		this.tools.set(mediaProcessorTool.definition.name, mediaProcessorTool);
+		this.tools.set(ocrTool.definition.name, ocrTool);
 	}
 
 	// Dynamic, asynchronous fetch of all available tools (Local + MCP)
@@ -38,17 +46,19 @@ class ToolRegistry {
 			}
 		}));
 
-		// 2. Gather MCP tools from connected servers
+		// 2. Gather MCP tools from connected servers (excluding say_speech speaking tool)
 		const mcpTools = await mcpManager.getTools();
-		const mappedMcpTools = mcpTools.map(tool => ({
-			type: 'function',
-			function: {
-				name: tool.name,
-				description: tool.description,
-				parameters: tool.inputSchema // Map MCP inputSchema to OpenAI/Ollama parameters key
-			},
-			serverName: tool.serverName // Preserve serverName metadata
-		}));
+		const mappedMcpTools = mcpTools
+			.filter(tool => tool.name !== 'say_speech')
+			.map(tool => ({
+				type: 'function',
+				function: {
+					name: tool.name,
+					description: tool.description,
+					parameters: tool.inputSchema // Map MCP inputSchema to OpenAI/Ollama parameters key
+				},
+				serverName: tool.serverName // Preserve serverName metadata
+			}));
 
 		return [...localTools, ...mappedMcpTools];
 	}

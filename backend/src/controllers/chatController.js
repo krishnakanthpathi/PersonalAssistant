@@ -4,9 +4,10 @@ import { getDB } from '../config/mongodb.js';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
-import { parsePdfText, extractVideoFrames } from '../utils/mediaProcessor.js';
+import { parsePdfText, extractVideoFrames, optimizeImageForVision } from '../utils/mediaProcessor.js';
 import { needsChunking, createSubtaskChunks } from '../orchestrator/chunkManager.js';
 import { SubtaskQueue } from '../orchestrator/subtaskQueue.js';
+import { mediaProcessorTool } from '../tools/mediaProcessorTool.js';
 
 const agent = new Agent();
 const activeSessions = new Map();
@@ -55,6 +56,7 @@ export const handleChat = async (req, res) => {
 		// Process attachments
 		const processedAttachments = [];
 		const images = [];
+		const attachmentToolExecutions = [];
 		let enhancedPrompt = prompt;
 
 		if (attachments && attachments.length > 0) {
@@ -86,10 +88,30 @@ export const handleChat = async (req, res) => {
 					path: filePath
 				};
 
+				// Execute process_media tool for live UI feedback & verification
+				const toolExecStart = Date.now();
+				sendSSE('status', `Processing media: ${file.name}...`);
+				const mediaResult = await mediaProcessorTool.execute({
+					filePath,
+					fileName: file.name,
+					fileType: file.type
+				});
+
+				const toolExec = {
+					id: `exec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+					toolName: 'process_media',
+					arguments: { fileName: file.name, filePath: filePath, fileType: file.type },
+					result: mediaResult.success ? JSON.stringify(mediaResult, null, 2) : `[ERROR]: ${mediaResult.error}`,
+					status: mediaResult.success ? 'success' : 'failed',
+					latency: Date.now() - toolExecStart
+				};
+
+				sendSSE('status', { type: 'tool_execution', data: toolExec });
+				attachmentToolExecutions.push(toolExec);
+
 				// PDF Extraction
 				if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
 					try {
-						sendSSE('status', `Parsing PDF: ${file.name}...`);
 						const pdfText = await parsePdfText(buffer);
 						if (pdfText.trim()) {
 							attachmentMeta.text = pdfText;
@@ -101,10 +123,11 @@ export const handleChat = async (req, res) => {
 				}
 				// Image Parsing
 				else if (file.type.startsWith('image/')) {
+					const optimized = await optimizeImageForVision(buffer, 1600);
 					const imgObj = {
 						type: 'image',
-						data: base64Data,
-						mimeType: file.type,
+						data: optimized.data,
+						mimeType: optimized.mimeType,
 						name: file.name
 					};
 					images.push(imgObj);
@@ -198,12 +221,17 @@ export const handleChat = async (req, res) => {
 		}
 
 		// 4. Save assistant response
+		const mergedToolExecutions = [
+			...attachmentToolExecutions,
+			...(response.toolExecutions || [])
+		];
+
 		const assistantMessage = {
 			role: 'assistant',
 			content: response.content || (typeof response === 'string' ? response : ''),
 			speech: response.speech || null,
 			logs: response.logs || [],
-			toolExecutions: response.toolExecutions || [],
+			toolExecutions: mergedToolExecutions,
 			ragFacts: response.ragFacts || [],
 			relevantTools: response.relevantTools || [],
 			isError: false,
@@ -215,7 +243,7 @@ export const handleChat = async (req, res) => {
 		);
 
 		// Send result along with sessionId so frontend can set/update it
-		sendSSE('result', { ...response, sessionId });
+		sendSSE('result', { ...response, toolExecutions: mergedToolExecutions, sessionId });
 	} catch (error) {
 		logger.error(`Error in chat endpoint: ${error.message}`);
 		try {

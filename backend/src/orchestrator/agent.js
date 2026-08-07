@@ -99,10 +99,7 @@ export class Agent {
 					const intermediateParsed = parseAgentResponse(message.content);
 					if (intermediateParsed.speech) {
 						intermediateSpeech = intermediateParsed.speech;
-						registry.callTool('say_speech', { text: intermediateSpeech }).catch(err => {
-							logger.error(`Intermediate speech execution failed: ${err.message}`);
-						});
-						triggerStatusUpdate(`🔊 ${intermediateSpeech}`);
+						triggerStatusUpdate(`💬 ${intermediateSpeech}`);
 					}
 				}
 
@@ -142,11 +139,6 @@ export class Agent {
 			metricsService.endRequest(requestId, true);
 
 			const parsed = parseAgentResponse(message.content || '');
-			if (parsed.speech) {
-				registry.callTool('say_speech', { text: parsed.speech }).catch(err => {
-					logger.error(`Manual speech execution failed: ${err.message}`);
-				});
-			}
 
 			return {
 				...parsed,

@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import { PDFParse } from 'pdf-parse';
+import sharp from 'sharp';
 import { logger } from './logger.js';
 
 const execAsync = promisify(exec);
@@ -30,6 +31,66 @@ export async function parsePdfText(fileBuffer) {
 		logger.error(`Failed to parse PDF: ${error.message}`);
 		throw new Error(`Failed to parse PDF text: ${error.message}`);
 	}
+}
+
+/**
+ * Automatically resizes and compresses oversized high-resolution images/screenshots
+ * to safe vision model dimensions (max 1600px, JPEG quality 85) to prevent HTTP 400 buffer limits.
+ * @param {Buffer} buffer - Raw image file buffer
+ * @param {number} maxDimension - Max width/height dimension (default 1600)
+ * @returns {Promise<{ buffer: Buffer, mimeType: string, data: string, optimized: boolean }>}
+ */
+export async function optimizeImageForVision(buffer, maxDimension = 1600) {
+	try {
+		if (!buffer || buffer.length === 0) {
+			return { buffer, mimeType: 'image/png', data: '', optimized: false };
+		}
+
+		const metadata = await sharp(buffer).metadata();
+		
+		// Optimize if image exceeds maxDimension (e.g. 2940x1912) OR byte size > 500KB
+		if ((metadata.width && metadata.width > maxDimension) || 
+		    (metadata.height && metadata.height > maxDimension) || 
+		    buffer.length > 500000) {
+			
+			logger.info(`Optimizing high-res image for vision model (${metadata.width}x${metadata.height}, original size: ${(buffer.length / 1024 / 1024).toFixed(2)} MB)...`);
+			
+			const optimizedBuffer = await sharp(buffer)
+				.resize({
+					width: maxDimension,
+					height: maxDimension,
+					fit: 'inside',
+					withoutEnlargement: true
+				})
+				.jpeg({ quality: 85 })
+				.toBuffer();
+			
+			const compressedSizeKb = (optimizedBuffer.length / 1024).toFixed(1);
+			logger.info(`Image successfully optimized: ${compressedSizeKb} KB (Format: JPEG)`);
+			
+			return {
+				buffer: optimizedBuffer,
+				mimeType: 'image/jpeg',
+				data: optimizedBuffer.toString('base64'),
+				optimized: true,
+				originalWidth: metadata.width,
+				originalHeight: metadata.height,
+				originalSize: buffer.length,
+				optimizedSize: optimizedBuffer.length
+			};
+		}
+	} catch (err) {
+		logger.warn(`Sharp image optimization fallback: ${err.message}`);
+	}
+
+	return {
+		buffer: buffer,
+		mimeType: 'image/png',
+		data: buffer.toString('base64'),
+		optimized: false,
+		originalSize: buffer.length,
+		optimizedSize: buffer.length
+	};
 }
 
 /**
