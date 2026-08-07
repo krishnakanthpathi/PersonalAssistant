@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { parsePdfText, extractVideoFrames } from '../utils/mediaProcessor.js';
+import { needsChunking, createSubtaskChunks } from '../orchestrator/chunkManager.js';
+import { SubtaskQueue } from '../orchestrator/subtaskQueue.js';
 
 const agent = new Agent();
 const activeSessions = new Map();
@@ -84,14 +86,13 @@ export const handleChat = async (req, res) => {
 					path: filePath
 				};
 
-				processedAttachments.push(attachmentMeta);
-
 				// PDF Extraction
 				if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
 					try {
 						sendSSE('status', `Parsing PDF: ${file.name}...`);
 						const pdfText = await parsePdfText(buffer);
 						if (pdfText.trim()) {
+							attachmentMeta.text = pdfText;
 							enhancedPrompt += `\n\n[Content of PDF file "${file.name}":]\n---\n${pdfText}\n---`;
 						}
 					} catch (pdfErr) {
@@ -100,11 +101,14 @@ export const handleChat = async (req, res) => {
 				}
 				// Image Parsing
 				else if (file.type.startsWith('image/')) {
-					images.push({
+					const imgObj = {
 						type: 'image',
 						data: base64Data,
-						mimeType: file.type
-					});
+						mimeType: file.type,
+						name: file.name
+					};
+					images.push(imgObj);
+					attachmentMeta.imageData = imgObj;
 				}
 				// Video Parsing (Keyframe Extraction)
 				else if (file.type.startsWith('video/')) {
@@ -112,16 +116,33 @@ export const handleChat = async (req, res) => {
 						sendSSE('status', `Extracting keyframes from video: ${file.name}...`);
 						const frames = await extractVideoFrames(filePath, sessionId);
 						for (const frame of frames) {
-							images.push({
+							const imgObj = {
 								type: 'image',
 								data: frame.data,
-								mimeType: frame.type
-							});
+								mimeType: frame.type,
+								name: file.name
+							};
+							images.push(imgObj);
+							attachmentMeta.imageData = imgObj;
 						}
 					} catch (videoErr) {
 						logger.error(`Error processing video: ${videoErr.message}`);
 					}
 				}
+				// Text / Code File Extraction
+				else {
+					try {
+						const textContent = buffer.toString('utf-8');
+						if (textContent.trim()) {
+							attachmentMeta.text = textContent;
+							enhancedPrompt += `\n\n[Content of File "${file.name}":]\n---\n${textContent}\n---`;
+						}
+					} catch (textErr) {
+						logger.error(`Error parsing text attachment ${file.name}: ${textErr.message}`);
+					}
+				}
+
+				processedAttachments.push(attachmentMeta);
 			}
 		}
 
@@ -151,16 +172,30 @@ export const handleChat = async (req, res) => {
 			{ $push: { messages: userMessage } }
 		);
 
-		// 3. Run agent with history, abort checks, images, and live token stream
-		const response = await agent.run(
-			enhancedPrompt,
-			history,
-			(status) => sendSSE('status', status),
-			() => isAborted,
-			images,
-			(metadata) => sendSSE('metadata', metadata),
-			(token) => sendSSE('token', token)
-		);
+		// 3. Check for Context Overflow & execute Subtask Queue if payload exceeds context limit
+		let response;
+		if (needsChunking(enhancedPrompt, history, processedAttachments, images)) {
+			sendSSE('status', 'Context/Image payload exceeds context limit. Creating subtask queue...');
+			const subtasks = createSubtaskChunks(prompt, processedAttachments, images);
+			
+			response = await SubtaskQueue.process(subtasks, agent, history, {
+				onStatusUpdate: (status) => sendSSE('status', status),
+				shouldStop: () => isAborted,
+				onMetadataRetrieved: (metadata) => sendSSE('metadata', metadata),
+				onToken: (token) => sendSSE('token', token)
+			});
+		} else {
+			// Run standard agent loop
+			response = await agent.run(
+				enhancedPrompt,
+				history,
+				(status) => sendSSE('status', status),
+				() => isAborted,
+				images,
+				(metadata) => sendSSE('metadata', metadata),
+				(token) => sendSSE('token', token)
+			);
+		}
 
 		// 4. Save assistant response
 		const assistantMessage = {

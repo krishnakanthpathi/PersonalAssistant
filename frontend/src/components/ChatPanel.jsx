@@ -205,7 +205,7 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
             <Sparkles className="w-4 h-4 text-white" />
           </div>
 
-          <div className="flex-1 space-y-3 text-sm text-slate-200 leading-relaxed pr-2 sm:pr-6 overflow-hidden">
+          <div className={`flex-1 space-y-3 text-sm text-slate-200 leading-relaxed pr-2 sm:pr-6 overflow-hidden ${msg.isError ? 'p-4 rounded-2xl bg-red-950/20 border border-red-500/30 text-red-200 shadow-inner' : ''}`}>
             {/* Speech Transcript Banner */}
             {msg.speech && (
               <div className="p-3.5 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-start space-x-3 shadow-inner">
@@ -230,7 +230,7 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
               rehypePlugins={[rehypeKatex]}
               components={markdownComponents}
             >
-              {cleanedContent}
+              {cleanedContent || (msg.isError ? '⚠️ Execution failed.' : '')}
             </ReactMarkdown>
 
             {chartData && (
@@ -501,6 +501,18 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
         }),
       });
 
+      if (!response.ok) {
+        const errText = await response.text();
+        let errMsg = `Server returned status ${response.status}`;
+        try {
+          const jsonErr = JSON.parse(errText);
+          if (jsonErr.error) errMsg = jsonErr.error;
+        } catch (_) {
+          if (errText) errMsg = errText;
+        }
+        throw new Error(errMsg);
+      }
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
@@ -602,6 +614,7 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
                     speech: speechContent,
                     toolExecutions: resObj.toolExecutions || updated[idx].toolExecutions || [],
                     ragFacts: resObj.ragFacts || [],
+                    isError: resObj.isError === true,
                     chartId: chartInfo?.chartId || updated[idx].chartId || null,
                     chartData: chartInfo?.chartData || updated[idx].chartData || null,
                     chartType: chartInfo?.chartType || updated[idx].chartType || 'bar',
@@ -622,6 +635,27 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
       }
     } catch (err) {
       console.error('Chat error:', err);
+      const errorMsgText = `⚠️ **Error**: ${err.message || 'The request encountered an issue and could not finish.'}`;
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastIdx = updated.length - 1;
+        if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
+          updated[lastIdx] = {
+            ...updated[lastIdx],
+            content: updated[lastIdx].content || errorMsgText,
+            isError: true,
+            createdAt: new Date(),
+          };
+        } else {
+          updated.push({
+            role: 'assistant',
+            content: errorMsgText,
+            isError: true,
+            createdAt: new Date(),
+          });
+        }
+        return updated;
+      });
     } finally {
       setIsStreaming(false);
       setStatusMessage('');
