@@ -68,6 +68,15 @@ function extractChartFromContent(content, index = 0) {
   return null;
 }
 
+const cleanContentSlashes = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/(\d+)\\\./g, '$1.')
+    .replace(/\\\$/g, '$')
+    .replace(/(\\)(?=\d)/g, '')
+    .replace(/(\d+)\\\/(\d+)/g, '$1/$2');
+};
+
 // Memoized Individual Message Item component to eliminate input typing lag
 const ChatMessageItem = React.memo(function ChatMessageItem({
   msg,
@@ -77,21 +86,21 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
   onCopy,
   onSpeak,
 }) {
-  const chartInfo = useMemo(() => extractChartFromContent(msg.content, idx), [msg.content, idx]);
+  const cleanedContent = useMemo(() => cleanContentSlashes(msg.content), [msg.content]);
+  const chartInfo = useMemo(() => extractChartFromContent(cleanedContent, idx), [cleanedContent, idx]);
   const chartData = msg.chartData || chartInfo?.chartData;
   const chartType = msg.chartType || chartInfo?.chartType || 'bar';
   const chartTitle = msg.chartTitle || chartInfo?.chartTitle || 'Analytics Chart';
   const chartId = msg.chartId || chartInfo?.chartId || `chart-${idx}`;
 
   const markdownComponents = useMemo(() => ({
-    pre: ({ children }) => <>{children}</>,
     p: ({ children }) => <p className="mb-2 leading-relaxed text-slate-200">{children}</p>,
     h1: ({ children }) => <h1 className="text-xl font-bold text-slate-100 mt-4 mb-2">{children}</h1>,
     h2: ({ children }) => <h2 className="text-lg font-bold text-slate-100 mt-3 mb-2">{children}</h2>,
     h3: ({ children }) => <h3 className="text-base font-semibold text-slate-100 mt-2 mb-1">{children}</h3>,
-    ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-2 text-slate-200">{children}</ul>,
-    ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2 text-slate-200">{children}</ol>,
-    li: ({ children }) => <li className="text-slate-200">{children}</li>,
+    ul: ({ children }) => <ul className="list-disc pl-5 space-y-1.5 mb-3 text-slate-200">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1.5 mb-3 text-slate-200">{children}</ol>,
+    li: ({ children }) => <li className="text-slate-200 leading-relaxed pl-1 [&>p]:inline [&>p]:mb-0">{children}</li>,
     strong: ({ children }) => <strong className="font-semibold text-slate-100">{children}</strong>,
     code: ({ node, className, children, ...props }) => {
       const contentStr = String(children || '').trim();
@@ -197,11 +206,6 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
           </div>
 
           <div className="flex-1 space-y-3 text-sm text-slate-200 leading-relaxed pr-2 sm:pr-6 overflow-hidden">
-            {/* Executed Tools Accordion Dropdown */}
-            {msg.toolExecutions && msg.toolExecutions.length > 0 && (
-              <ToolCard toolExecutions={msg.toolExecutions} />
-            )}
-
             {/* Speech Transcript Banner */}
             {msg.speech && (
               <div className="p-3.5 rounded-2xl bg-[#141414] border border-[#2a2a2a] flex items-start space-x-3 shadow-inner">
@@ -226,17 +230,22 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
               rehypePlugins={[rehypeKatex]}
               components={markdownComponents}
             >
-              {msg.content}
+              {cleanedContent}
             </ReactMarkdown>
 
             {chartData && (
               <ChartCard chartId={chartId} chartData={chartData} title={chartTitle} type={chartType} />
             )}
 
+            {/* Executed Tools Bottom Footer Pill */}
+            {msg.toolExecutions && msg.toolExecutions.length > 0 && (
+              <ToolCard toolExecutions={msg.toolExecutions} />
+            )}
+
             {/* Action buttons */}
             <div className="flex items-center space-x-3 pt-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={() => onCopy(msg.content, idx)}
+                onClick={() => onCopy(cleanedContent, idx)}
                 className="flex items-center space-x-1 hover:text-slate-200 cursor-pointer"
               >
                 {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
