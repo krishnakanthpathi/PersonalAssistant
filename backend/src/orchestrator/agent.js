@@ -93,6 +93,19 @@ export class Agent {
 					break;
 				}
 
+				// Extract intermediate speech if the model outputs speech text alongside tool calls
+				let intermediateSpeech = null;
+				if (message.content) {
+					const intermediateParsed = parseAgentResponse(message.content);
+					if (intermediateParsed.speech) {
+						intermediateSpeech = intermediateParsed.speech;
+						registry.callTool('say_speech', { text: intermediateSpeech }).catch(err => {
+							logger.error(`Intermediate speech execution failed: ${err.message}`);
+						});
+						triggerStatusUpdate(`🔊 ${intermediateSpeech}`);
+					}
+				}
+
 				messages.push(message);
 
 				for (const call of message.tool_calls) {
@@ -105,6 +118,9 @@ export class Agent {
 					const { success, result, error, toolExec } = await executeToolWithLogging(toolName, toolArgs, toolContext, requestId, toolCallStart, triggerStatusUpdate);
 
 					if (toolExec) {
+						if (intermediateSpeech) {
+							toolExec.speech = intermediateSpeech;
+						}
 						toolExecutions.push(toolExec);
 					}
 
