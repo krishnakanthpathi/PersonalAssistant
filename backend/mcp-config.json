@@ -43,6 +43,27 @@
         "git+https://github.com/aryapandrangi/MacSystem-MCP",
         "macsystem-mcp"
       ]
+    },
+    "mem0-mcp": {
+      "enabled": true,
+      "command": "uvx",
+      "args": [
+        "mem0-mcp"
+      ]
+    },
+    "mem0": {
+      "enabled": true,
+      "command": "uvx",
+      "args": [
+        "mem0-mcp"
+      ]
+    },
+    "tesseract-ocr": {
+      "enabled": true,
+      "command": "python",
+      "args": [
+        "mcps/tesseract-ocr/server.py"
+      ]
     }
   }
 }

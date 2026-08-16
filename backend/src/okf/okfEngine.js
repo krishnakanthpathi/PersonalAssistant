@@ -70,16 +70,15 @@ type: tool_group
 title: MCP Server Management & Dynamic Tool Integration
 description: Utilities to connect, configure, manage, and execute dynamic Model Context Protocol (MCP) servers.
 tags: [mcp, server, integration, tools, dynamic, connect]
-tools: [integrate_mcp_server, create_prebuilt_form, rds_query]
+tools: [create_prebuilt_form, rds_query]
 timestamp: ${new Date().toISOString()}
 ---
 
 # MCP Server Management & Dynamic Tool Integration
 
-Provides system capabilities to register, connect, manage, and query dynamic MCP servers and system tools.
+Provides system capabilities to query dynamic MCP servers and system tools.
 
 ### Available Tools
-- **\`integrate_mcp_server\`**: Add, edit, test, enable, disable, or delete MCP servers dynamically.
 - **\`create_prebuilt_form\`**: Create structured UI form inputs for users.
 - **\`rds_query\`**: Query relational database systems.
 `;

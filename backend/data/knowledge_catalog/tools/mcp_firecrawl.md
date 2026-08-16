@@ -4,7 +4,7 @@ title: MCP Server - firecrawl
 description: Integrated MCP server providing tools for firecrawl.
 tags: [firecrawl, scrape, map, search, feedback, crawl, check, status, extract, agent, interact, stop, parse, monitor, create, list, get, update, delete, run, checks, research, papers, inspect, paper, related, read, github, developer]
 tools: [firecrawl_scrape, firecrawl_map, firecrawl_search, firecrawl_search_feedback, firecrawl_feedback, firecrawl_crawl, firecrawl_check_crawl_status, firecrawl_extract, firecrawl_agent, firecrawl_agent_status, firecrawl_interact, firecrawl_interact_stop, firecrawl_parse, firecrawl_monitor_create, firecrawl_monitor_list, firecrawl_monitor_get, firecrawl_monitor_update, firecrawl_monitor_delete, firecrawl_monitor_run, firecrawl_monitor_checks, firecrawl_monitor_check, firecrawl_research_search_papers, firecrawl_research_inspect_paper, firecrawl_research_related_papers, firecrawl_research_read_paper, firecrawl_research_search_github, firecrawl_developer_search]
-timestamp: 2026-08-07T17:23:38.569Z
+timestamp: 2026-08-15T03:54:42.718Z
 ---
 
 # MCP Server - firecrawl
@@ -18,6 +18,8 @@ Retrieve and extract content from one supplied URL through Firecrawl. Use this w
 
 This tool operates on a known page. For a set of pages use `firecrawl_crawl`, and to discover page URLs use `firecrawl_map` or `firecrawl_search`. Options include JavaScript render delay, cache age, main-content filtering, PII redaction, and lockdown cache-only retrieval. Browser actions may change the live page when interactive actions are enabled.
 
+Firecrawl may reuse recently indexed content instead of refetching the page, and the reuse window varies by domain. Set `maxAge: 0` to force a live fetch, or a smaller `maxAge` to bound how stale reused content may be. A successful response does not by itself confirm that the state it describes is still current.
+
 Returns the selected content formats and page metadata.
 
 - **`firecrawl_map`**: 
@@ -30,7 +32,9 @@ Search web, news, or image sources and return ranked results. Operators include 
 
 For a programming question, add `categories: ["developer"]`. It searches an index of GitHub issues, merged pull requests, repository READMEs, and curated documentation sites, and returns the hits in `data.developer` beside the web results.
 
-`scrapeOptions` can attach extracted page content. Returns source-type result groups and usage metadata. Authenticated responses can include an `id` for optional search feedback.
+`categories: ["research"]` restricts these web results to research-affiliated websites and returns page snippets. The `firecrawl_research_*` tools are a separate surface that searches paper abstracts and full text across biomedical (PubMed, bioRxiv, medRxiv) and arXiv literature.
+
+`scrapeOptions` can attach extracted page content; pages fetched this way use a fixed reuse window and ignore `maxAge`, so use `firecrawl_scrape` when a live fetch is required. Returns source-type result groups and usage metadata. Authenticated responses can include an `id` for optional search feedback.
 
 - **`firecrawl_search_feedback`**: 
 Records schema-validated quality feedback for a prior `firecrawl_search` UUID `searchId`. A `good` rating requires a valuable source, `partial` a valuable source or at least one `missingContent` entry, and `bad` at least one `missingContent` entry or a query suggestion; caps are 50 `valuableSources` and 20 `missingContent` entries.
@@ -51,9 +55,7 @@ Crawl results can be large; use conservative limits when full-site coverage is u
 Retrieve the current status, progress, and available results for an existing crawl ID. This only reads Firecrawl job state and does not start or modify the crawl.
 
 - **`firecrawl_extract`**: 
-Extract structured information from one or more URLs with an optional natural-language prompt and JSON schema. It can include subdomains, follow external links, or use web search when those options are enabled.
-
-Use this for a defined structured result rather than full page content. Returns data shaped by the supplied schema or prompt.
+Deprecated compatibility entry point. Use firecrawl_scrape once per known URL with formats: ["json"] and jsonOptions containing the prompt and schema. Use firecrawl_search or firecrawl_agent before Scrape when URLs are not known.
 
 - **`firecrawl_agent`**: 
 Start an asynchronous web research job from a prompt, optional seed URLs, and an optional JSON schema. Use this for a requested synthesis across multiple sources when the task can wait for asynchronous completion. The agent can search, navigate, read pages, and assemble a structured result.
@@ -111,7 +113,9 @@ Retrieve one monitor check and its page-level results, optionally filtered by pa
 Markdown tracking returns a unified text diff, JSON tracking returns field paths with previous/current values and a current snapshot, and mixed tracking returns both. Returns one page of results plus a `next` URL when more pages exist.
 
 - **`firecrawl_research_search_papers`**: 
-For topics represented in the indexed corpus, search paper metadata and abstracts with a natural-language query. Optional author, category, and date filters constrain results.
+Search paper metadata and abstracts with a natural-language query across the indexed corpus, which spans biomedical, life-science, and clinical literature (PubMed, bioRxiv, medRxiv) alongside arXiv and other scientific sources. Optional author, category, and date filters constrain results.
+
+Several distinct framings of the same question surface different papers than a single query does.
 
 Returns ranked papers with canonical IDs, titles, authors, and abstracts.
 

@@ -25,7 +25,8 @@ import {
   Square,
   MessageSquareQuote,
   Layers,
-  RefreshCw
+  RefreshCw,
+  UploadCloud
 } from 'lucide-react';
 import ToolCard from './cards/ToolCard';
 import ChartCard from './cards/ChartCard';
@@ -274,6 +275,8 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
   const [isStreaming, setIsStreaming] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [attachments, setAttachments] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [isCardsModalOpen, setIsCardsModalOpen] = useState(false);
   const fileInputRef = useRef(null);
@@ -310,6 +313,16 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
       if (onClearInitialPrompt) onClearInitialPrompt();
     }
   }, [initialPrompt]);
+
+  // Auto-focus chat input textarea on initial reload/mount, session change, and streaming completion
+  useEffect(() => {
+    const focusTimeout = setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }, 100);
+    return () => clearTimeout(focusTimeout);
+  }, [activeSessionId, isStreaming]);
 
   useEffect(() => {
     if (activeSessionId) {
@@ -437,8 +450,9 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
     }
   };
 
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files);
+  const processFiles = (fileList) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -453,6 +467,56 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleFileUpload = (e) => {
+    processFiles(e.target.files);
+    if (e.target) e.target.value = '';
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      setIsDragging(false);
+      dragCounterRef.current = 0;
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+      if (e.dataTransfer.clearData) e.dataTransfer.clearData();
+    }
+  };
+
+  const handlePaste = (e) => {
+    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const files = Array.from(e.clipboardData.files);
+      if (files.length > 0) {
+        processFiles(files);
+      }
+    }
   };
 
   const removeAttachment = (index) => {
@@ -670,7 +734,24 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full chatgpt-main overflow-hidden relative font-sans">
+    <div 
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="flex-1 flex flex-col h-full chatgpt-main overflow-hidden relative font-sans"
+    >
+      {/* Drag & Drop Visual Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-black/75 backdrop-blur-sm border-2 border-dashed border-white/40 rounded-2xl m-3 flex flex-col items-center justify-center pointer-events-none transition-all animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mb-4 shadow-2xl animate-bounce">
+            <UploadCloud className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-1">Drop files here to attach</h3>
+          <p className="text-xs text-slate-300">Images, PDFs, documents, text, code, or attachments</p>
+        </div>
+      )}
+
       {/* Scrollable Chat Feed */}
       <div 
         ref={chatContainerRef} 
@@ -818,10 +899,12 @@ export default function ChatPanel({ activeSessionId, onSessionCreated, initialPr
 
             <textarea
               ref={textareaRef}
+              autoFocus
               rows={1}
               placeholder={isListening ? 'Listening to your voice...' : 'Message Personal Assistant...'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onPaste={handlePaste}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();

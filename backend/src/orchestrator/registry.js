@@ -4,7 +4,6 @@
 
 import { rdsQueryTool } from '../tools/rdsQuery.js';
 import { createPrebuiltFormTool } from '../tools/prebuiltFormTools.js';
-import { integrateMcpServerTool } from '../tools/mcpIntegrationTool.js';
 import { getCurrentTimeTool } from '../tools/dateTimeTool.js';
 import { imageProcessorTool } from '../tools/imageProcessorTool.js';
 import { attachmentProcessorTool } from '../tools/attachmentProcessorTool.js';
@@ -26,7 +25,6 @@ class ToolRegistry {
 		// Register core local tools
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
 		this.tools.set(createPrebuiltFormTool.definition.name, createPrebuiltFormTool);
-		this.tools.set(integrateMcpServerTool.definition.name, integrateMcpServerTool);
 		this.tools.set(getCurrentTimeTool.definition.name, getCurrentTimeTool);
 		this.tools.set(imageProcessorTool.definition.name, imageProcessorTool);
 		this.tools.set(attachmentProcessorTool.definition.name, attachmentProcessorTool);
