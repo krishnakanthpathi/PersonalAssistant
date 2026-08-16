@@ -3,7 +3,7 @@ import path from 'path';
 import axios from 'axios';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import { optimizeImageForVision } from '../utils/mediaProcessor.js';
+import { optimizeImageForVision, parsePdfText } from '../utils/mediaProcessor.js';
 
 /**
  * GLM-OCR Task Trigger Prefix Mapping
@@ -150,6 +150,28 @@ export const glmOcrTool = {
 
 				fileName = path.basename(resolvedPath);
 				const rawBuffer = fs.readFileSync(resolvedPath);
+
+				// If the file is a PDF document, extract text directly
+				if (resolvedPath.toLowerCase().endsWith('.pdf')) {
+					logger.info(`Extracting text from PDF document: ${fileName}...`);
+					const pdfText = await parsePdfText(rawBuffer);
+					const latencyMs = Date.now() - startTime;
+					return {
+						success: true,
+						model: 'pdf-parse',
+						taskType: resolvedTask,
+						taskPrefix: prefix,
+						fileName,
+						filePath: resolvedPath,
+						extractedText: pdfText,
+						characterCount: pdfText.length,
+						wordCount: pdfText.trim().split(/\s+/).filter(Boolean).length,
+						format,
+						imageOptimized: false,
+						latencyMs,
+						processedAt: new Date().toISOString()
+					};
+				}
 
 				// Automatically optimize high-res images (max 1600px, JPEG quality 85)
 				const optimized = await optimizeImageForVision(rawBuffer, 1600);

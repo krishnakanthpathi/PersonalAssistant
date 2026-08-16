@@ -2,9 +2,9 @@
 type: tool_group
 title: MCP Server - memorize
 description: Integrated MCP server providing tools for memory storage, remembering notes and preferences, recalling info, saving, and searching memories.
-tags: [memorize, store, update, delete, fetch, hybrid, list, memories, get, categories, remember, recall, save, note, notes, forget, retrieve, know, preference, preferences, knowledge, find, lookup, keep, mind, memory]
-tools: [store, update, delete, fetch, hybrid_fetch, list_memories, get_categories]
-timestamp: 2026-08-16T14:38:17.677Z
+tags: [memorize, store, update, delete, fetch, hybrid, list, memories, get, categories, merge, find, correlated, organize, memory, remember, recall, save, note, notes, forget, retrieve, know, preference, preferences, knowledge, lookup, keep, mind]
+tools: [store, update, delete, fetch, hybrid_fetch, list_memories, get_categories, merge_memories, find_correlated_memories, organize_memory]
+timestamp: 2026-08-16T16:47:25.525Z
 ---
 
 # MCP Server - memorize
@@ -112,4 +112,34 @@ Categories:
 - 'integration': MCP servers, API endpoints, webhooks, cloud setup, Tailscale, WSL, Linux server configs, OAuth, CI/CD.
 - 'media': Books, podcasts, audio, video, movies, reading lists, YouTube channels, OCR document scans.
 - 'others': Miscellaneous or temporary reference information that does not fit the above categories.
+
+- **`merge_memories`**: 
+Consolidates multiple correlated memories/notes into a single, cohesive, non-redundant Markdown document using context-safe LLM synthesis.
+Automatically ensures the combined notes do not exceed the LLM context window.
+
+Args:
+    memory_ids: List of 2 or more memory IDs to merge (e.g. ['mem_abc123', 'mem_def456'])
+    target_title: Optional title for the merged master memory (defaults to primary note title)
+    target_category: Optional category name from the taxonomy (e.g. 'development', 'projects')
+    target_tags: Optional list of tags to attach to the merged memory
+    delete_sources: Whether to remove the individual source notes after successful consolidation (default True)
+    instruction: Optional specific guidance for the LLM during consolidation (e.g. 'Focus on LeetCode patterns', 'Merge CLI configs')
+    use_ai: Optional flag to force AI synthesis (True) or deterministic section merge (False). Defaults to global setting.
+
+- **`find_correlated_memories`**: 
+Discovers related/correlated memories for a given note using vector similarity, category matches, and tag overlap.
+Useful for finding candidate notes to merge.
+
+Args:
+    memory_id: The memory ID to find related notes for (e.g. 'mem_abc123')
+    top_k: Number of correlated notes to return (default 5)
+
+- **`organize_memory`**: 
+Polishes, restructures, organizes, or summarizes a single memory note using AI.
+Automatically creates a version snapshot before applying changes so the original can be reverted.
+
+Args:
+    memory_id: The memory ID to organize/polish (e.g. 'mem_abc123')
+    instruction: Optional goal or instruction (e.g. 'Summarize into key takeaways', 'Format as clean API reference')
+    use_ai: Whether to use AI for intelligent restructuring (default True)
 

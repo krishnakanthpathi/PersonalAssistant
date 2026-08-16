@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { parsePdfText, extractVideoFrames, optimizeImageForVision } from '../utils/mediaProcessor.js';
+import { glmOcrTool } from '../tools/glmOcrTool.js';
 import { needsChunking, createSubtaskChunks } from '../orchestrator/chunkManager.js';
 import { SubtaskQueue } from '../orchestrator/subtaskQueue.js';
 
@@ -99,7 +100,7 @@ export const handleChat = async (req, res) => {
 						logger.error(`Error parsing PDF attachment: ${pdfErr.message}`);
 					}
 				}
-				// Image Parsing
+				// Image Parsing & GLM-OCR Text Extraction
 				else if (file.type.startsWith('image/')) {
 					const optimized = await optimizeImageForVision(buffer, 1600);
 					const imgObj = {
@@ -110,6 +111,35 @@ export const handleChat = async (req, res) => {
 					};
 					images.push(imgObj);
 					attachmentMeta.imageData = imgObj;
+
+					// Run GLM-OCR on image attachment
+					try {
+						sendSSE('status', `Running GLM-OCR on image: ${file.name}...`);
+						const ocrStart = Date.now();
+						const ocrResult = await glmOcrTool.execute({
+							filePath,
+							taskType: 'text'
+						});
+						const ocrDuration = Date.now() - ocrStart;
+
+						if (ocrResult.success && ocrResult.extractedText && ocrResult.extractedText.trim()) {
+							attachmentMeta.text = ocrResult.extractedText;
+							attachmentMeta.ocr = ocrResult;
+							enhancedPrompt += `\n\n[OCR Transcribed Content of Image "${file.name}":]\n---\n${ocrResult.extractedText}\n---`;
+
+							attachmentToolExecutions.push({
+								id: `exec-ocr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+								toolName: 'glm_ocr',
+								toolArgs: { filePath, taskType: 'text' },
+								status: 'success',
+								result: ocrResult.extractedText,
+								latency: ocrDuration,
+								timestamp: ocrStart
+							});
+						}
+					} catch (ocrErr) {
+						logger.warn(`GLM-OCR attachment extraction failed for ${file.name}: ${ocrErr.message}`);
+					}
 				}
 				// Video Parsing (Keyframe Extraction)
 				else if (file.type.startsWith('video/')) {
