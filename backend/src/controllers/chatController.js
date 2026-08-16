@@ -7,7 +7,6 @@ import fs from 'fs';
 import { parsePdfText, extractVideoFrames, optimizeImageForVision } from '../utils/mediaProcessor.js';
 import { needsChunking, createSubtaskChunks } from '../orchestrator/chunkManager.js';
 import { SubtaskQueue } from '../orchestrator/subtaskQueue.js';
-import { mediaProcessorTool } from '../tools/mediaProcessorTool.js';
 
 const agent = new Agent();
 const activeSessions = new Map();
@@ -87,27 +86,6 @@ export const handleChat = async (req, res) => {
 					url: staticUrl,
 					path: filePath
 				};
-
-				// Execute process_media tool for live UI feedback & verification
-				const toolExecStart = Date.now();
-				sendSSE('status', `Processing media: ${file.name}...`);
-				const mediaResult = await mediaProcessorTool.execute({
-					filePath,
-					fileName: file.name,
-					fileType: file.type
-				});
-
-				const toolExec = {
-					id: `exec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-					toolName: 'process_media',
-					arguments: { fileName: file.name, filePath: filePath, fileType: file.type },
-					result: mediaResult.success ? JSON.stringify(mediaResult, null, 2) : `[ERROR]: ${mediaResult.error}`,
-					status: mediaResult.success ? 'success' : 'failed',
-					latency: Date.now() - toolExecStart
-				};
-
-				sendSSE('status', { type: 'tool_execution', data: toolExec });
-				attachmentToolExecutions.push(toolExec);
 
 				// PDF Extraction
 				if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {

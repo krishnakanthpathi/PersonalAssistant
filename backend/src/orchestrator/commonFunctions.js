@@ -119,53 +119,28 @@ export async function prepareMessages(prompt, history, images = []) {
 // ==========================================
 
 export async function callLLM(msgs, includeTools = false, tools = [], requestId = null, onToken = null) {
-	// Determine if we should override using the multimedia model config
-	const hasImages = msgs.some(m => m.images && m.images.length > 0);
-	const useMultimedia = env.USE_MULTIMEDIA_MODEL && hasImages;
-
 	let provider = env.LLM_PROVIDER;
 	let model = '';
 	let baseUrl = '';
 	let apiKey = '';
 
-	if (useMultimedia) {
-		provider = env.MULTIMEDIA_PROVIDER || env.LLM_PROVIDER;
-		if (provider === 'openai') {
-			model = env.MULTIMEDIA_MODEL || env.OPENAI_MODEL;
-			baseUrl = env.MULTIMEDIA_BASE_URL || env.OPENAI_BASE_URL || '';
-			apiKey = env.MULTIMEDIA_API_KEY || env.OPENAI_API_KEY || '';
-		} else if (provider === 'grok') {
-			model = env.MULTIMEDIA_MODEL || env.GROK_MODEL || 'grok-2-1218';
-			baseUrl = env.MULTIMEDIA_BASE_URL || env.GROK_BASE_URL || 'https://api.x.ai/v1';
-			apiKey = env.MULTIMEDIA_API_KEY || env.GROK_API_KEY || '';
-		} else if (provider === 'gemini') {
-			model = (env.MULTIMEDIA_MODEL || env.GEMINI_MODEL || 'gemini-3.6-flash').replace(/^models\//, '');
-			baseUrl = env.MULTIMEDIA_BASE_URL || env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
-			apiKey = env.MULTIMEDIA_API_KEY || env.GEMINI_API_KEY || '';
-		} else if (provider === 'ollama') {
-			model = env.MULTIMEDIA_MODEL || env.OLLAMA_MODEL;
-			baseUrl = env.MULTIMEDIA_BASE_URL || env.OLLAMA_URL;
-		}
-		logger.info(`Using dedicated multimedia model: provider=${provider}, model=${model}`);
-	} else {
-		if (provider === 'openai') {
-			model = env.OPENAI_MODEL;
-			baseUrl = env.OPENAI_BASE_URL || '';
-			apiKey = env.OPENAI_API_KEY || '';
-		} else if (provider === 'grok') {
-			model = env.GROK_MODEL || 'grok-2-1218';
-			baseUrl = env.GROK_BASE_URL || 'https://api.x.ai/v1';
-			apiKey = env.GROK_API_KEY || '';
-		} else if (provider === 'gemini') {
-			model = (env.GEMINI_MODEL || 'gemini-3.6-flash').replace(/^models\//, '');
-			baseUrl = env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
-			apiKey = env.GEMINI_API_KEY || '';
-		} else if (provider === 'ollama') {
-			model = env.OLLAMA_MODEL;
-			baseUrl = env.OLLAMA_URL;
-		}
-		logger.info(`Using standard chat model: provider=${provider}, model=${model}`);
+	if (provider === 'openai') {
+		model = env.OPENAI_MODEL;
+		baseUrl = env.OPENAI_BASE_URL || '';
+		apiKey = env.OPENAI_API_KEY || '';
+	} else if (provider === 'grok') {
+		model = env.GROK_MODEL || 'grok-2-1218';
+		baseUrl = env.GROK_BASE_URL || 'https://api.groq.com/openai/v1';
+		apiKey = env.GROK_API_KEY || '';
+	} else if (provider === 'gemini') {
+		model = (env.GEMINI_MODEL || 'gemini-3.6-flash').replace(/^models\//, '');
+		baseUrl = env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
+		apiKey = env.GEMINI_API_KEY || '';
+	} else if (provider === 'ollama') {
+		model = env.OLLAMA_MODEL;
+		baseUrl = env.OLLAMA_URL;
 	}
+	logger.info(`Using chat model: provider=${provider}, model=${model}`);
 
 	let duration = 0;
 	let promptEvalDuration = 0;

@@ -4,7 +4,7 @@ title: MCP Server - memorize
 description: Integrated MCP server providing tools for memory storage, remembering notes and preferences, recalling info, saving, and searching memories.
 tags: [memorize, store, update, delete, fetch, hybrid, list, memories, get, categories, remember, recall, save, note, notes, forget, retrieve, know, preference, preferences, knowledge, find, lookup, keep, mind, memory]
 tools: [store, update, delete, fetch, hybrid_fetch, list_memories, get_categories]
-timestamp: 2026-08-15T03:54:42.704Z
+timestamp: 2026-08-16T14:38:17.677Z
 ---
 
 # MCP Server - memorize

@@ -5,10 +5,7 @@
 import { rdsQueryTool } from '../tools/rdsQuery.js';
 import { createPrebuiltFormTool } from '../tools/prebuiltFormTools.js';
 import { getCurrentTimeTool } from '../tools/dateTimeTool.js';
-import { imageProcessorTool } from '../tools/imageProcessorTool.js';
-import { attachmentProcessorTool } from '../tools/attachmentProcessorTool.js';
-import { mediaProcessorTool } from '../tools/mediaProcessorTool.js';
-import { ocrTool } from '../tools/ocrTool.js';
+import { glmOcrTool } from '../tools/glmOcrTool.js';
 
 import { mcpManager } from '../mcp/mcpManager.js';
 import { env } from '../config/env.js';
@@ -26,10 +23,7 @@ class ToolRegistry {
 		this.tools.set(rdsQueryTool.definition.name, rdsQueryTool);
 		this.tools.set(createPrebuiltFormTool.definition.name, createPrebuiltFormTool);
 		this.tools.set(getCurrentTimeTool.definition.name, getCurrentTimeTool);
-		this.tools.set(imageProcessorTool.definition.name, imageProcessorTool);
-		this.tools.set(attachmentProcessorTool.definition.name, attachmentProcessorTool);
-		this.tools.set(mediaProcessorTool.definition.name, mediaProcessorTool);
-		this.tools.set(ocrTool.definition.name, ocrTool);
+		this.tools.set(glmOcrTool.definition.name, glmOcrTool);
 	}
 
 	// Dynamic, asynchronous fetch of all available tools (Local + MCP)
